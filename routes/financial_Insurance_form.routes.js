@@ -8,8 +8,8 @@ const router = express.Router();
 router.post('/create', validateApplication, Controller.createApplication);
 router.get('/list', Controller.getAllApplications);
 router.get('/:id', Controller.getApplicationById);
-router.put('/:id', validateApplication, Controller.updateApplication);
-// router.delete('/:id', Controller.deleteApplication);
+router.put('/:id', validateApplication, Controller.updateApplication); // not tested
+router.delete('/:id', Controller.deleteApplication); // not tested
 
 // // Export
 // router.get('/export', Controller.exportApplications);

@@ -81,3 +81,16 @@ export const updateApplication = async (id, data) => {
         `);
     return res.getApplicationById(id);        
 };
+
+// Delete application
+export const deleteApplication = async (id) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('id', sql.Int, id)
+        .query(`
+            DELETE 
+            FROM sg.financial_insurance_application
+            WHERE application_id = @id
+        `);
+    return { deleted: true};
+}

@@ -46,3 +46,14 @@ export const updateApplication = async (req, res) => {
         return error(res, err.message);
     }
 }
+
+// Delete application
+export const deleteApplication = async (req, res) => {
+    try {
+        await Model.deleteApplication(req.params.id);
+        return success(res, null,'Application deleted successfully.')
+    } catch (err) {
+        console.error("Service Error:",err);
+        return error(res. err.message);
+    }
+};
