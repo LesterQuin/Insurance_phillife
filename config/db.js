@@ -25,3 +25,8 @@ const poolPromise = new sql.ConnectionPool(config)
     });
 
 module.exports = { sql, poolPromise };
+
+
+// git remote add origin https://github.com/LesterQuin/Insurance_phillife.git
+// git branch -M main
+// git push -u origin main
