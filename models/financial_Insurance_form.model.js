@@ -25,3 +25,31 @@ export const createApplication = async (data) => {
         `);
     return res.recordset?.[0] ?? null;
 };
+
+// Get all applications
+export const getAllApplications = async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT fia.*, fis.status_name
+            FROM sg.financial_insurance_application fia
+            JOIN sg.financial_insurance_status fis
+            ON fia.status_id = fis.status_id
+        `);
+    return res.recordset ?? [];
+};
+
+// Get application by ID
+export const getApplicationById = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('id', sql.Int, id)
+        .query(`
+            SELECT fia.*, fis.status_name
+            FROM sg.financial_insurance_application fia
+            JOIN sg.financial_insurance_status fis
+            ON fia.status_id = fis.status_id
+            WHERE fia.application_id = @id
+        `);
+    return res.recordset?.[0] ?? null;
+};

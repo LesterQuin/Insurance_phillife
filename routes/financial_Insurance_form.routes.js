@@ -6,8 +6,8 @@ const router = express.Router();
 
 // CRUD
 router.post('/create', validateApplication, Controller.createApplication);
-// router.get('/list', Controller.getAllApplications);
-// router.get('/:id', Controller.getApplicationById);
+router.get('/list', Controller.getAllApplications);
+router.get('/:id', Controller.getApplicationById);
 // router.put('/:id', validateApplication, Controller.updateApplication);
 // router.delete('/:id', Controller.deleteApplication);
 
