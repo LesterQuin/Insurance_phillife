@@ -3,15 +3,12 @@ import cors from "cors";
 import dotenv from "dotenv";
 //import path from "path";
 
-//import authRoutes from "./routes/user/auth_routes.js";
+import financialInsuranceRoutes from './routes/financial_Insurance_form.routes.js';
 
 
 dotenv.config();
-
 const app = express();
-
 app.use(cors());
-
 app.use(express.json());
 
 // Test endpoint
@@ -20,7 +17,7 @@ app.get("/api/hello", (req, res) => {
 });
 
 // Auth routes
-// app.use("/api/auth", authRoutes);
+app.use('/api/financial-insurance', financialInsuranceRoutes);
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

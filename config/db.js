@@ -1,4 +1,6 @@
-const sql = require('mssql');
+import sql from 'mssql';
+import dotenv from 'dotenv';
+dotenv.config();
 
 const config = {
     user: process.env.DB_USER,
@@ -12,7 +14,7 @@ const config = {
     }
 };
 
-const poolPromise = new sql.ConnectionPool(config)
+export const poolPromise = new sql.ConnectionPool(config)
     .connect()
     .then(pool => {
         console.log('✅ Connected to SQL Server');
@@ -20,12 +22,10 @@ const poolPromise = new sql.ConnectionPool(config)
     })
     .catch(err => {
         console.error('❌ Database Connection Failed:', err);
-        // throw to prevent app from running without DB connection
         throw err;
     });
 
-module.exports = { sql, poolPromise };
-
+export { sql };
 
 // git remote add origin https://github.com/LesterQuin/Insurance_phillife.git
 // git branch -M main
