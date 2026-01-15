@@ -35,3 +35,14 @@ export const getApplicationById = async (req, res) => {
         return error(res, err.message);
     }
 };
+
+// Update application
+export const updateApplication = async (req, res) => {
+    try {
+        const updated = await Model.updateApplication(req,params.id, req.body);
+        return success(res, updated, 'Application updated successfully.')
+    } catch (err) {
+        console.error("Service Error:", err);
+        return error(res, err.message);
+    }
+}
