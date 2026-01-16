@@ -28,3 +28,18 @@ export const createBusinessType = async (req, res) => {
         });
     }
 };
+
+// GET ALL
+export const getAllBusinessTypes = async (req, res) => {
+    try {
+        const data = await Model.getAll();
+        res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:", err);
+        res.status(500).json({ 
+            error: err.message 
+        });
+    }
+}

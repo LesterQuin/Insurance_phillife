@@ -21,3 +21,15 @@ export const getByName = async (name) => {
         .query(`SELECT * FROM sg.financial_insurance_business_types WHERE LOWER(name) = LOWER(@name)`);
     return result.recordset[0];
 };
+
+// GET ALL
+export const getAll = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_business_types
+            ORDER BY business_type_id
+        `);
+    return result.recordset;
+}

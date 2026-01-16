@@ -4,5 +4,6 @@ import * as Controller from "../../controllers/business_type/business_type.contr
 const router = express.Router();
 
 router.post("/", Controller.createBusinessType);
+router.get("/", Controller.getAllBusinessTypes);
 
 export default router;
