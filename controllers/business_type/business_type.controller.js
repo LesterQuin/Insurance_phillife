@@ -61,3 +61,36 @@ export const  getBusinessTypeById = async (req, res) => {
         });
     }
 }
+
+// UPDATE
+export const updateBusinessType = async (req, res) => {
+    try {
+        const { name } =req.body;
+        const id = req.params.id;
+
+        if (!name || name.trim() === "") return res.status(400).json({
+            message: "name was required."
+        });
+
+        const duplicate = await Model.getByName(name.trim());
+        if (duplicate && duplicate.business_type_id != id) {
+            return res.status(400).json({
+                message: "This name already exists."
+            });
+        }
+
+        const updated = await Model.update(id, name.trim());
+        if (!updated) return res.status(404).json({
+            message: "Not found."
+        })
+        res.json({
+            message: "Updated successfully.",
+            data: updated
+        });
+    } catch (err) {
+        console.error("Service Error:", err);
+        res.status(500).json({ 
+            error: err.message 
+        });
+    }
+}

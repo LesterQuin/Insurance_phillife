@@ -6,4 +6,5 @@ const router = express.Router();
 router.post("/", Controller.createBusinessType);
 router.get("/", Controller.getAllBusinessTypes);
 router.get("/:id", Controller.getBusinessTypeById);
+router.put("/:id", Controller.updateBusinessType)
 export default router;

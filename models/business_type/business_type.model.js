@@ -46,3 +46,18 @@ export const getById = async (id) => {
         `);
     return result.recordset[0];
 };
+
+// UPDATE
+export const update = async (id, name) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input("id", sql.Int, id)
+        .input("name", sql. VarChar, name)
+        .query(`
+            UPDATE sg.financial_insurance_business_types
+            SET name = @name
+            OUTPUT INSERTED.*
+            WHERE business_type_id = @id
+        `);
+    return result.recordset[0];
+};
