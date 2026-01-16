@@ -4,7 +4,7 @@ import dotenv from "dotenv";
 //import path from "path";
 
 import financialInsuranceRoutes from './routes/financial_Insurance_form.routes.js';
-import groupClassificationRoutes from './routes/group_Classification.routes.js'
+import groupClassificationRoutes from './routes/group_classification/group_Classification.routes.js'
 
 dotenv.config();
 const app = express();

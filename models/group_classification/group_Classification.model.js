@@ -1,4 +1,4 @@
-import { sql, poolPromise } from "../config/db.js"
+import { sql, poolPromise } from "../../config/db.js"
 
 // CREATE
 export const create = async (name) => {

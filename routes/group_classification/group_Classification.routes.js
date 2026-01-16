@@ -1,5 +1,5 @@
 import express from "express";
-import * as Controller from '../controllers/group_Classification.controller.js';
+import * as Controller from '../../controllers/group_classification/group_Classification.controller.js';
 
 const router = express.Router();
 

@@ -1,4 +1,4 @@
-import * as GroupModel from "../models/group_Classification.model.js";
+import * as GroupModel from "../../models/group_classification/group_Classification.model.js";
 
 // CREATE
 export const createClassification = async (req, res) => {
