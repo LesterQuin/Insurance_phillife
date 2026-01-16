@@ -11,7 +11,7 @@ export const createClassification = async (req, res) => {
             });
         }
         // Duplicate check
-        const duplicate = await GroupModel.geByName(name.trim());
+        const duplicate = await GroupModel.getByName(name.trim());
         if (duplicate) return res.status(400).json({
             message: "This name already exist."
         });
