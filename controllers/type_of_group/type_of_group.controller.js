@@ -25,4 +25,19 @@ export const createGroupType = async (req, res) => {
             error: err.message
         });
     }
+};
+
+// GET ALL
+export const getAllGroupTypes = async (req, res) => {
+    try {
+        const data = await Model.getAll();
+        res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
 }

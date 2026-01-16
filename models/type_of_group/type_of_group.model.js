@@ -27,3 +27,15 @@ export const getByName = async (name) => {
         `);
     return res.recordset[0];
 };
+
+// GET ALL
+export const getAll =async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_typesof_group
+            ORDER BY parent_id, group_type_id
+        `);
+    return res.recordset;
+};
