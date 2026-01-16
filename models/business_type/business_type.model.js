@@ -33,3 +33,16 @@ export const getAll = async () => {
         `);
     return result.recordset;
 }
+
+// GET by ID
+export const getById = async (id) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_business_types
+            WHERE business_type_id = @id
+        `);
+    return result.recordset[0];
+};

@@ -43,3 +43,21 @@ export const getAllBusinessTypes = async (req, res) => {
         });
     }
 }
+
+// GET by ID
+export const  getBusinessTypeById = async (req, res) => {
+    try {
+        const data = await Model.getById(req.params.id);
+        if (!data) return res.status(404).json({
+            message: "Not found."
+        });
+        res.json({
+            data
+        })
+    } catch (err) {
+        console.error("Service Error:", err);
+        res.status(500).json({ 
+            error: err.message 
+        });
+    }
+}
