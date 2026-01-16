@@ -61,3 +61,16 @@ export const update = async (id, name) => {
         `);
     return result.recordset[0];
 };
+
+// DELETE
+export const remove = async (id) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            DELETE FROM sg.financial_insurance_business_types
+            OUTPUT DELETED.*
+            WHERE business_type_id = @id
+        `);
+    return result.recordset[0];
+};
