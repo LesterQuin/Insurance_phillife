@@ -5,5 +5,6 @@ const router = express.Router();
 
 router.post("/", Controller.createGroupType);
 router.get("/", Controller.getAllGroupTypes);
+router.get("/:id", Controller.getGroupTypeById);
 
 export default router;

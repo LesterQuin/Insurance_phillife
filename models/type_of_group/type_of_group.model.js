@@ -39,3 +39,16 @@ export const getAll =async () => {
         `);
     return res.recordset;
 };
+
+// GET BY ID
+export const getById = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            SELECT * 
+            FROM sg.financial_insurance_typeof_groupd
+            WHERE group_type_id = @id
+        `);
+    return res.recordset[0];
+};
