@@ -98,4 +98,24 @@ export const updateClassification = async (req, res) => {
             error: err.message
         });
     }
+};
+
+// DELETE
+export const deleteClassification = async (req, res) => {
+    try {
+        const deletedRecord = await GroupModel.remove(req.params.id)
+        if (!deletedRecord) return res.status(404).json({
+            message: "Not Found."
+        });
+
+        res.json({
+            message: "Deleted successfully.",
+            data: deletedRecord
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
 }

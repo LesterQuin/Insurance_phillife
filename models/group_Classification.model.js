@@ -66,3 +66,19 @@ export const update = async (classification_id, name) => {
         `);
     return result.recordset[0];
 };
+
+// DELETE
+export const remove = async (classification_id) => {
+    const pool = await poolPromise;
+
+    const recordToDelete = await getById(classification_id);
+    if (!recordToDelete) return null;
+
+    await pool.request()
+        .input("classification_id", sql.Int, classification_id)
+        .query(`
+            DELETE FROM sg.financial_insurance_group_classifications
+            WHERE classification_id = @classification_id
+        `);
+    return recordToDelete;
+};
