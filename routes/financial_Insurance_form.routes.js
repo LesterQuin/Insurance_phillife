@@ -11,7 +11,4 @@ router.get('/:id', Controller.getApplicationById);
 router.put('/:id', validateApplication, Controller.updateApplication); // not tested
 router.delete('/:id', Controller.deleteApplication); // not tested
 
-// // Export
-// router.get('/export', Controller.exportApplications);
-
 export default router;
