@@ -60,3 +60,54 @@ export const getGroupTypeById = async (req, res) => {
         });
     }
 }
+
+// UPDATE
+export const updateGroupType = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { name, parent_id } = req.body;
+
+        if (!name || name.trim() === "") return res.status(400).json({
+            message: "Name is required."
+        });
+
+        const duplicate = await Model.getByName(name.trim());
+        if (duplicate && duplicate.group_type_id != id)
+            return res.status(400).json({
+                message: "This name already exist."
+        });
+
+        const updated = await Model.update(id, name.trim(), parent_id || null);
+        if (!updated) return res.status(404).json({
+            message: "Not Found."
+        });
+        res.json({
+            message: "Updated successfully.",
+            data: updated
+        })
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+}
+
+// DELETE
+export const deleteGroupType = async (req, res) => {
+    try {
+        const deleted = await Model.remove(req.params.id);
+        if (!deleted) return res.status(404).json({
+            message: "Not Found."
+        });
+        res.json({
+            message: "Deleted successfully.",
+            data: deleted
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+}
