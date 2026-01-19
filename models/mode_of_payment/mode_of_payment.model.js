@@ -50,3 +50,18 @@ export const getByName = async (name) => {
         `);
     return res.recordset[0];
 };
+
+// UPDATE
+export const update = async (id, name) => {
+    const pool = await poolPromise
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .input("name", sql.VarChar, name)
+        .query(`
+            UPDATE sg.financial_insurance_payment_modes
+            SET name = @name
+            OUTPUT INSERTED.*
+            WHERE payment_mode_id = @id
+        `)
+    return res.recordset[0];
+};

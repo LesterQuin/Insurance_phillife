@@ -6,5 +6,6 @@ const router = express.Router();
 router.post("/", Controller.createPaymentMode);
 router.get("/", Controller.getAllPaymentModes);
 router.get("/:id", Controller.getPaymentModeById);
+router.put("/:id", Controller.updatePaymentMode);
 
 export default router;
