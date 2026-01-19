@@ -65,3 +65,16 @@ export const update = async (id, name) => {
         `)
     return res.recordset[0];
 };
+
+// DELETE 
+export const remove = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            DELETE FROM sg.financial_insurance_payment_modes
+            OUTPUT DELETED.*
+            WHERE payment_mode_id = @id
+        `);
+    return res.recordset[0];
+};

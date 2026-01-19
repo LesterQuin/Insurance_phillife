@@ -7,5 +7,6 @@ router.post("/", Controller.createPaymentMode);
 router.get("/", Controller.getAllPaymentModes);
 router.get("/:id", Controller.getPaymentModeById);
 router.put("/:id", Controller.updatePaymentMode);
+router.delete("/:id", Controller.deletePaymentMode);
 
 export default router;
