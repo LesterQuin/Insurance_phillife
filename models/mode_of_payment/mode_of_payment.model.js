@@ -32,7 +32,7 @@ export const getById = async (id) => {
         .input("id", sql.Int, id)
         .query(`
             SELECT * 
-            FROM sg.financial_isurance_payment_modes
+            FROM sg.financial_insurance_payment_modes
             WHERE payment_mode_id = @id
         `);
     return res.recordset[0];

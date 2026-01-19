@@ -44,4 +44,22 @@ export const getAllPaymentModes = async (req, res) => {
             error: err.message
         });
     }
-}
+};
+
+// GET BY ID
+export const getPaymentModeById = async (req, res) => {
+    try {
+        const data = await Model.getById(req.params.id);
+        if (!data) return res.status(404).json({
+            message: "Not Found."
+        });
+        res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};
