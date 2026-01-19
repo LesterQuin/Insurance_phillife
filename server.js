@@ -7,6 +7,7 @@ import financialInsuranceRoutes from './routes/financial_Insurance_form.routes.j
 import groupClassificationRoutes from './routes/group_classification/group_Classification.routes.js'
 import businessTypeRoutes from './routes/business_type/business_type.routes.js'
 import groupTypeRoutes from './routes/type_of_group/type_of_group.routes.js'
+import paymentModeRoutes from './routes/mode_of_payment/mode_of_payment.routes.js'
 
 dotenv.config();
 const app = express();
@@ -25,7 +26,9 @@ app.use('/api/group-classification', groupClassificationRoutes)
 // business type
 app.use("/api/business-types", businessTypeRoutes);
 // Groupe type
-app.use("/api/typeof-group", groupTypeRoutes)
+app.use("/api/typeof-group", groupTypeRoutes);
+// Type of payment
+app.use("/api/payment-modes", paymentModeRoutes);
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
