@@ -85,3 +85,22 @@ export const updatePlan = async (req, res) => {
         });
     }
 };
+
+export const deletePlan = async (req, res) => {
+    try {
+        const deleted = await Model.deletePlan(req.params.id);
+        if (!deleted) return res.status(404).json({
+            message: "Not Found."
+        });
+
+        res.json({
+            message: "Deleted successfully",
+            data: deleted
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};

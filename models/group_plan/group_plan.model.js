@@ -67,3 +67,17 @@ export const updatePlan = async (id, name) => {
         `);
     return res.recordset[0];
 };
+
+// DELETE
+export const deletePlan = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            DELETE 
+            FROM sg.financial_insurance_plans
+            OUTPUT DELETED.*
+            WHERE plan_id = @id
+        `);
+    return res.recordset[0];
+};

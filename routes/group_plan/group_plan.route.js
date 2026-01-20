@@ -6,5 +6,6 @@ router.post("/", Controller.createPlan);
 router.get("/", Controller.getAllPlans);
 router.get("/:id", Controller.getPlanById);
 router.put("/:id", Controller.updatePlan);
+router.delete("/:id", Controller.deletePlan);
 
 export default router;
