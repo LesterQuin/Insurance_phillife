@@ -52,3 +52,18 @@ export const getPlanById = async (id) => {
         `);
     return res.recordset[0];
 };
+
+// UPDATE
+export const updatePlan = async (id, name) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .input("name", sql.VarChar, name)
+        .query(`
+            UPDATE sg.financial_insurance_plans
+            SET name = @name
+            OUTPUT INSERTED.*
+            WHERE plan_id = @id
+        `);
+    return res.recordset[0];
+};
