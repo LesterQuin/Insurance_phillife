@@ -24,3 +24,17 @@ export const createPlan = async (req, res) => {
         });
     }
 }
+
+export const getAllPlans = async (req, res) => {
+    try {
+        const data = await Model.getAllPlans();
+        res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+}

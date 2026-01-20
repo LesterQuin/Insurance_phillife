@@ -27,3 +27,15 @@ export const getPlanByName = async (name) => {
 
     return res.recordset?.[0] || null;
 };
+
+// GET ALl
+export const getAllPlans = async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_plans
+            ORDER BY plan_id
+        `);
+    return res.recordset;
+};
