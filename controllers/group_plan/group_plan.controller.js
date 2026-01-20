@@ -23,11 +23,28 @@ export const createPlan = async (req, res) => {
             error: err.message
         });
     }
-}
+};
 
 export const getAllPlans = async (req, res) => {
     try {
         const data = await Model.getAllPlans();
+        res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};
+
+export const getPlanById = async (req, res) => {
+    try {
+        const data = await Model.getPlanById(req.params.id);
+        if (!data) return res.status(400).json({
+            message: "Not Found"
+        });
         res.json({
             data
         });

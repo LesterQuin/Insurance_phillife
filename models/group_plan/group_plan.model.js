@@ -39,3 +39,16 @@ export const getAllPlans = async () => {
         `);
     return res.recordset;
 };
+
+// GET BY ID
+export const getPlanById = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_plans
+            WHERE plan_id = @id
+        `);
+    return res.recordset[0];
+};
