@@ -9,7 +9,7 @@ import businessTypeRoutes from './routes/business_type/business_type.routes.js'
 import groupTypeRoutes from './routes/type_of_group/type_of_group.routes.js'
 import paymentModeRoutes from './routes/mode_of_payment/mode_of_payment.routes.js'
 import groupPlanRoutes from './routes/group_plan/group_plan.route.js'
-//import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
+import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
 
 dotenv.config();
 const app = express();
@@ -34,7 +34,7 @@ app.use("/api/payment-modes", paymentModeRoutes);
 // Group plans
 app.use("/api/group-plans", groupPlanRoutes);
 // Group riders
-//app.use("/api/group-riders", groupRiderRoutes);
+app.use("/api/group-riders", groupRiderRoutes);
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
