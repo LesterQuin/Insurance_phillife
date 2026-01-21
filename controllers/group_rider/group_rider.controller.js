@@ -88,3 +88,22 @@ export const updateRider = async (req, res) => {
         });
     }
 };
+
+export const deleteRider = async (req, res) => {
+    try {
+        const deleted = await Model.deleteRider(parseInt(req.params.id));
+        if (!deleted) return res.status(404).json({
+            message: "Not found."
+        });
+        
+        return res.json({
+            message: "Deleted successfully.",
+            data: deleted
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+}

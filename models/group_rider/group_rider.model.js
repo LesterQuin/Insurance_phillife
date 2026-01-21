@@ -70,3 +70,18 @@ export const updateRider = async (id, name) => {
 
     return res.recordset[0] || null;
 };
+
+// DELETE
+export const deleteRider = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            DELETE 
+            FROM sg.financial_insurance_riders
+            OUTPUT DELETED.*
+            WHERE rider_id = @id
+        `);
+
+    return res.recordset[0] || null;
+};
