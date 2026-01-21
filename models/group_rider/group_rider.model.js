@@ -27,3 +27,16 @@ export const getRiderByName = async (name) => {
 
     return res.recordset[0] || null;
 };
+
+// GET ALL
+export const getAllRiders = async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_riders
+            ORDER BY rider_id
+        `);
+
+    return res.recordset;
+};

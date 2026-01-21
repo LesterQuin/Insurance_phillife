@@ -26,3 +26,17 @@ export const createRider = async (req, res) => {
         });
     }
 }
+
+export const getAllRiders =async (req ,res) => {
+    try {
+        const data = await Model.getAllRiders();
+        return res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};
