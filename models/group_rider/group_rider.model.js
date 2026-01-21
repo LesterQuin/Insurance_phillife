@@ -40,3 +40,17 @@ export const getAllRiders = async () => {
 
     return res.recordset;
 };
+
+// GET BY ID
+export const getRiderById = async (id) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .query(`
+            SELECT *
+            FROM sg.financial_insurance_riders
+            WHERE rider_id = @id
+        `);
+    
+    return res.recordset[0] || null;
+};

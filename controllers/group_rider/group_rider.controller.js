@@ -40,3 +40,20 @@ export const getAllRiders =async (req ,res) => {
         });
     }
 };
+
+export const getRiderById = async (req, res) => {
+    try {
+        const data = await Model.getRiderById(parseInt(req.params.id));
+        if (!data) return res.status(404).json({
+            message: "Not found."
+        });
+        return res.json({
+            data
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};
