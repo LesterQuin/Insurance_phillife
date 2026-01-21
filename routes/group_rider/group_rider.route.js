@@ -6,5 +6,6 @@ const router = express.Router();
 router.post("/", Controller.createRider);
 router.get("/", Controller.getAllRiders);
 router.get("/:id", Controller.getRiderById);
+router.put("/:id", Controller.updateRider);
 
 export default router;

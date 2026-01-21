@@ -54,3 +54,19 @@ export const getRiderById = async (id) => {
     
     return res.recordset[0] || null;
 };
+
+// UPDATE
+export const updateRider = async (id, name) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input("id", sql.Int, id)
+        .input("name", sql.VarChar, name)
+        .query(`
+            UPDATE sg.financial_insurance_riders
+            SET name = @name
+            OUTPUT INSERTED.*
+            WHERE rider_id = @id
+        `);
+
+    return res.recordset[0] || null;
+};

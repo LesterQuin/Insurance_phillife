@@ -57,3 +57,34 @@ export const getRiderById = async (req, res) => {
         });
     }
 };
+
+export const updateRider = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        const { name } = req.body;
+        if (!name || name.trim() === "") return res.status(400).json({
+            message: "Name is required."
+        });
+
+        const trimmedName = name.trim();
+        const duplicate = await Model.getRiderByName(trimmedName);
+        if (duplicate && duplicate.rider_id !== id) return res.status(400).json({
+            message: "This riders is already exists."
+        });
+
+        const updated = await Model.updateRider(id, trimmedName);
+        if (!updated) return res.status(404).json({
+            message: "Not found."
+        });
+
+        return res.json({
+            message: "Updated successfully.",
+            data: updated
+        });
+    } catch (err) {
+        console.error("Service Error:",err);
+        res.status(500).json({
+            error: err.message
+        });
+    }
+};
