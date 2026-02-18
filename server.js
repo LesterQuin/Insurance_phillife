@@ -11,6 +11,7 @@ import paymentModeRoutes from './routes/mode_of_payment/mode_of_payment.routes.j
 import groupPlanRoutes from './routes/group_plan/group_plan.route.js'
 import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
 import accidentPlanRoutes from './routes/accident_plan/accident_plan.routes.js'
+import userRoutes from './routes/user/user_route.js'
 
 dotenv.config();
 const app = express();
@@ -38,6 +39,8 @@ app.use("/api/group-plans", groupPlanRoutes);
 app.use("/api/group-riders", groupRiderRoutes);
 // Accident plans
 app.use("/api/accident-plan", accidentPlanRoutes)
+// User
+app.use("/api/user", userRoutes)
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
