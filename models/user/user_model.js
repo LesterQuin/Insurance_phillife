@@ -124,3 +124,15 @@ export const clearTokens = async (userId) => {
             WHERE user_id = @userId
         `);
 }
+
+// Fetch valid IDs from lookup table based on category
+export const getValidLookupIds = async (category) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('category', sql.VarChar, category)
+        .query(`
+            SELECT id FROM DHUB.sg.financial_insurance_system_lookups
+            WHERE category = @category AND is_active = 1
+        `);
+    return result.recordset.map(row => row.id);
+}

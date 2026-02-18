@@ -19,6 +19,14 @@ const transporter = nodemailer.createTransport({
     debug: true      
 });
 
+// Cookie options
+const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+};
+
 // Helper: generate random OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -30,33 +38,21 @@ export const register = async (req, res) => {
             lastname,
             email,
             agent_code,
-            role_id,        // ← add this
+            role_id,
             department_id,
             location_id,
             phoneNumber
         } = req.body;
 
+        // Validation is now handled by middleware
+        // Clean up the data
         agent_code = agent_code?.trim() || null;
         phoneNumber = phoneNumber?.trim() || null;
-        role_id = role_id ? Number(role_id) : 1;       // default role
+        role_id = role_id ? Number(role_id) : 1;
         department_id = department_id ? Number(department_id) : null;
         location_id = location_id ? Number(location_id) : null;
 
-        if (!firstname || !lastname || !email || !role_id) {
-            return res.status(400).json({
-                status: false,
-                message: "Missing required fields"
-            });
-        }
-
-        const emailRegex = /^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i;
-        if (!emailRegex.test(email)) {
-            return res.status(400).json({
-                status: false,
-                message: "Invalid domain address"
-            });
-        }
-
+        // Check if email already exists
         const existing = await User.getUserByEmail(email);
         if (existing) {
             return res.status(400).json({
@@ -71,7 +67,7 @@ export const register = async (req, res) => {
             lastname,
             email,
             agent_code,
-            role_id,        // ← now included
+            role_id,
             department_id,
             location_id,
             phoneNumber
@@ -107,15 +103,9 @@ export const login = async (req, res) => {
     try {
         const { email, password, newPassword } = req.body;
 
-        // 1️⃣ Check required fields
-        if (!email || !password) {
-            return res.status(400).json({
-                status: false,
-                message: "Email and password required."
-            });
-        }
-
-        // 2️⃣ Fetch user from DB
+        // Validation is now handled by middleware
+        
+        // Fetch user from DB
         const user = await User.getUserByEmail(email);
         if (!user) {
             return res.status(401).json({
@@ -124,7 +114,7 @@ export const login = async (req, res) => {
             });
         }
 
-        // 3️⃣ Compare password
+        // Compare password
         const valid = await bcrypt.compare(password, user.password_hash);
         if (!valid) {
             return res.status(401).json({
@@ -133,7 +123,7 @@ export const login = async (req, res) => {
             });
         }
 
-        // 4️⃣ Handle first-time login / mustChangePassword
+        // Handle first-time login / mustChangePassword
         if (user.mustChangePassword) {
             if (!newPassword) {
                 return res.status(403).json({
@@ -145,11 +135,11 @@ export const login = async (req, res) => {
             await User.updatePassword(email, newPassword);
         }
 
-        // 5️⃣ Generate OTP and save to DB
+        // Generate OTP and save to DB
         const otp = generateOTP();
         await User.saveOTP(user.user_id, otp);
 
-        // 6️⃣ Send OTP email
+        // Send OTP email
         await transporter.sendMail({
             from: `"Insurance System" <${process.env.SMTP_USER}>`,
             to: email,
@@ -157,7 +147,7 @@ export const login = async (req, res) => {
             html: otpTemplate(user.lastname, otp)
         });
 
-        // 7️⃣ Return response
+        // Return response
         res.json({
             status: true,
             message: 'OTP sent to your email.'
@@ -177,13 +167,16 @@ export const login = async (req, res) => {
 export const verifyOTP = async (req, res) => {
     try {
         const { email, otp } = req.body;
+        
+        // Validation is now handled by middleware
+        
         const user = await User.getUserByEmail(email);
         if (!user) return res.status(404).json({
             status: false,
             message: 'User not found.'
         });
 
-        const valid = await User.verifyOTP(user.user_id, otp); // fixed typo here
+        const valid = await User.verifyOTP(user.user_id, otp);
         if (!valid) return res.status(401).json({
             status: false,
             message: 'Invalid or expired OTP.'
@@ -194,9 +187,10 @@ export const verifyOTP = async (req, res) => {
         const payload = { userId: user.user_id, email: user.email, role_id: user.role_id };
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
         const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
-        const accessTokenExpiry = new Date(Date.now() + 8 * 60 * 60 * 1000); // fixed DataTransfer → Date
 
-        await User.saveTokens(user.user_id, accessToken, refreshToken, accessTokenExpiry);
+        // Set tokens in cookies instead of database
+        res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 }); // 8 hours
+        res.cookie('refreshToken', refreshToken, cookieOptions); // 7 days
 
         res.json({
             status: true,
@@ -218,11 +212,28 @@ export const verifyOTP = async (req, res) => {
 export const resendOTP = async (req, res) => {
     try {
         const { email } = req.body;
+        
+        // Validation is now handled by middleware
+        
         const user = await User.getUserByEmail(email);
         if (!user) return res.status(404).json({
             status: false,
             message: 'User not found.'
         });
+
+        // Check if user is already logged in (check cookies)
+        const accessToken = req.cookies.accessToken;
+        if (accessToken) {
+            try {
+                jwt.verify(accessToken, process.env.JWT_SECRET);
+                return res.status(400).json({
+                    status: false,
+                    message: 'User is already logged in.'
+                });
+            } catch (err) {
+                // Token is invalid/expired, proceed with resend
+            }
+        }
 
         const otp = generateOTP();
         await User.saveOTP(user.user_id, otp);
@@ -251,6 +262,9 @@ export const resendOTP = async (req, res) => {
 export const resetPassword = async (req, res) => {
     try {
         const { email, newPassword } = req.body;
+        
+        // Validation is now handled by middleware
+        
         await User.updatePassword(email, newPassword);
         res.json({
             status: true,
@@ -269,12 +283,19 @@ export const resetPassword = async (req, res) => {
 export const logout = async (req, res) => {
     try {
         const { email } = req.body;
+        
+        // Validation is now handled by middleware
+        
         const user = await User.getUserByEmail(email);
         if (!user) return res.status(404).json({
             status: false,
             message: 'User not found.'
         });
-        await User.clearTokens(user.user_id);
+        
+        // Clear cookies instead of database tokens
+        res.clearCookie('accessToken');
+        res.clearCookie('refreshToken');
+        
         res.json({
             status: true,
             message: 'Logged out successfully.'
@@ -291,7 +312,18 @@ export const logout = async (req, res) => {
 
 export const refreshToken = async (req, res) => {
     try {
-        const { refreshToken } = req.body;
+        // Get refresh token from cookie or body
+        const refreshTokenFromCookie = req.cookies.refreshToken;
+        const refreshTokenFromBody = req.body.refreshToken;
+        const refreshToken = refreshTokenFromCookie || refreshTokenFromBody;
+
+        if (!refreshToken) {
+            return res.status(401).json({
+                status: false,
+                message: 'Refresh token required'
+            });
+        }
+
         const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
         const user = await User.getUserByEmail(payload.email);
         if (!user) return res.status(404).json({
@@ -303,17 +335,15 @@ export const refreshToken = async (req, res) => {
             userId: user.user_id,
             email: user.email
         }, 
-            process.env.JWT_SECRET,{
+            process.env.JWT_SECRET, {
             expiresIn: '8h'
         });
-        const accessTokenExpiry = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
-        await User.saveTokens(
-            user.user_id,
-            newAccessToken,
-            refreshToken,
-            accessTokenExpiry
-        );
+        // Set new access token in cookie
+        res.cookie('accessToken', newAccessToken, { 
+            ...cookieOptions, 
+            maxAge: 8 * 60 * 60 * 1000 
+        });
 
         res.json({
             status: true,
