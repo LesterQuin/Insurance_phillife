@@ -45,7 +45,6 @@ export const register = async (req, res) => {
         } = req.body;
 
         // Validation is now handled by middleware
-        // Clean up the data
         agent_code = agent_code?.trim() || null;
         phoneNumber = phoneNumber?.trim() || null;
         role_id = role_id ? Number(role_id) : 1;
@@ -104,7 +103,6 @@ export const login = async (req, res) => {
         const { email, password, newPassword } = req.body;
 
         // Validation is now handled by middleware
-        
         // Fetch user from DB
         const user = await User.getUserByEmail(email);
         if (!user) {
@@ -147,7 +145,6 @@ export const login = async (req, res) => {
             html: otpTemplate(user.lastname, otp)
         });
 
-        // Return response
         res.json({
             status: true,
             message: 'OTP sent to your email.'
@@ -169,7 +166,6 @@ export const verifyOTP = async (req, res) => {
         const { email, otp } = req.body;
         
         // Validation is now handled by middleware
-        
         const user = await User.getUserByEmail(email);
         if (!user) return res.status(404).json({
             status: false,
@@ -213,8 +209,7 @@ export const resendOTP = async (req, res) => {
     try {
         const { email } = req.body;
         
-        // Validation is now handled by middleware
-        
+        // Validation is now handled by middleware      
         const user = await User.getUserByEmail(email);
         if (!user) return res.status(404).json({
             status: false,
@@ -264,7 +259,6 @@ export const resetPassword = async (req, res) => {
         const { email, newPassword } = req.body;
         
         // Validation is now handled by middleware
-        
         await User.updatePassword(email, newPassword);
         res.json({
             status: true,
@@ -285,7 +279,6 @@ export const logout = async (req, res) => {
         const { email } = req.body;
         
         // Validation is now handled by middleware
-        
         const user = await User.getUserByEmail(email);
         if (!user) return res.status(404).json({
             status: false,
