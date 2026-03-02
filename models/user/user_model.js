@@ -2,7 +2,7 @@ import { sql, poolPromise } from "../../config/db.js";
 import bcrypt from "bcryptjs";
 import crypto from 'crypto';
 
-export const createUser = async ({ firstname, middlename, lastname, email, agent_code, role_id, location_id, department_id, phoneNumber }) => {
+export const createUser = async ({ firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber }) => {
     const pool = await poolPromise;
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
@@ -11,6 +11,7 @@ export const createUser = async ({ firstname, middlename, lastname, email, agent
         .input('firstname', sql.VarChar, firstname)
         .input('middlename',sql.VarChar, middlename || null)
         .input('lastname', sql.VarChar, lastname)
+        .input('suffix', sql.VarChar, suffix || null)
         .input('email', sql.VarChar, email)
         .input('agent_code', sql.VarChar, agent_code || null)
         .input('role_id', sql.Int, role_id || null)
@@ -21,9 +22,9 @@ export const createUser = async ({ firstname, middlename, lastname, email, agent
         .input('mustChangePassword', sql.Bit,  1)
         .query(`
             INSERT INTO DHUB.sg.financial_insurance_users
-            (firstname, middlename, lastname, email, agent_code, role_id, location_id, department_id, phoneNumber, password_hash, mustChangePassword)
+            (firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, password_hash, mustChangePassword)
             OUTPUT INSERTED.user_id AS userId
-            VALUES (@firstname, @middlename, @lastname, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @password_hash, @mustChangePassword)
+            VALUES (@firstname, @middlename, @lastname, @suffix, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @password_hash, @mustChangePassword)
         `);
 
     return { ...result.recordset[0], tempPassword}
@@ -44,6 +45,21 @@ export const getUserByEmail = async (email) => {
     return result.recordset[0];
 }
 
+export const getUserById = async (userId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('userId', sql.Int, userId)
+        .query(`
+            SELECT u.*, r.name AS roleName, l.name AS locationName, d.name AS departmentName
+            FROM DHUB.sg.financial_insurance_users u
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON d.id = u.department_id AND d.category = 'DEPARTMENT'
+            WHERE u.user_id = @userId
+        `);
+    return result.recordset[0];
+}
+
 export const updatePassword = async (email, newPassword) => {
     const pool = await poolPromise;
     const hashed = await bcrypt.hash(newPassword, 10);
@@ -55,6 +71,59 @@ export const updatePassword = async (email, newPassword) => {
             SET password_hash = @password_hash, mustChangePassword = 0
             WHERE email = @email
         `);
+}
+
+// Helper function to check if value is provided and not empty
+const hasValue = (value) => value !== undefined && value !== null && value !== '';
+
+export const updateProfile = async (userId, { firstname, middlename, lastname, suffix, phoneNumber, newPassword }) => {
+    const pool = await poolPromise;
+    
+    // Get current user data
+    const user = await getUserById(userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    // If newPassword is provided, hash it; otherwise keep the existing password
+    let hashedPassword = user.password_hash;
+    let mustChangePasswordValue = user.mustChangePassword;
+    
+    if (newPassword) {
+        hashedPassword = await bcrypt.hash(newPassword, 10);
+        mustChangePasswordValue = 0; // User has changed their password
+    }
+
+    // For firstname and lastname: keep existing if not provided or empty
+    // For other fields: allow empty string
+    const updatedFirstname = hasValue(firstname) ? firstname : user.firstname;
+    const updatedLastname = hasValue(lastname) ? lastname : user.lastname;
+    const updatedMiddlename = middlename !== undefined ? middlename : user.middlename;
+    const updatedSuffix = suffix !== undefined ? suffix : user.suffix;
+    const updatedPhoneNumber = phoneNumber !== undefined ? phoneNumber : user.phoneNumber;
+
+    await pool.request()
+        .input('userId', sql.Int, userId)
+        .input('firstname', sql.VarChar, updatedFirstname)
+        .input('middlename', sql.VarChar, updatedMiddlename)
+        .input('lastname', sql.VarChar, updatedLastname)
+        .input('suffix', sql.VarChar, updatedSuffix)
+        .input('phoneNumber', sql.VarChar, updatedPhoneNumber)
+        .input('password_hash', sql.VarChar, hashedPassword)
+        .input('mustChangePassword', sql.Bit, mustChangePasswordValue)
+        .query(`
+            UPDATE DHUB.sg.financial_insurance_users
+            SET firstname = @firstname,
+                middlename = @middlename,
+                lastname = @lastname,
+                suffix = @suffix,
+                phoneNumber = @phoneNumber,
+                password_hash = @password_hash,
+                mustChangePassword = @mustChangePassword
+            WHERE user_id = @userId
+        `);
+
+    return await getUserById(userId);
 }
 
 export const saveOTP = async (userId, otp) => {

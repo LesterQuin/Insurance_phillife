@@ -30,6 +30,9 @@ export const validateRegister = [
     body('lastname')
         .notEmpty().withMessage('Last name is required')
         .isLength({ max: 100 }).withMessage('Last name must not exceed 100 characters'),
+    body('suffix')
+        .optional()
+        .isLength({ max: 20 }).withMessage('Suffix must not exceed 20 characters'),
     body('email')
         .notEmpty().withMessage('Email is required')
         .isEmail().withMessage('Invalid email format')
@@ -85,9 +88,6 @@ export const validateLogin = [
         .isEmail().withMessage('Invalid email format'),
     body('password')
         .notEmpty().withMessage('Password is required'),
-    body('newPassword')
-        .optional()
-        .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -154,6 +154,38 @@ export const validateLogout = [
 export const validateRefreshToken = [
     body('refreshToken')
         .notEmpty().withMessage('Refresh token is required'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// Validation for update profile
+export const validateUpdateProfile = [
+    body('email')
+        .notEmpty().withMessage('Email is required')
+        .isEmail().withMessage('Invalid email format'),
+    body('password')
+        .notEmpty().withMessage('Password is required'),
+    body('firstname')
+        .optional()
+        .isLength({ max: 100 }).withMessage('First name must not exceed 100 characters'),
+    body('middlename')
+        .optional()
+        .isLength({ max: 100 }).withMessage('Middle name must not exceed 100 characters'),
+    body('lastname')
+        .optional()
+        .isLength({ max: 100 }).withMessage('Last name must not exceed 100 characters'),
+    body('suffix')
+        .optional()
+        .isLength({ max: 20 }).withMessage('Suffix must not exceed 20 characters'),
+    body('phoneNumber')
+        .optional()
+        .matches(/^[0-9]{10,15}$/).withMessage('Phone number must be 10-15 digits'),
+    body('newPassword')
+        .optional()
+        .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });

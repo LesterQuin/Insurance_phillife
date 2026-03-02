@@ -7,7 +7,8 @@ import {
     validateResendOTP, 
     validateResetPassword, 
     validateLogout, 
-    validateRefreshToken 
+    validateRefreshToken,
+    validateUpdateProfile 
 } from '../../middlewares/validate.js';
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.post('/resend-otp', validateResendOTP, Controller.resendOTP);
 router.post('/reset-password', validateResetPassword, Controller.resetPassword);
 router.post('/logout', validateLogout, Controller.logout);
 router.post('/refresh-token', validateRefreshToken, Controller.refreshToken);
+router.put('/update-profile', validateUpdateProfile, Controller.updateProfile);
 
 export default router;

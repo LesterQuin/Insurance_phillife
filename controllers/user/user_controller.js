@@ -36,6 +36,7 @@ export const register = async (req, res) => {
             firstname,
             middlename,
             lastname,
+            suffix,
             email,
             agent_code,
             role_id,
@@ -64,6 +65,7 @@ export const register = async (req, res) => {
             firstname,
             middlename,
             lastname,
+            suffix,
             email,
             agent_code,
             role_id,
@@ -100,7 +102,7 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
     try {
-        const { email, password, newPassword } = req.body;
+        const { email, password } = req.body;
 
         // Validation is now handled by middleware
         // Fetch user from DB
@@ -121,18 +123,6 @@ export const login = async (req, res) => {
             });
         }
 
-        // Handle first-time login / mustChangePassword
-        if (user.mustChangePassword) {
-            if (!newPassword) {
-                return res.status(403).json({
-                    status: false,
-                    message: "Password change required."
-                });
-            }
-            // Update password
-            await User.updatePassword(email, newPassword);
-        }
-
         // Generate OTP and save to DB
         const otp = generateOTP();
         await User.saveOTP(user.user_id, otp);
@@ -147,7 +137,8 @@ export const login = async (req, res) => {
 
         res.json({
             status: true,
-            message: 'OTP sent to your email.'
+            message: 'OTP sent to your email.',
+            mustChangePassword: user.mustChangePassword // Indicates if user needs to change password
         });
 
     } catch (err) {
@@ -184,7 +175,13 @@ export const verifyOTP = async (req, res) => {
         const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
         const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
 
-        // Set tokens in cookies instead of database
+        // Calculate access token expiry
+        const accessTokenExpiry = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+
+        // Save tokens to database
+        await User.saveTokens(user.user_id, accessToken, refreshToken, accessTokenExpiry);
+
+        // Set tokens in cookies
         res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 }); // 8 hours
         res.cookie('refreshToken', refreshToken, cookieOptions); // 7 days
 
@@ -285,7 +282,10 @@ export const logout = async (req, res) => {
             message: 'User not found.'
         });
         
-        // Clear cookies instead of database tokens
+        // Clear tokens from database
+        await User.clearTokens(user.user_id);
+        
+        // Clear cookies
         res.clearCookie('accessToken');
         res.clearCookie('refreshToken');
         
@@ -332,6 +332,12 @@ export const refreshToken = async (req, res) => {
             expiresIn: '8h'
         });
 
+        // Calculate access token expiry
+        const accessTokenExpiry = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+
+        // Update tokens in database
+        await User.saveTokens(user.user_id, newAccessToken, refreshToken, accessTokenExpiry);
+
         // Set new access token in cookie
         res.cookie('accessToken', newAccessToken, { 
             ...cookieOptions, 
@@ -351,4 +357,62 @@ export const refreshToken = async (req, res) => {
             error: err.message
         });
     }
-}
+};
+
+// Update profile with temporary password
+export const updateProfile = async (req, res) => {
+    try {
+        const { 
+            email, 
+            password, 
+            firstname, 
+            middlename, 
+            lastname, 
+            suffix, 
+            phoneNumber, 
+            newPassword 
+        } = req.body;
+
+        // Fetch user from DB
+        const user = await User.getUserByEmail(email);
+        if (!user) {
+            return res.status(404).json({
+                status: false,
+                message: "User not found"
+            });
+        }
+
+        // Compare the provided password (can be temporary password)
+        const valid = await bcrypt.compare(password, user.password_hash);
+        if (!valid) {
+            return res.status(401).json({
+                status: false,
+                message: "Invalid credentials"
+            });
+        }
+
+        // Update user profile with new data
+        const updatedUser = await User.updateProfile(user.user_id, {
+            firstname,
+            middlename,
+            lastname,
+            suffix,
+            phoneNumber,
+            newPassword
+        });
+
+        res.json({
+            status: true,
+            message: "Profile updated successfully",
+            user: updatedUser
+        });
+
+    } catch (err) {
+        console.error('UPDATE PROFILE ERROR:', err);
+        res.status(500).json({
+            status: false,
+            message: 'Server error',
+            error: err.message
+        });
+    }
+};
