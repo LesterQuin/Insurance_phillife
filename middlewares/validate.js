@@ -1,3 +1,4 @@
+// validate.js
 import validator from 'express-validator';
 const { body, validationResult } = validator;
 import * as User from '../models/user/user_model.js';
@@ -38,42 +39,54 @@ export const validateRegister = [
         .isEmail().withMessage('Invalid email format')
         .matches(/^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i)
         .withMessage('Email must be from allowed domain (gmail.com, yahoo.com, phillifeassurance.onmicrosoft.com)'),
-    body('role_id')
-        .notEmpty().withMessage('Role ID is required')
-        .isInt().withMessage('Role ID must be a valid integer')
-        .custom(async (value) => {
-            const validIds = await User.getValidLookupIds('ROLE');
-            if (!validIds.includes(Number(value))) {
-                throw new Error('Role ID must be a valid role from the system');
-            }
-            return true;
-        }),
     body('phoneNumber')
         .optional()
         .matches(/^[0-9]{10,15}$/).withMessage('Phone number must be 10-15 digits'),
     body('agent_code')
         .optional()
         .isLength({ max: 50 }).withMessage('Agent code must not exceed 50 characters'),
+    body('role_id')
+    .notEmpty().withMessage('Role ID is required')
+    .isInt().withMessage('Role ID must be a valid integer')
+    .custom(async (value) => {
+        const roles = await User.getLookupListByCategory('ROLE');
+        const validIds = roles.map(r => r.id);
+        if (!validIds.includes(Number(value))) {
+            const roleList = roles.map(r => `${r.id} - ${r.name}`).join(', ');
+            throw new Error(
+                `Invalid role_id (${value}). Please select one of the following: ${roleList}`
+            );
+        }
+        return true;
+    }),
     body('department_id')
-        .optional()
-        .isInt().withMessage('Department ID must be a valid integer')
-        .custom(async (value) => {
-            const validIds = await User.getValidLookupIds('DEPARTMENT');
-            if (!validIds.includes(Number(value))) {
-                throw new Error('Department ID must be a valid department from the system');
-            }
-            return true;
-        }),
+    .optional()
+    .isInt().withMessage('Department ID must be a valid integer')
+    .custom(async (value) => {
+        const departments = await User.getLookupListByCategory('DEPARTMENT');
+        const validIds = departments.map(d => d.id);
+        if (!validIds.includes(Number(value))) {
+            const deptList = departments.map(d => `${d.id} - ${d.name}`).join(', ');
+            throw new Error(
+                `Invalid department_id (${value}). Please select one of the following: ${deptList}`
+            );
+        }
+        return true;
+    }),
     body('location_id')
-        .optional()
-        .isInt().withMessage('Location ID must be a valid integer')
-        .custom(async (value) => {
-            const validIds = await User.getValidLookupIds('LOCATION');
-            if (!validIds.includes(Number(value))) {
-                throw new Error('Location ID must be a valid location from the system');
-            }
-            return true;
-        }),
+    .optional()
+    .isInt().withMessage('Location ID must be a valid integer')
+    .custom(async (value) => {
+        const locations = await User.getLookupListByCategory('LOCATION');
+        const validIds = locations.map(l => l.id);
+        if (!validIds.includes(Number(value))) {
+            const locationList = locations.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(
+                `Invalid location_id (${value}). Please select one of the following: ${locationList}`
+            );
+        }
+        return true;
+    }),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -163,11 +176,6 @@ export const validateRefreshToken = [
 
 // Validation for update profile
 export const validateUpdateProfile = [
-    body('email')
-        .notEmpty().withMessage('Email is required')
-        .isEmail().withMessage('Invalid email format'),
-    body('password')
-        .notEmpty().withMessage('Password is required'),
     body('firstname')
         .optional()
         .isLength({ max: 100 }).withMessage('First name must not exceed 100 characters'),
@@ -186,9 +194,12 @@ export const validateUpdateProfile = [
     body('newPassword')
         .optional()
         .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+
+    // Final middleware to check for validation errors
     (req, res, next) => {
         const errors = validationResult(req);
-        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        if (!errors.isEmpty())
+            return res.status(400).json({ status: false, errors: errors.array() });
         next();
     }
 ];

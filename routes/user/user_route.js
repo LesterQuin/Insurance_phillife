@@ -1,5 +1,6 @@
 import express from 'express';
-import * as Controller from '../../controllers/user/user_controller.js'
+import * as Controller from '../../controllers/user/user_controller.js';
+import { authenticate } from '../../middlewares/authenticate.js';
 import { 
     validateRegister, 
     validateLogin, 
@@ -20,6 +21,6 @@ router.post('/resend-otp', validateResendOTP, Controller.resendOTP);
 router.post('/reset-password', validateResetPassword, Controller.resetPassword);
 router.post('/logout', validateLogout, Controller.logout);
 router.post('/refresh-token', validateRefreshToken, Controller.refreshToken);
-router.put('/update-profile', validateUpdateProfile, Controller.updateProfile);
+router.put('/update-profile', authenticate, validateUpdateProfile, Controller.updateProfile);
 
 export default router;

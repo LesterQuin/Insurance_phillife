@@ -1,3 +1,4 @@
+// user_controller.js
 import * as User from '../../models/user/user_model.js';
 import { tempPasswordTemplate } from '../../templates/tempPasswordTemplate.js';
 import { otpTemplate } from '../../templates/otpTemplate.js';
@@ -362,37 +363,31 @@ export const refreshToken = async (req, res) => {
 // Update profile with temporary password
 export const updateProfile = async (req, res) => {
     try {
-        const { 
-            email, 
-            password, 
-            firstname, 
-            middlename, 
-            lastname, 
-            suffix, 
-            phoneNumber, 
-            newPassword 
-        } = req.body;
+        const { password, newPassword, firstname, middlename, lastname, suffix, phoneNumber } = req.body;
+
+        // Get userId from accessToken (set by authenticate middleware)
+        const userId = req.user.userId;
 
         // Fetch user from DB
-        const user = await User.getUserByEmail(email);
+        const user = await User.getUserById(userId);
         if (!user) {
-            return res.status(404).json({
-                status: false,
-                message: "User not found"
-            });
+            return res.status(404).json({ status: false, message: "User not found" });
         }
 
-        // Compare the provided password (can be temporary password)
-        const valid = await bcrypt.compare(password, user.password_hash);
-        if (!valid) {
-            return res.status(401).json({
-                status: false,
-                message: "Invalid credentials"
-            });
+        // If newPassword is provided, require old password
+        if (newPassword) {
+            if (!password) {
+                return res.status(400).json({ status: false, message: "Current password is required to change password" });
+            }
+
+            const valid = await bcrypt.compare(password, user.password_hash);
+            if (!valid) {
+                return res.status(401).json({ status: false, message: "Invalid current password" });
+            }
         }
 
-        // Update user profile with new data
-        const updatedUser = await User.updateProfile(user.user_id, {
+        // Update profile
+        const updatedUser = await User.updateProfile(userId, {
             firstname,
             middlename,
             lastname,
@@ -409,10 +404,6 @@ export const updateProfile = async (req, res) => {
 
     } catch (err) {
         console.error('UPDATE PROFILE ERROR:', err);
-        res.status(500).json({
-            status: false,
-            message: 'Server error',
-            error: err.message
-        });
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
     }
 };

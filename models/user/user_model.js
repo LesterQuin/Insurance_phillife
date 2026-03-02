@@ -205,3 +205,16 @@ export const getValidLookupIds = async (category) => {
         `);
     return result.recordset.map(row => row.id);
 }
+
+export const getLookupListByCategory = async (category) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('category', sql.VarChar, category)
+        .query(`
+            SELECT id, name 
+            FROM DHUB.sg.financial_insurance_system_lookups
+            WHERE category = @category AND is_active = 1
+        `);
+
+    return result.recordset;
+};
