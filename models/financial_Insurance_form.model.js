@@ -309,3 +309,33 @@ export const getRidersByBasicPlanId = async (basicPlanId) => {
         `);
     return res.recordset ?? [];
 };
+
+// Get lookup names by a list of IDs
+export const getLookupNamesByIds = async (ids) => {
+    if (!ids || ids.length === 0) return new Map();
+
+    const pool = await poolPromise;
+    const request = pool.request();
+    const parameters = [];
+    // Use a Set to avoid duplicate IDs in the IN clause and filter nulls
+    const uniqueIds = [...new Set(ids.filter(id => id != null))];
+
+    if (uniqueIds.length === 0) return new Map();
+
+    uniqueIds.forEach((id, index) => {
+        const paramName = `id${index}`;
+        request.input(paramName, sql.Int, id);
+        parameters.push(`@${paramName}`);
+    });
+
+    const result = await request.query(`
+        SELECT id, name FROM sg.financial_insurance_group_lookups 
+        WHERE id IN (${parameters.join(',')})
+    `);
+
+    const namesMap = new Map();
+    result.recordset.forEach(row => {
+        namesMap.set(row.id, row.name);
+    });
+    return namesMap;
+};
