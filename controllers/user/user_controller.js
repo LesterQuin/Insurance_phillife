@@ -2,13 +2,13 @@
 import * as User from '../../models/user/user_model.js';
 import { tempPasswordTemplate } from '../../templates/tempPasswordTemplate.js';
 import { otpTemplate } from '../../templates/otpTemplate.js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import nodemailer from 'nodemailer';
+import * as bcrypt from 'bcryptjs';
+import * as jwt from 'jsonwebtoken';
+import * as nodemailer from "nodemailer";
 import dotenv from 'dotenv';
 dotenv.config();
 
-const transporter = nodemailer.createTransport({
+export const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT),
     secure: false,   
@@ -92,7 +92,7 @@ export const register = async (req, res) => {
         });
 
     } catch (err) {
-        console.error('REGISTRATION ERROR:', err);
+        //console.error('REGISTRATION ERROR:', err);
         res.status(500).json({
             status: false,
             message: 'Server error',

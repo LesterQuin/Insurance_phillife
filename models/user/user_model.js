@@ -1,5 +1,5 @@
 import { sql, poolPromise } from "../../config/db.js";
-import bcrypt from "bcryptjs";
+import * as bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 export const createUser = async ({ firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber }) => {
