@@ -7,6 +7,7 @@ import * as Financial from '../models/financial_Insurance_form.model.js'
 // -----------------------------
 // User validation
 // -----------------------------
+
 // Validation for financial insurance application
 export const validateApplication = [
     body('group_name').notEmpty().withMessage('Group Name is required'),
@@ -90,6 +91,36 @@ export const validateRegister = [
         }
         return true;
     }),
+    // Custom middleware to check for duplicate agent_code
+    async (req, res, next) => {
+        try {
+            const { agent_code } = req.body;
+            
+            // If agent_code is provided and not empty, check if it already exists
+            if (agent_code && agent_code.trim()) {
+                const existingUser = await User.getUserByAgentCode(agent_code.trim());
+                
+                if (existingUser) {
+                    // Return error instead of auto-generating a new code
+                    return res.status(400).json({
+                        status: false,
+                        message: "Agent code already exists. Please use a different agent code."
+                    });
+                }
+                
+                req.body.agent_code = agent_code.trim();
+            }
+            
+            next();
+        } catch (error) {
+            console.error('Agent code validation error:', error);
+            res.status(500).json({ 
+                status: false, 
+                message: 'Error validating agent code',
+                error: error.message 
+            });
+        }
+    },
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });

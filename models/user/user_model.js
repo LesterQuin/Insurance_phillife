@@ -60,6 +60,19 @@ export const getUserById = async (userId) => {
     return result.recordset[0];
 }
 
+// Check if agent_code already exists
+export const getUserByAgentCode = async (agent_code) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('agent_code', sql.VarChar, agent_code)
+        .query(`
+            SELECT user_id, agent_code, email, firstname, lastname
+            FROM DHUB.sg.financial_insurance_users
+            WHERE agent_code = @agent_code
+        `);
+    return result.recordset[0];
+}
+
 export const updatePassword = async (email, newPassword) => {
     const pool = await poolPromise;
     const hashed = await bcrypt.hash(newPassword, 10);
@@ -217,4 +230,21 @@ export const getLookupListByCategory = async (category) => {
         `);
 
     return result.recordset;
+};
+
+export const setUserStatus = async (userId, isActive) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('userId', sql.Int, userId)
+        .input('isActive', sql.Bit, isActive)
+        .query(`
+            UPDATE DHUB.sg.financial_insurance_users
+            SET is_active = @isActive
+            WHERE user_id = @userId
+        `);
+    
+    // If deactivating, also clear their tokens to force logout
+    if (!isActive) {
+        await clearTokens(userId);
+    }
 };

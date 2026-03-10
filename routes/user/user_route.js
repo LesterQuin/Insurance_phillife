@@ -22,5 +22,7 @@ router.post('/reset-password', validateResetPassword, Controller.resetPassword);
 router.post('/logout', validateLogout, Controller.logout);
 router.post('/refresh-token', validateRefreshToken, Controller.refreshToken);
 router.put('/update-profile', authenticate, validateUpdateProfile, Controller.updateProfile);
+router.put('/deactivate/:userId', authenticate, Controller.deactivateAccount);
+router.put('/activate/:userId', authenticate, Controller.activateAccount);
 
 export default router;

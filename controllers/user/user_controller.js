@@ -3,7 +3,7 @@ import * as User from '../../models/user/user_model.js';
 import { tempPasswordTemplate } from '../../templates/tempPasswordTemplate.js';
 import { otpTemplate } from '../../templates/otpTemplate.js';
 import * as bcrypt from 'bcryptjs';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 import * as nodemailer from "nodemailer";
 import dotenv from 'dotenv';
 dotenv.config();
@@ -404,6 +404,57 @@ export const updateProfile = async (req, res) => {
 
     } catch (err) {
         console.error('UPDATE PROFILE ERROR:', err);
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const deactivateAccount = async (req, res) => {
+    try {
+        // This should be an admin-only route.
+        // The user ID to deactivate comes from the URL parameter.
+        const { userId } = req.params;
+
+        const userToDeactivate = await User.getUserById(userId);
+        if (!userToDeactivate) {
+            return res.status(404).json({ status: false, message: 'User not found.' });
+        }
+
+        // Deactivate the user by setting is_active to 0
+        // This will also clear their tokens to force logout.
+        await User.setUserStatus(userId, 0);
+
+        res.status(200).json({ 
+            status: true, 
+            message: 'User account has been successfully deactivated.' 
+        });
+
+    } catch (err) {
+        console.error('DEACTIVATE ACCOUNT ERROR:', err);
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const activateAccount = async (req, res) => {
+    try {
+        // This should be an admin-only route.
+        // The user ID to activate comes from the URL parameter.
+        const { userId } = req.params;
+
+        const userToActivate = await User.getUserById(userId);
+        if (!userToActivate) {
+            return res.status(404).json({ status: false, message: 'User not found.' });
+        }
+
+        // Activate the user by setting is_active to 1
+        await User.setUserStatus(userId, 1);
+
+        res.status(200).json({ 
+            status: true, 
+            message: 'User account has been successfully activated.' 
+        });
+
+    } catch (err) {
+        console.error('ACTIVATE ACCOUNT ERROR:', err);
         res.status(500).json({ status: false, message: 'Server error', error: err.message });
     }
 };
