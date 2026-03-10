@@ -1,6 +1,6 @@
 import { poolPromise, sql } from '../config/db.js';
 
-export const createApplication = async (data) => {
+export const createApplication = async (data, userId) => {
     const pool = await poolPromise;
 
     // Convert rider_ids array to JSON string if it's an array
@@ -8,7 +8,13 @@ export const createApplication = async (data) => {
         ? Array.isArray(data.rider_ids) ? JSON.stringify(data.rider_ids) : data.rider_ids
         : null;
 
+    // Convert sub_group_type_id array to JSON string if it's an array (for Employer-Employee)
+    const subGroupTypeIdsValue = data.sub_group_type_id
+        ? Array.isArray(data.sub_group_type_id) ? JSON.stringify(data.sub_group_type_id) : data.sub_group_type_id
+        : null;
+
     const res = await pool.request()
+        .input('user_id', sql.Int, userId)
         .input('group_name', sql.NVarChar, data.group_name)
         .input('business_nature', sql.NVarChar, data.business_nature)
         .input('number_of_lives', sql.Int, data.number_of_lives)
@@ -25,24 +31,26 @@ export const createApplication = async (data) => {
         .input('business_type_id', sql.Int, data.business_type_id)
         .input('other_business_type', sql.NVarChar, data.other_business_type || null)
         .input('group_type_id', sql.Int, data.group_type_id)
-        .input('sub_group_type_id', sql.Int, data.sub_group_type_id || null)
+        .input('sub_group_type_id', sql.NVarChar, subGroupTypeIdsValue)
         .input('other_group_type', sql.NVarChar, data.other_group_type || null)
+        .input('minimum_age', sql.Int, data.minimum_age)
+        .input('maximum_age', sql.Int, data.maximum_age)
         .input('payment_mode_id', sql.Int, data.payment_mode_id)
         .input('plan_id', sql.Int, data.plan_id || null)
         .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
         .input('rider_ids', sql.NVarChar, riderIdsValue)
         .input('status_id', sql.Int, data.status_id || 1)
         .query(`
-            INSERT INTO sg.financial_insurance_application
-            (group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
+            INSERT INTO DHUB.sg.financial_insurance_application
+            (user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
             contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
             other_group_classification, business_type_id, other_business_type, group_type_id, sub_group_type_id,
-            other_group_type, payment_mode_id, plan_id, basic_plan_id, rider_ids, status_id)
+            other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, rider_ids, status_id)
             VALUES
-            (@group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
+            (@user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
             @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
             @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @sub_group_type_id,
-            @other_group_type, @payment_mode_id, @plan_id, @basic_plan_id, @rider_ids, @status_id);
+            @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @rider_ids, @status_id);
             SELECT SCOPE_IDENTITY() AS application_id;
         `);
 
@@ -55,12 +63,125 @@ export const getAllApplications = async () => {
     const pool = await poolPromise;
     const res = await pool.request()
         .query(`
-            SELECT fia.*, fis.status_name
+            SELECT
+                fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives, fia.contact_person,
+                fia.status_id, fia.group_classification_id, fia.other_group_classification,
+                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
+                fia.plan_id, fia.basic_plan_id, fia.rider_ids, fia.sub_group_type_id, 
+                fia.created_at, fia.updated_at,
+                fis.status_name,
+                gc.name AS group_classification_name,
+                bt.name AS business_type_name,
+                gt.name AS group_type_name,
+                p.proposal_plan AS plan_name,
+                bp.basic_plan_name
             FROM sg.financial_insurance_application fia
-            JOIN sg.financial_insurance_status fis
-            ON fia.status_id = fis.status_id
+            LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
+            LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
+            LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
+            LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
+            LEFT JOIN sg.financial_insurance_plan p ON fia.plan_id = p.plan_id
+            LEFT JOIN sg.financial_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+            ORDER BY fia.created_at DESC
         `);
-    return res.recordset ?? [];
+
+    const applications = res.recordset ?? [];
+    if (applications.length === 0) return [];
+
+    // --- Bulk fetch related data to avoid N+1 queries ---
+
+    const allRiderIds = new Set();
+    const allSubGroupTypeIds = new Set();
+
+    applications.forEach(app => {
+        if (app.rider_ids) {
+            try {
+                const riderIds = JSON.parse(app.rider_ids);
+                if (Array.isArray(riderIds)) {
+                    riderIds.forEach(id => allRiderIds.add(id));
+                }
+            } catch {}
+        }
+        if (app.sub_group_type_id) {
+            try {
+                const subGroupIds = JSON.parse(app.sub_group_type_id);
+                (Array.isArray(subGroupIds) ? subGroupIds : [subGroupIds]).forEach(id => {
+                    const numId = parseInt(id, 10);
+                    if (!isNaN(numId)) allSubGroupTypeIds.add(numId);
+                });
+            } catch {
+                const numId = parseInt(app.sub_group_type_id, 10);
+                if (!isNaN(numId)) allSubGroupTypeIds.add(numId);
+            }
+        }
+    });
+
+    const riderIdsArray = [...allRiderIds];
+    const subGroupTypeIdsArray = [...allSubGroupTypeIds];
+
+    let ridersMap = new Map();
+    if (riderIdsArray.length > 0) {
+        const riderRes = await pool.request()
+            .query(`SELECT rider_id AS id, rider_name AS name FROM sg.financial_attachable_rider WHERE rider_id IN (${riderIdsArray.join(',')})`);
+        riderRes.recordset.forEach(r => ridersMap.set(r.id, r.name));
+    }
+
+    let subGroupTypesMap = new Map();
+    if (subGroupTypeIdsArray.length > 0) {
+        const subGroupRes = await pool.request()
+            .query(`SELECT id, name FROM sg.financial_insurance_group_lookups WHERE id IN (${subGroupTypeIdsArray.join(',')})`);
+        subGroupRes.recordset.forEach(sg => subGroupTypesMap.set(sg.id, sg.name));
+    }
+
+    // --- Map the bulk-fetched data back to each application ---
+
+    return applications.map(app => {
+        let currentRiderIds = [];
+        try {
+            if (app.rider_ids) currentRiderIds = JSON.parse(app.rider_ids);
+        } catch {}
+
+        let currentSubGroupTypeIds = [];
+        if (app.sub_group_type_id) {
+            try {
+                const parsed = JSON.parse(app.sub_group_type_id);
+                currentSubGroupTypeIds = Array.isArray(parsed) ? parsed : [parsed];
+            } catch {
+                currentSubGroupTypeIds = [app.sub_group_type_id];
+            }
+        }
+        currentSubGroupTypeIds = currentSubGroupTypeIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+
+        return {
+            application_id: app.application_id,
+            user_id: app.user_id,
+            group_name: app.group_name,
+            number_of_lives: app.number_of_lives,
+            contact_person: app.contact_person,
+            status: { id: app.status_id, name: app.status_name },
+            group_classification: { 
+                id: app.group_classification_id, 
+                name: app.group_classification_name,
+                other_value: app.other_group_classification
+            },
+            business_type: {
+                id: app.business_type_id,
+                name: app.business_type_name,
+                other_value: app.other_business_type
+            },
+            group_type: { 
+                id: app.group_type_id, 
+                name: app.group_type_name,
+                other_value: app.other_group_type
+            },
+            sub_group_types: currentSubGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name),
+            plan: { id: app.plan_id, name: app.plan_name },
+            basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+            riders: currentRiderIds.map(id => ({ id, name: ridersMap.get(id) })).filter(r => r.name),
+            created_at: app.created_at,
+            updated_at: app.updated_at,
+        };
+    });
 };
 
 // Get application by ID
@@ -77,36 +198,32 @@ export const getApplicationById = async (id) => {
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
-                sgt.name AS sub_group_type_name,
                 pm.name AS payment_mode_name,
 
                 p.proposal_plan AS plan_name,
                 bp.basic_plan_name
 
-            FROM sg.financial_insurance_application fia
+            FROM DHUB.sg.financial_insurance_application fia
 
-            LEFT JOIN sg.financial_insurance_status fis
+            LEFT JOIN DHUB.sg.financial_insurance_status fis
                 ON fia.status_id = fis.status_id
 
-            LEFT JOIN sg.financial_insurance_group_lookups gc
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
 
-            LEFT JOIN sg.financial_insurance_group_lookups bt
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
 
-            LEFT JOIN sg.financial_insurance_group_lookups gt
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
 
-            LEFT JOIN sg.financial_insurance_group_lookups sgt
-                ON fia.sub_group_type_id = sgt.id
-
-            LEFT JOIN sg.financial_insurance_group_lookups pm
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
 
-            LEFT JOIN sg.financial_insurance_plan p
+            LEFT JOIN DHUB.sg.financial_insurance_plan p
                 ON fia.plan_id = p.plan_id
 
-            LEFT JOIN sg.financial_basic_plan bp
+            LEFT JOIN DHUB.sg.financial_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
 
             WHERE fia.application_id = @id
@@ -116,11 +233,45 @@ export const getApplicationById = async (id) => {
     if (!app) return null;
 
     /* -----------------------------
+    Build structured response
+       Parse sub_group_type_id (could be JSON array for Employer-Employee)
+    ----------------------------- */
+    
+    let subGroupTypeIds = [];
+    if (app.sub_group_type_id) {
+        try {
+            // Try to parse as JSON array first
+            const parsed = JSON.parse(app.sub_group_type_id);
+            if (Array.isArray(parsed)) {
+                subGroupTypeIds = parsed;
+            } else {
+                subGroupTypeIds = [parsed];
+            }
+        } catch {
+            // If not JSON, treat as single value
+            subGroupTypeIds = [app.sub_group_type_id];
+        }
+    }
+
+    let subGroupTypes = [];
+    // Fetch sub_group_type details if there are sub_group_type_ids
+    if (subGroupTypeIds.length > 0) {
+        const subGroupRes = await pool.request()
+            .query(`
+                SELECT id, name
+                FROM sg.financial_insurance_group_lookups
+                WHERE id IN (${subGroupTypeIds.join(',')})
+            `);
+        subGroupTypes = subGroupRes.recordset;
+    }
+
+    /* -----------------------------
        Build structured response
     ----------------------------- */
 
     const response = {
         application_id: app.application_id,
+        user_id: app.user_id,
         group_name: app.group_name,
         business_nature: app.business_nature,
         number_of_lives: app.number_of_lives,
@@ -132,26 +283,28 @@ export const getApplicationById = async (id) => {
         designation: app.designation,
         proposal_addressee: app.proposal_addressee,
         addressee_designation: app.addressee_designation,
+        minimum_age: app.minimum_age,
+        maximum_age: app.maximum_age,
         status: {
             id: app.status_id,
             name: app.status_name
         },
         group_classification: {
             id: app.group_classification_id,
-            name: app.group_classification_name
+            name: app.group_classification_name,
+            other_value: app.other_group_classification || null
         },
         business_type: {
             id: app.business_type_id,
-            name: app.business_type_name
+            name: app.business_type_name,
+            other_value: app.other_business_type || null
         },
         group_type: {
             id: app.group_type_id,
-            name: app.group_type_name
+            name: app.group_type_name,
+            other_value: app.other_group_type || null
         },
-        sub_group_type: {
-            id: app.sub_group_type_id,
-            name: app.sub_group_type_name
-        },
+        sub_group_types: subGroupTypes,
         payment_mode: {
             id: app.payment_mode_id,
             name: app.payment_mode_name
@@ -197,52 +350,137 @@ export const getApplicationById = async (id) => {
     return response;
 };
 
-// Update application
+// Update application - handles partial updates
 export const updateApplication = async (id, data) => {
     const pool = await poolPromise;
-
-    const riderIdsValue = data.rider_ids
-        ? Array.isArray(data.rider_ids) ? JSON.stringify(data.rider_ids) : data.rider_ids
-        : null;
-
-    await pool.request()
-        .input('id', sql.Int, id)
-        .input('group_name', sql.NVarChar, data.group_name)
-        .input('business_nature', sql.NVarChar, data.business_nature)
-        .input('number_of_lives', sql.Int, data.number_of_lives)
-        .input('business_address', sql.NVarChar, data.business_address)
-        .input('contact_number', sql.NVarChar, data.contact_number)
-        .input('fax_number', sql.NVarChar, data.fax_number || null)
-        .input('email', sql.NVarChar, data.email)
-        .input('contact_person', sql.NVarChar, data.contact_person)
-        .input('designation', sql.NVarChar, data.designation)
-        .input('proposal_addressee', sql.NVarChar, data.proposal_addressee)
-        .input('addressee_designation', sql.NVarChar, data.addressee_designation)
-        .input('group_classification_id', sql.Int, data.group_classification_id)
-        .input('other_group_classification', sql.NVarChar, data.other_group_classification || null)
-        .input('business_type_id', sql.Int, data.business_type_id)
-        .input('other_business_type', sql.NVarChar, data.other_business_type || null)
-        .input('group_type_id', sql.Int, data.group_type_id)
-        .input('sub_group_type_id', sql.Int, data.sub_group_type_id || null)
-        .input('other_group_type', sql.NVarChar, data.other_group_type || null)
-        .input('payment_mode_id', sql.Int, data.payment_mode_id)
-        .input('plan_id', sql.Int, data.plan_id || null)
-        .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
-        .input('rider_ids', sql.NVarChar, riderIdsValue)
-        .input('status_id', sql.Int, data.status_id || 1)
-        .query(`
-            UPDATE sg.financial_insurance_application
-            SET group_name=@group_name, business_nature=@business_nature, number_of_lives=@number_of_lives,
-                business_address=@business_address, contact_number=@contact_number, fax_number=@fax_number, email=@email,
-                contact_person=@contact_person, designation=@designation, proposal_addressee=@proposal_addressee,
-                addressee_designation=@addressee_designation, group_classification_id=@group_classification_id,
-                other_group_classification=@other_group_classification, business_type_id=@business_type_id,
-                other_business_type=@other_business_type, group_type_id=@group_type_id, sub_group_type_id=@sub_group_type_id,
-                other_group_type=@other_group_type, payment_mode_id=@payment_mode_id, plan_id=@plan_id,
-                basic_plan_id=@basic_plan_id, rider_ids=@rider_ids,
-                status_id=@status_id, updated_at=GETDATE()
-            WHERE application_id=@id
-        `);
+    
+    // Build dynamic SET clause based on provided fields
+    const setClauses = [];
+    const inputs = [];
+    
+    if (data.group_name !== undefined) {
+        setClauses.push('group_name = @group_name');
+        inputs.push({ name: 'group_name', value: data.group_name });
+    }
+    if (data.business_nature !== undefined) {
+        setClauses.push('business_nature = @business_nature');
+        inputs.push({ name: 'business_nature', value: data.business_nature });
+    }
+    if (data.number_of_lives !== undefined) {
+        setClauses.push('number_of_lives = @number_of_lives');
+        inputs.push({ name: 'number_of_lives', value: data.number_of_lives });
+    }
+    if (data.business_address !== undefined) {
+        setClauses.push('business_address = @business_address');
+        inputs.push({ name: 'business_address', value: data.business_address });
+    }
+    if (data.contact_number !== undefined) {
+        setClauses.push('contact_number = @contact_number');
+        inputs.push({ name: 'contact_number', value: data.contact_number });
+    }
+    if (data.fax_number !== undefined) {
+        setClauses.push('fax_number = @fax_number');
+        inputs.push({ name: 'fax_number', value: data.fax_number || null });
+    }
+    if (data.email !== undefined) {
+        setClauses.push('email = @email');
+        inputs.push({ name: 'email', value: data.email });
+    }
+    if (data.contact_person !== undefined) {
+        setClauses.push('contact_person = @contact_person');
+        inputs.push({ name: 'contact_person', value: data.contact_person });
+    }
+    if (data.designation !== undefined) {
+        setClauses.push('designation = @designation');
+        inputs.push({ name: 'designation', value: data.designation });
+    }
+    if (data.proposal_addressee !== undefined) {
+        setClauses.push('proposal_addressee = @proposal_addressee');
+        inputs.push({ name: 'proposal_addressee', value: data.proposal_addressee });
+    }
+    if (data.addressee_designation !== undefined) {
+        setClauses.push('addressee_designation = @addressee_designation');
+        inputs.push({ name: 'addressee_designation', value: data.addressee_designation });
+    }
+    if (data.group_classification_id !== undefined) {
+        setClauses.push('group_classification_id = @group_classification_id');
+        inputs.push({ name: 'group_classification_id', value: data.group_classification_id });
+    }
+    if (data.other_group_classification !== undefined) {
+        setClauses.push('other_group_classification = @other_group_classification');
+        inputs.push({ name: 'other_group_classification', value: data.other_group_classification || null });
+    }
+    if (data.business_type_id !== undefined) {
+        setClauses.push('business_type_id = @business_type_id');
+        inputs.push({ name: 'business_type_id', value: data.business_type_id });
+    }
+    if (data.other_business_type !== undefined) {
+        setClauses.push('other_business_type = @other_business_type');
+        inputs.push({ name: 'other_business_type', value: data.other_business_type || null });
+    }
+    if (data.group_type_id !== undefined) {
+        setClauses.push('group_type_id = @group_type_id');
+        inputs.push({ name: 'group_type_id', value: data.group_type_id });
+    }
+    if (data.sub_group_type_id !== undefined) {
+        const subGroupTypeIdsValue = data.sub_group_type_id
+            ? Array.isArray(data.sub_group_type_id) ? JSON.stringify(data.sub_group_type_id) : data.sub_group_type_id
+            : null;
+        setClauses.push('sub_group_type_id = @sub_group_type_id');
+        inputs.push({ name: 'sub_group_type_id', value: subGroupTypeIdsValue });
+    }
+    if (data.other_group_type !== undefined) {
+        setClauses.push('other_group_type = @other_group_type');
+        inputs.push({ name: 'other_group_type', value: data.other_group_type || null });
+    }
+    if (data.minimum_age !== undefined) {
+        setClauses.push('minimum_age = @minimum_age');
+        inputs.push({ name: 'minimum_age', value: data.minimum_age });
+    }
+    if (data.maximum_age !== undefined) {
+        setClauses.push('maximum_age = @maximum_age');
+        inputs.push({ name: 'maximum_age', value: data.maximum_age });
+    }
+    if (data.payment_mode_id !== undefined) {
+        setClauses.push('payment_mode_id = @payment_mode_id');
+        inputs.push({ name: 'payment_mode_id', value: data.payment_mode_id });
+    }
+    if (data.plan_id !== undefined) {
+        setClauses.push('plan_id = @plan_id');
+        inputs.push({ name: 'plan_id', value: data.plan_id || null });
+    }
+    if (data.basic_plan_id !== undefined) {
+        setClauses.push('basic_plan_id = @basic_plan_id');
+        inputs.push({ name: 'basic_plan_id', value: data.basic_plan_id || null });
+    }
+    if (data.rider_ids !== undefined) {
+        const riderIdsValue = data.rider_ids
+            ? Array.isArray(data.rider_ids) ? JSON.stringify(data.rider_ids) : data.rider_ids
+            : null;
+        setClauses.push('rider_ids = @rider_ids');
+        inputs.push({ name: 'rider_ids', value: riderIdsValue });
+    }
+    if (data.status_id !== undefined) {
+        setClauses.push('status_id = @status_id');
+        inputs.push({ name: 'status_id', value: data.status_id });
+    }
+    
+    // Always update timestamp
+    setClauses.push('updated_at = GETDATE()');
+    
+    // Add WHERE clause
+    const whereClause = 'WHERE application_id = @id';
+    
+    // Build and execute query
+    const request = pool.request();
+    request.input('id', sql.Int, id);
+    
+    for (const input of inputs) {
+        request.input(input.name, input.name.includes('age') || input.name.includes('id') ? sql.Int : sql.NVarChar, input.value);
+    }
+    
+    const query = `UPDATE DHUB.sg.financial_insurance_application SET ${setClauses.join(', ')} ${whereClause}`;
+    await request.query(query);
 
     return getApplicationById(id);
 };

@@ -276,6 +276,22 @@ export const validateFinancialApplication = [
         .notEmpty().withMessage('Addressee Designation is required')
         .isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
 
+    // Age validation - Minimum 18, Maximum 64
+    body('minimum_age')
+        .notEmpty().withMessage('Minimum Age is required')
+        .isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be 18 '),
+    body('maximum_age')
+        .notEmpty().withMessage('Maximum Age is required')
+        .isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be 64 ')
+        .custom(async (value, { req }) => {
+            const minAge = Number(req.body.minimum_age);
+            const maxAge = Number(value);
+            if (minAge && maxAge && maxAge < minAge) {
+                throw new Error('Maximum Age must be greater than or equal to Minimum Age');
+            }
+            return true;
+        }),
+
     // Lookup ID validations
     body('group_classification_id')
         .notEmpty().withMessage('Group Classification is required')
@@ -314,32 +330,111 @@ export const validateFinancialApplication = [
             const lookups = req.lookupCache.TYPE_OF_GROUP;
             const item = lookups.find(l => l.id === Number(value));
             if (!item) throw new Error(`Invalid group_type_id (${value})`);
+            
+            // Store group_type for sub_group_type validation
+            req.body.group_type_name = item.name;
             return true;
         }),
-    body('sub_group_type_id')
-    .optional()
-    .isInt().withMessage('sub_group_type_id must be an integer')
-    .custom(async (value, { req }) => {
-        const parentId = Number(req.body.group_type_id); // convert to number
-        if (!parentId) throw new Error('group_type_id is required to validate sub_group_type_id');
-
-        if (!req.lookupCache) req.lookupCache = {};
-        if (!req.lookupCache.TYPE_OF_GROUP) {
-            req.lookupCache.TYPE_OF_GROUP = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
+    
+    // Custom validation for sub_group_type_id based on group_type_id
+    // - Employer-Employee (11): allows multiple selections (array)
+    // - OFW (16): allows only ONE selection (single integer)
+    // - Other: required to provide other_group_type
+    async (req, res, next) => {
+        try {
+            const groupTypeId = Number(req.body.group_type_id);
+            const subGroupTypeId = req.body.sub_group_type_id;
+            
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.TYPE_OF_GROUP) {
+                req.lookupCache.TYPE_OF_GROUP = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
+            }
+            const lookups = req.lookupCache.TYPE_OF_GROUP;
+            const groupTypeItem = lookups.find(l => l.id === groupTypeId);
+            
+            // If group_type is "Other", sub_group_type_id is not allowed, other_group_type is required
+            if (groupTypeItem && (groupTypeItem.name === 'Other' || groupTypeItem.name === 'Others')) {
+                if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
+                    return res.status(400).json({ 
+                        status: false, 
+                        errors: [{ msg: 'sub_group_type_id should not be provided when Group Type is "Other". Please use other_group_type field instead.' }] 
+                    });
+                }
+                return next();
+            }
+            
+            // If no sub_group_type_id provided and it's required for this group_type
+            const validSubgroups = lookups.filter(l => Number(l.parent_id) === groupTypeId);
+            if (validSubgroups.length > 0 && !subGroupTypeId && subGroupTypeId !== 0) {
+                return res.status(400).json({ 
+                    status: false, 
+                    errors: [{ msg: 'sub_group_type_id is required for the selected Group Type' }] 
+                });
+            }
+            
+            // Employer-Employee (ID 11): allows array of sub_group_type_ids
+            if (groupTypeId === 11) {
+                if (Array.isArray(subGroupTypeId)) {
+                    // Validate each sub_group_type_id
+                    const invalidIds = subGroupTypeId.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
+                    if (invalidIds.length > 0) {
+                        return res.status(400).json({ 
+                            status: false, 
+                            errors: [{ msg: `Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options for Employer-Employee: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
+                        });
+                    }
+                } else if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
+                    // Single value also allowed for Employer-Employee
+                    if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
+                        return res.status(400).json({ 
+                            status: false, 
+                            errors: [{ msg: `Invalid sub_group_type_id: ${subGroupTypeId}. Valid options for Employer-Employee: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
+                        });
+                    }
+                }
+            }
+            // OFW (ID 16): allows only ONE selection
+            else if (groupTypeId === 16) {
+                if (Array.isArray(subGroupTypeId)) {
+                    return res.status(400).json({ 
+                        status: false, 
+                        errors: [{ msg: 'OFW Group Type allows only ONE sub_group_type_id selection. Please select either Land Based or Sea Based.' }] 
+                    });
+                }
+                if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
+                    if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
+                        return res.status(400).json({ 
+                            status: false, 
+                            errors: [{ msg: `Invalid sub_group_type_id: ${subGroupTypeId}. Valid options for OFW: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
+                        });
+                    }
+                }
+            }
+            // Other group types with subgroups
+            else if (validSubgroups.length > 0) {
+                if (Array.isArray(subGroupTypeId)) {
+                    return res.status(400).json({ 
+                        status: false, 
+                        errors: [{ msg: 'Only Employer-Employee group type allows multiple sub_group_type_id selections.' }] 
+                    });
+                }
+                if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
+                    if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
+                        return res.status(400).json({ 
+                            status: false, 
+                            errors: [{ msg: `Invalid sub_group_type_id: ${subGroupTypeId}. Valid options: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
+                        });
+                    }
+                }
+            }
+            
+            next();
+        } catch (error) {
+            console.error('sub_group_type_id validation error:', error);
+            return res.status(500).json({ status: false, errors: [{ msg: 'Error validating sub_group_type_id' }] });
         }
-        const lookups = req.lookupCache.TYPE_OF_GROUP;
-        const validSubgroups = lookups
-            .filter(l => Number(l.parent_id) === parentId) // convert parent_id to number
-            .map(l => ({ id: l.id, name: l.name }));
+    },
 
-        if (!validSubgroups.some(l => l.id === Number(value))) {
-            const allowed = validSubgroups.length
-                ? validSubgroups.map(l => `${l.id} (${l.name})`).join(', ')
-                : 'None';
-            throw new Error(`Invalid sub_group_type_id (${value}) for group_type_id (${parentId}). Allowed: ${allowed}`);
-        }
-        return true;
-    }),
     body('payment_mode_id')
         .notEmpty().withMessage('Payment Mode is required')
         .isInt().withMessage('payment_mode_id must be an integer')
@@ -450,8 +545,8 @@ export const validateFinancialApplication = [
             const id = req.body.group_type_id;
             if (!id) return true;
 
-            // This lookup should already be cached by the group_type_id validator
-            const lookups = req.lookupCache.TYPE_OF_GROUP || [];
+            // This lookup should already be cached
+            const lookups = req.lookupCache.TYPE_OF_GROUP || await Financial.getLookupListByCategory('TYPE_OF_GROUP');
             const selected = lookups.find(l => l.id === Number(id));
 
             if (!selected) return true;
@@ -514,6 +609,18 @@ export const validateUpdateFinancialApplication = [
     body('proposal_addressee').optional().isLength({ max: 255 }).withMessage('Proposal Addressee must not exceed 255 characters'),
     body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
 
+    // Age validation for update - Minimum 18, Maximum 64
+    body('minimum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be 18 '),
+    body('maximum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be 64 ')
+        .custom(async (value, { req }) => {
+            const minAge = Number(req.body.minimum_age);
+            const maxAge = Number(value);
+            if (minAge && maxAge && maxAge < minAge) {
+                throw new Error('Maximum Age must be greater than or equal to Minimum Age');
+            }
+            return true;
+        }),
+
     // Lookup ID validations (optional, but validated if present)
     body('group_classification_id').optional().isInt().withMessage('group_classification_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
@@ -536,22 +643,26 @@ export const validateUpdateFinancialApplication = [
         return true;
     }),
 
-    // Dependent field validations
-    body('sub_group_type_id').optional({ nullable: true }).isInt().withMessage('sub_group_type_id must be an integer').custom(async (value, { req }) => {
-        if (value === null) return true; // Allow clearing the value
-
-        const parentId = req.body.group_type_id !== undefined
-            ? Number(req.body.group_type_id)
-            : req.existingApplication?.group_type?.id;
-
-        if (!parentId) throw new Error('group_type_id is required to validate sub_group_type_id');
-
-        const lookups = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
-        const validSubgroups = lookups.filter(l => Number(l.parent_id) === parentId);
-        if (!validSubgroups.some(l => l.id === Number(value))) {
-            const allowed = validSubgroups.length ? validSubgroups.map(l => `${l.id} (${l.name})`).join(', ') : 'None';
-            throw new Error(`Invalid sub_group_type_id (${value}) for group_type_id (${parentId}). Allowed: ${allowed}`);
+    // Dependent field validations - sub_group_type_id can be array or string
+    body('sub_group_type_id').optional({ nullable: true }).custom(async (value, { req }) => {
+        // Allow null, arrays (for Employer-Employee), or single values
+        if (value === null || value === undefined) return true;
+        
+        // If it's an array, validate each element
+        if (Array.isArray(value)) {
+            for (const id of value) {
+                if (isNaN(Number(id))) {
+                    throw new Error('sub_group_type_id array must contain only integers');
+                }
+            }
+            return true;
         }
+        
+        // If it's a single value, validate it's a number
+        if (isNaN(Number(value))) {
+            throw new Error('sub_group_type_id must be an integer or array of integers');
+        }
+        
         return true;
     }),
     body('plan_id').optional().isInt().withMessage('plan_id must be a valid integer').custom(async (value) => {
