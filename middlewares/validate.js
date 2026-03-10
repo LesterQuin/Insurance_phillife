@@ -289,7 +289,10 @@ export const validateFinancialApplication = [
             }
             const lookups = req.lookupCache.GROUP_CLASSIFICATION;
             const item = lookups.find(l => l.id === Number(value));
-            if (!item) throw new Error(`Invalid group_classification_id (${value})`);
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid group_classification_id (${value}). Valid options: ${validOptions}`);
+            }
             return true;
         }),
     body('other_group_classification')
@@ -332,7 +335,10 @@ export const validateFinancialApplication = [
             }
             const lookups = req.lookupCache.BUSINESS_TYPE;
             const item = lookups.find(l => l.id === Number(value));
-            if (!item) throw new Error(`Invalid business_type_id (${value})`);
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid business_type_id (${value}). Valid options: ${validOptions}`);
+            }
             return true;
         }),
     body('other_business_type')
@@ -374,7 +380,10 @@ export const validateFinancialApplication = [
             }
             const lookups = req.lookupCache.TYPE_OF_GROUP;
             const item = lookups.find(l => l.id === Number(value));
-            if (!item) throw new Error(`Invalid group_type_id (${value})`);
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid group_type_id (${value}). Valid options: ${validOptions}`);
+            }
             
             req.body.group_type_name = item.name;
             return true;
@@ -435,7 +444,7 @@ export const validateFinancialApplication = [
                 if (Array.isArray(subGroupTypeId)) {
                     return res.status(400).json({ 
                         status: false, 
-                        errors: [{ msg: 'OFW Group Type allows only ONE sub_group_type_id selection. Please select either Land Based or Sea Based.' }] 
+                        errors: [{ msg: `Only select one. Valid options for OFW: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
                     });
                 }
                 if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
@@ -447,12 +456,13 @@ export const validateFinancialApplication = [
                     }
                 }
             }
-            // Other group types with subgroups
+            // Other group types with subgroups (not 11-Employer-Employee or 16-OFW)
             else if (validSubgroups.length > 0) {
+                // Only Employer-Employee (ID 11) and OFW (ID 16) allow array input
                 if (Array.isArray(subGroupTypeId)) {
                     return res.status(400).json({ 
                         status: false, 
-                        errors: [{ msg: 'Only Employer-Employee group type allows multiple sub_group_type_id selections.' }] 
+                        errors: [{ msg: `Group Type ID ${groupTypeId} does not allow array input for sub_group_type_id. Only Employer-Employee (ID 11) and OFW (ID 16) allow multiple selections. Valid options: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
                     });
                 }
                 if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
@@ -525,7 +535,10 @@ export const validateFinancialApplication = [
             }
             const lookups = req.lookupCache.MODE_OF_PAYMENT;
             const item = lookups.find(l => l.id === Number(value));
-            if (!item) throw new Error(`Invalid payment_mode_id (${value})`);
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid payment_mode_id (${value}). Valid options: ${validOptions}`);
+            }
             return true;
         }),
 
@@ -542,7 +555,10 @@ export const validateFinancialApplication = [
             }
             const lookups = req.lookupCache.TYPE_OF_PROPOSAL;
             const item = lookups.find(l => l.id === Number(value));
-            if (!item) throw new Error(`Invalid type_of_proposal_id (${value})`);
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid type_of_proposal_id (${value}). Valid options: ${validOptions}`);
+            }
             return true;
         }),
 
@@ -554,13 +570,21 @@ export const validateFinancialApplication = [
         .isInt().withMessage('plan_id must be a valid integer')
         .custom(async (value) => {
             const plans = await Financial.getAllPlans();
-            if (!plans.some(p => p.plan_id === Number(value))) throw new Error(`Invalid plan_id (${value})`);
+            if (!plans.some(p => p.plan_id === Number(value))) {
+                const validOptions = plans.map(p => `${p.plan_id} - ${p.plan_name}`).join(', ');
+                throw new Error(`Invalid plan_id (${value}). Valid options: ${validOptions}`);
+            }
             return true;
         }),
-    body('basic_plan_id')
+body('basic_plan_id')
         .notEmpty().withMessage('Basic Plan is required')
         .isInt().withMessage('basic_plan_id must be a valid integer')
         .custom(async (value, { req }) => {
+            // Check if basic_plan_id is an array - only one allowed
+            if (Array.isArray(value)) {
+                throw new Error('Only select one');
+            }
+            
             const planId = Number(req.body.plan_id);
             if (!planId) throw new Error('plan_id is required to validate basic_plan_id');
 
@@ -647,27 +671,42 @@ export const validateUpdateFinancialApplication = [
     // Lookup ID validations (optional, but validated if present)
     body('group_classification_id').optional().isInt().withMessage('group_classification_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
-        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid group_classification_id (${value})`);
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid group_classification_id (${value}). Valid options: ${validOptions}`);
+        }
         return true;
     }),
     body('business_type_id').optional().isInt().withMessage('business_type_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('BUSINESS_TYPE');
-        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid business_type_id (${value})`);
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid business_type_id (${value}). Valid options: ${validOptions}`);
+        }
         return true;
     }),
     body('group_type_id').optional().isInt().withMessage('group_type_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
-        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid group_type_id (${value})`);
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid group_type_id (${value}). Valid options: ${validOptions}`);
+        }
         return true;
     }),
     body('payment_mode_id').optional().isInt().withMessage('payment_mode_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('MODE_OF_PAYMENT');
-        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid payment_mode_id (${value})`);
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid payment_mode_id (${value}). Valid options: ${validOptions}`);
+        }
         return true;
     }),
     body('type_of_proposal_id').optional().isInt().withMessage('type_of_proposal_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('TYPE_OF_PROPOSAL');
-        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid type_of_proposal_id (${value})`);
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid type_of_proposal_id (${value}). Valid options: ${validOptions}`);
+        }
         return true;
     }),
 
@@ -695,10 +734,18 @@ export const validateUpdateFinancialApplication = [
     }),
     body('plan_id').optional().isInt().withMessage('plan_id must be a valid integer').custom(async (value) => {
         const plans = await Financial.getAllPlans();
-        if (!plans.some(p => p.plan_id === Number(value))) throw new Error(`Invalid plan_id (${value})`);
+        if (!plans.some(p => p.plan_id === Number(value))) {
+            const validOptions = plans.map(p => `${p.plan_id} - ${p.plan_name}`).join(', ');
+            throw new Error(`Invalid plan_id (${value}). Valid options: ${validOptions}`);
+        }
         return true;
     }),
-    body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a valid integer').custom(async (value, { req }) => {
+body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a valid integer').custom(async (value, { req }) => {
+        // Check if basic_plan_id is an array - only one allowed
+        if (Array.isArray(value)) {
+            throw new Error('Only select one');
+        }
+        
         const planId = req.body.plan_id !== undefined
             ? Number(req.body.plan_id)
             : req.existingApplication?.plan?.id;
