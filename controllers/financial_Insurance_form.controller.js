@@ -34,12 +34,18 @@ const cleanupOtherFields = async (data) => {
 // Create Application
 export const createApplication = async (req, res) => {
     try {
-        // Get userId from authenticated user
         const userId = req.user.userId;
         
         const cleanedData = await cleanupOtherFields(req.body);
-        const application = await Model.createApplication(cleanedData, userId);
-        return success(res, application, 'Application submitted successfully', 201);
+        const newRecord = await Model.createApplication(cleanedData, userId);
+
+        if (!newRecord || !newRecord.application_id) {
+            return error(res, 'Failed to create the application.', 500);
+        }
+
+        const fullApplication = await Model.getApplicationById(newRecord.application_id);
+
+        return success(res, fullApplication, 'Application submitted successfully', 201);
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);
@@ -72,13 +78,10 @@ export const getApplicationById = async (req, res) => {
 // Update Application
 export const updateApplication = async (req, res) => {
     try {
-        // Get userId from authenticated user
         const userId = req.user.userId;
         
         console.log('=== UPDATE DEBUG ===');
         console.log('Logged in userId:', userId, 'Type:', typeof userId);
-        
-        // Get the agent_code from request body (optional)
         const agentCodeFromBody = req.body.agent_code;
         
         // Get the existing application to check ownership
@@ -88,9 +91,7 @@ export const updateApplication = async (req, res) => {
         }
         
         console.log('Application user_id:', existingApplication.user_id, 'Type:', typeof existingApplication.user_id);
-        
-        // Check if the logged-in user is the creator (compare user_id directly)
-        // Convert both to numbers to ensure proper comparison
+
         const loggedInId = Number(userId);
         const creatorId = Number(existingApplication.user_id);
         
@@ -99,11 +100,9 @@ export const updateApplication = async (req, res) => {
         let isAuthorized = false;
         
         if (loggedInId === creatorId) {
-            // Logged-in user is the creator
             console.log('User is the creator - authorized');
             isAuthorized = true;
         } else if (agentCodeFromBody) {
-            // Check if agent_code from body matches creator's agent_code
             const creatorUser = await User.getUserById(existingApplication.user_id);
             console.log('Creator user agent_code:', creatorUser?.agent_code, 'Provided:', agentCodeFromBody);
             if (creatorUser && creatorUser.agent_code === agentCodeFromBody.trim()) {
@@ -115,7 +114,6 @@ export const updateApplication = async (req, res) => {
             return error(res, 'You are not authorized to update this application. Only the original agent can update it.', 403);
         }
         
-        // Remove agent_code from data before updating (it's not a table column)
         const { agent_code, ...updateData } = req.body;
         
         const cleanedData = await cleanupOtherFields(updateData);

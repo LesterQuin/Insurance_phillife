@@ -96,12 +96,10 @@ export const validateRegister = [
         try {
             const { agent_code } = req.body;
             
-            // If agent_code is provided and not empty, check if it already exists
             if (agent_code && agent_code.trim()) {
                 const existingUser = await User.getUserByAgentCode(agent_code.trim());
                 
                 if (existingUser) {
-                    // Return error instead of auto-generating a new code
                     return res.status(400).json({
                         status: false,
                         message: "Agent code already exists. Please use a different agent code."
@@ -229,7 +227,6 @@ export const validateUpdateProfile = [
         .optional()
         .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
 
-    // Final middleware to check for validation errors
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty())
@@ -331,15 +328,10 @@ export const validateFinancialApplication = [
             const item = lookups.find(l => l.id === Number(value));
             if (!item) throw new Error(`Invalid group_type_id (${value})`);
             
-            // Store group_type for sub_group_type validation
             req.body.group_type_name = item.name;
             return true;
         }),
     
-    // Custom validation for sub_group_type_id based on group_type_id
-    // - Employer-Employee (11): allows multiple selections (array)
-    // - OFW (16): allows only ONE selection (single integer)
-    // - Other: required to provide other_group_type
     async (req, res, next) => {
         try {
             const groupTypeId = Number(req.body.group_type_id);
@@ -352,7 +344,6 @@ export const validateFinancialApplication = [
             const lookups = req.lookupCache.TYPE_OF_GROUP;
             const groupTypeItem = lookups.find(l => l.id === groupTypeId);
             
-            // If group_type is "Other", sub_group_type_id is not allowed, other_group_type is required
             if (groupTypeItem && (groupTypeItem.name === 'Other' || groupTypeItem.name === 'Others')) {
                 if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
                     return res.status(400).json({ 
@@ -384,7 +375,6 @@ export const validateFinancialApplication = [
                         });
                     }
                 } else if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                    // Single value also allowed for Employer-Employee
                     if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
                         return res.status(400).json({ 
                             status: false, 
@@ -491,7 +481,7 @@ export const validateFinancialApplication = [
         .optional().isLength({ max: 255 }).withMessage('other_group_classification must not exceed 255 characters')
         .custom(async (value, { req }) => {
             const id = req.body.group_classification_id;
-            if (!id) return true; // Let other validator handle missing id
+            if (!id) return true; 
 
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.GROUP_CLASSIFICATION) {
@@ -500,7 +490,7 @@ export const validateFinancialApplication = [
             const lookups = req.lookupCache.GROUP_CLASSIFICATION;
             const selected = lookups.find(l => l.id === Number(id));
 
-            if (!selected) return true; // Let other validator handle invalid id
+            if (!selected) return true;
 
             const isOther = selected.name === 'Others' || selected.name === 'Other';
 
@@ -545,7 +535,6 @@ export const validateFinancialApplication = [
             const id = req.body.group_type_id;
             if (!id) return true;
 
-            // This lookup should already be cached
             const lookups = req.lookupCache.TYPE_OF_GROUP || await Financial.getLookupListByCategory('TYPE_OF_GROUP');
             const selected = lookups.find(l => l.id === Number(id));
 
@@ -578,8 +567,6 @@ export const validateFinancialApplication = [
 // Form validation (Update)
 // -----------------------------
 export const validateUpdateFinancialApplication = [
-    // This helper pre-loads the existing application data if we're in an update context.
-    // This allows dependent validations to work correctly on partial updates.
     async (req, res, next) => {
         if (req.params.id) {
             try {

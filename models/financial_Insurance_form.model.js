@@ -88,7 +88,7 @@ export const getAllApplications = async () => {
     const applications = res.recordset ?? [];
     if (applications.length === 0) return [];
 
-    // --- Bulk fetch related data to avoid N+1 queries ---
+    // --- Bulk fetch related data 
 
     const allRiderIds = new Set();
     const allSubGroupTypeIds = new Set();
@@ -240,7 +240,6 @@ export const getApplicationById = async (id) => {
     let subGroupTypeIds = [];
     if (app.sub_group_type_id) {
         try {
-            // Try to parse as JSON array first
             const parsed = JSON.parse(app.sub_group_type_id);
             if (Array.isArray(parsed)) {
                 subGroupTypeIds = parsed;
@@ -248,13 +247,11 @@ export const getApplicationById = async (id) => {
                 subGroupTypeIds = [parsed];
             }
         } catch {
-            // If not JSON, treat as single value
             subGroupTypeIds = [app.sub_group_type_id];
         }
     }
 
     let subGroupTypes = [];
-    // Fetch sub_group_type details if there are sub_group_type_ids
     if (subGroupTypeIds.length > 0) {
         const subGroupRes = await pool.request()
             .query(`
@@ -354,7 +351,6 @@ export const getApplicationById = async (id) => {
 export const updateApplication = async (id, data) => {
     const pool = await poolPromise;
     
-    // Build dynamic SET clause based on provided fields
     const setClauses = [];
     const inputs = [];
     
@@ -421,6 +417,10 @@ export const updateApplication = async (id, data) => {
     if (data.group_type_id !== undefined) {
         setClauses.push('group_type_id = @group_type_id');
         inputs.push({ name: 'group_type_id', value: data.group_type_id });
+
+        if (data.sub_group_type_id === undefined) {
+            setClauses.push('sub_group_type_id = NULL');
+        }
     }
     if (data.sub_group_type_id !== undefined) {
         const subGroupTypeIdsValue = data.sub_group_type_id
@@ -555,7 +555,7 @@ export const getLookupNamesByIds = async (ids) => {
     const pool = await poolPromise;
     const request = pool.request();
     const parameters = [];
-    // Use a Set to avoid duplicate IDs in the IN clause and filter nulls
+
     const uniqueIds = [...new Set(ids.filter(id => id != null))];
 
     if (uniqueIds.length === 0) return new Map();
