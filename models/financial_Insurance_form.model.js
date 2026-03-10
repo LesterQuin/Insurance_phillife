@@ -39,18 +39,19 @@ export const createApplication = async (data, userId) => {
         .input('plan_id', sql.Int, data.plan_id || null)
         .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
         .input('rider_ids', sql.NVarChar, riderIdsValue)
+        .input('type_of_proposal_id', sql.Int, data.type_of_proposal_id)
         .input('status_id', sql.Int, data.status_id || 1)
         .query(`
             INSERT INTO DHUB.sg.financial_insurance_application
             (user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
             contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
             other_group_classification, business_type_id, other_business_type, group_type_id, sub_group_type_id,
-            other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, rider_ids, status_id)
+            other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, rider_ids, type_of_proposal_id, status_id)
             VALUES
             (@user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
             @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
             @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @sub_group_type_id,
-            @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @rider_ids, @status_id);
+            @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @rider_ids, @type_of_proposal_id, @status_id);
             SELECT SCOPE_IDENTITY() AS application_id;
         `);
 
@@ -67,12 +68,14 @@ export const getAllApplications = async () => {
                 fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives, fia.contact_person,
                 fia.status_id, fia.group_classification_id, fia.other_group_classification,
                 fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
-                fia.plan_id, fia.basic_plan_id, fia.rider_ids, fia.sub_group_type_id, 
+                fia.plan_id, fia.basic_plan_id, fia.rider_ids, fia.sub_group_type_id,
+                fia.type_of_proposal_id, 
                 fia.created_at, fia.updated_at,
                 fis.status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
+                top.name AS type_of_proposal_name,
                 p.product_name AS plan_name,
                 bp.basic_plan_name
             FROM sg.financial_insurance_application fia
@@ -80,6 +83,7 @@ export const getAllApplications = async () => {
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
             LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
             LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
+            LEFT JOIN sg.financial_insurance_group_lookups top ON fia.type_of_proposal_id = top.id
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             ORDER BY fia.created_at DESC
@@ -175,6 +179,10 @@ export const getAllApplications = async () => {
                 other_value: app.other_group_type
             },
             sub_group_types: currentSubGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name),
+            type_of_proposal: {
+                id: app.type_of_proposal_id,
+                name: app.type_of_proposal_name
+            },
             plan: { id: app.plan_id, name: app.plan_name },
             basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
             riders: currentRiderIds.map(id => ({ id, name: ridersMap.get(id) })).filter(r => r.name),
@@ -199,6 +207,7 @@ export const getApplicationById = async (id) => {
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
                 pm.name AS payment_mode_name,
+                top.name AS type_of_proposal_name,
 
                 p.product_name AS plan_name,
                 bp.basic_plan_name
@@ -219,6 +228,9 @@ export const getApplicationById = async (id) => {
 
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
+
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups top
+                ON fia.type_of_proposal_id = top.id
 
             LEFT JOIN DHUB.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
@@ -305,6 +317,10 @@ export const getApplicationById = async (id) => {
         payment_mode: {
             id: app.payment_mode_id,
             name: app.payment_mode_name
+        },
+        type_of_proposal: {
+            id: app.type_of_proposal_id,
+            name: app.type_of_proposal_name
         },
         plan: {
             id: app.plan_id,
@@ -444,6 +460,10 @@ export const updateApplication = async (id, data) => {
     if (data.payment_mode_id !== undefined) {
         setClauses.push('payment_mode_id = @payment_mode_id');
         inputs.push({ name: 'payment_mode_id', value: data.payment_mode_id });
+    }
+    if (data.type_of_proposal_id !== undefined) {
+        setClauses.push('type_of_proposal_id = @type_of_proposal_id');
+        inputs.push({ name: 'type_of_proposal_id', value: data.type_of_proposal_id });
     }
     if (data.plan_id !== undefined) {
         setClauses.push('plan_id = @plan_id');

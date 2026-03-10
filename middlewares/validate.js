@@ -530,6 +530,23 @@ export const validateFinancialApplication = [
         }),
 
     // -----------------------------
+    // Type of Proposal
+    // -----------------------------
+    body('type_of_proposal_id')
+        .notEmpty().withMessage('Type of Proposal is required')
+        .isInt().withMessage('type_of_proposal_id must be an integer')
+        .custom(async (value, { req }) => {
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.TYPE_OF_PROPOSAL) {
+                req.lookupCache.TYPE_OF_PROPOSAL = await Financial.getLookupListByCategory('TYPE_OF_PROPOSAL');
+            }
+            const lookups = req.lookupCache.TYPE_OF_PROPOSAL;
+            const item = lookups.find(l => l.id === Number(value));
+            if (!item) throw new Error(`Invalid type_of_proposal_id (${value})`);
+            return true;
+        }),
+
+    // -----------------------------
     // Product/Plan
     // -----------------------------
     body('plan_id')
@@ -646,6 +663,11 @@ export const validateUpdateFinancialApplication = [
     body('payment_mode_id').optional().isInt().withMessage('payment_mode_id must be an integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('MODE_OF_PAYMENT');
         if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid payment_mode_id (${value})`);
+        return true;
+    }),
+    body('type_of_proposal_id').optional().isInt().withMessage('type_of_proposal_id must be an integer').custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('TYPE_OF_PROPOSAL');
+        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid type_of_proposal_id (${value})`);
         return true;
     }),
 
