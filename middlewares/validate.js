@@ -239,6 +239,9 @@ export const validateUpdateProfile = [
 // Form validation
 // -----------------------------
 export const validateFinancialApplication = [
+    // -----------------------------
+    // KYC
+    // -----------------------------
     body('group_name')
         .notEmpty().withMessage('Group Name is required')
         .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
@@ -272,24 +275,10 @@ export const validateFinancialApplication = [
     body('addressee_designation')
         .notEmpty().withMessage('Addressee Designation is required')
         .isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
-
-    // Age validation - Minimum 18, Maximum 64
-    body('minimum_age')
-        .notEmpty().withMessage('Minimum Age is required')
-        .isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be 18 '),
-    body('maximum_age')
-        .notEmpty().withMessage('Maximum Age is required')
-        .isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be 64 ')
-        .custom(async (value, { req }) => {
-            const minAge = Number(req.body.minimum_age);
-            const maxAge = Number(value);
-            if (minAge && maxAge && maxAge < minAge) {
-                throw new Error('Maximum Age must be greater than or equal to Minimum Age');
-            }
-            return true;
-        }),
-
-    // Lookup ID validations
+    
+    // -----------------------------
+    // Group Classification
+    // -----------------------------
     body('group_classification_id')
         .notEmpty().withMessage('Group Classification is required')
         .isInt().withMessage('group_classification_id must be an integer')
@@ -303,6 +292,36 @@ export const validateFinancialApplication = [
             if (!item) throw new Error(`Invalid group_classification_id (${value})`);
             return true;
         }),
+    body('other_group_classification')
+        .optional().isLength({ max: 255 }).withMessage('other_group_classification must not exceed 255 characters')
+        .custom(async (value, { req }) => {
+            const id = req.body.group_classification_id;
+            if (!id) return true; 
+
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.GROUP_CLASSIFICATION) {
+                req.lookupCache.GROUP_CLASSIFICATION = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
+            }
+            const lookups = req.lookupCache.GROUP_CLASSIFICATION;
+            const selected = lookups.find(l => l.id === Number(id));
+
+            if (!selected) return true;
+
+            const isOther = selected.name === 'Others' || selected.name === 'Other';
+
+            if (isOther && (!value || value.trim() === '')) {
+                throw new Error('other_group_classification is required when "Others" is selected.');
+            }
+
+            if (!isOther && value) {
+                throw new Error(`other_group_classification must be empty when Group Classification is not "Others".`);
+            }
+            return true;
+        }),
+
+    // -----------------------------
+    // Business Type
+    // -----------------------------
     body('business_type_id')
         .notEmpty().withMessage('Business Type is required')
         .isInt().withMessage('business_type_id must be an integer')
@@ -316,6 +335,35 @@ export const validateFinancialApplication = [
             if (!item) throw new Error(`Invalid business_type_id (${value})`);
             return true;
         }),
+    body('other_business_type')
+        .optional().isLength({ max: 255 }).withMessage('other_business_type must not exceed 255 characters')
+        .custom(async (value, { req }) => {
+            const id = req.body.business_type_id;
+            if (!id) return true;
+
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.BUSINESS_TYPE) {
+                req.lookupCache.BUSINESS_TYPE = await Financial.getLookupListByCategory('BUSINESS_TYPE');
+            }
+            const lookups = req.lookupCache.BUSINESS_TYPE;
+            const selected = lookups.find(l => l.id === Number(id));
+
+            if (!selected) return true;
+
+            const isOther = selected.name === 'Others' || selected.name === 'Other';
+
+            if (isOther && (!value || value.trim() === '')) {
+                throw new Error('other_business_type is required when "Other" is selected.');
+            }
+
+            if (!isOther && value) {
+                throw new Error(`other_business_type must be empty when Business Type is not "Other".`);
+            }
+            return true;
+        }),
+    // -----------------------------
+    // Type of Group
+    // -----------------------------
     body('group_type_id')
         .notEmpty().withMessage('Group Type is required')
         .isInt().withMessage('group_type_id must be an integer')
@@ -331,7 +379,6 @@ export const validateFinancialApplication = [
             req.body.group_type_name = item.name;
             return true;
         }),
-    
     async (req, res, next) => {
         try {
             const groupTypeId = Number(req.body.group_type_id);
@@ -424,7 +471,50 @@ export const validateFinancialApplication = [
             return res.status(500).json({ status: false, errors: [{ msg: 'Error validating sub_group_type_id' }] });
         }
     },
+    body('other_group_type')
+        .optional().isLength({ max: 255 }).withMessage('other_group_type must not exceed 255 characters')
+        .custom(async (value, { req }) => {
+            const id = req.body.group_type_id;
+            if (!id) return true;
 
+            const lookups = req.lookupCache.TYPE_OF_GROUP || await Financial.getLookupListByCategory('TYPE_OF_GROUP');
+            const selected = lookups.find(l => l.id === Number(id));
+
+            if (!selected) return true;
+
+            const isOther = selected.name === 'Others' || selected.name === 'Other';
+
+            if (isOther && (!value || value.trim() === '')) {
+                throw new Error('other_group_type is required when "Other" is selected.');
+            }
+
+            if (!isOther && value) {
+                throw new Error(`other_group_type must be empty when Group Type is not "Other".`);
+            }
+            return true;
+        }),
+
+    // -----------------------------
+    // Age Profile (Employee Census)
+    // -----------------------------
+    body('minimum_age')
+        .notEmpty().withMessage('Minimum Age is required')
+        .isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be 18 '),
+    body('maximum_age')
+        .notEmpty().withMessage('Maximum Age is required')
+        .isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be 64 ')
+        .custom(async (value, { req }) => {
+            const minAge = Number(req.body.minimum_age);
+            const maxAge = Number(value);
+            if (minAge && maxAge && maxAge < minAge) {
+                throw new Error('Maximum Age must be greater than or equal to Minimum Age');
+            }
+            return true;
+        }),
+
+    // -----------------------------
+    // Mode of Payment
+    // -----------------------------
     body('payment_mode_id')
         .notEmpty().withMessage('Payment Mode is required')
         .isInt().withMessage('payment_mode_id must be an integer')
@@ -438,7 +528,10 @@ export const validateFinancialApplication = [
             if (!item) throw new Error(`Invalid payment_mode_id (${value})`);
             return true;
         }),
-    // Plan + Basic Plan validations
+
+    // -----------------------------
+    // Product/Plan
+    // -----------------------------
     body('plan_id')
         .notEmpty().withMessage('Plan is required')
         .isInt().withMessage('plan_id must be a valid integer')
@@ -460,8 +553,6 @@ export const validateFinancialApplication = [
             }
             return true;
         }),
-
-    // Attachable riders (multiple allowed)
     body('rider_ids')
         .optional()
         .isArray().withMessage('rider_ids must be an array of integers')
@@ -473,82 +564,6 @@ export const validateFinancialApplication = [
             const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
             const invalidRiders = riders.filter(r => !validRiders.some(v => v.rider_id === Number(r)));
             if (invalidRiders.length) throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}`);
-            return true;
-        }),
-
-    // Optional "Other" fields
-    body('other_group_classification')
-        .optional().isLength({ max: 255 }).withMessage('other_group_classification must not exceed 255 characters')
-        .custom(async (value, { req }) => {
-            const id = req.body.group_classification_id;
-            if (!id) return true; 
-
-            if (!req.lookupCache) req.lookupCache = {};
-            if (!req.lookupCache.GROUP_CLASSIFICATION) {
-                req.lookupCache.GROUP_CLASSIFICATION = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
-            }
-            const lookups = req.lookupCache.GROUP_CLASSIFICATION;
-            const selected = lookups.find(l => l.id === Number(id));
-
-            if (!selected) return true;
-
-            const isOther = selected.name === 'Others' || selected.name === 'Other';
-
-            if (isOther && (!value || value.trim() === '')) {
-                throw new Error('other_group_classification is required when "Others" is selected.');
-            }
-
-            if (!isOther && value) {
-                throw new Error(`other_group_classification must be empty when Group Classification is not "Others".`);
-            }
-            return true;
-        }),
-    body('other_business_type')
-        .optional().isLength({ max: 255 }).withMessage('other_business_type must not exceed 255 characters')
-        .custom(async (value, { req }) => {
-            const id = req.body.business_type_id;
-            if (!id) return true;
-
-            if (!req.lookupCache) req.lookupCache = {};
-            if (!req.lookupCache.BUSINESS_TYPE) {
-                req.lookupCache.BUSINESS_TYPE = await Financial.getLookupListByCategory('BUSINESS_TYPE');
-            }
-            const lookups = req.lookupCache.BUSINESS_TYPE;
-            const selected = lookups.find(l => l.id === Number(id));
-
-            if (!selected) return true;
-
-            const isOther = selected.name === 'Others' || selected.name === 'Other';
-
-            if (isOther && (!value || value.trim() === '')) {
-                throw new Error('other_business_type is required when "Other" is selected.');
-            }
-
-            if (!isOther && value) {
-                throw new Error(`other_business_type must be empty when Business Type is not "Other".`);
-            }
-            return true;
-        }),
-    body('other_group_type')
-        .optional().isLength({ max: 255 }).withMessage('other_group_type must not exceed 255 characters')
-        .custom(async (value, { req }) => {
-            const id = req.body.group_type_id;
-            if (!id) return true;
-
-            const lookups = req.lookupCache.TYPE_OF_GROUP || await Financial.getLookupListByCategory('TYPE_OF_GROUP');
-            const selected = lookups.find(l => l.id === Number(id));
-
-            if (!selected) return true;
-
-            const isOther = selected.name === 'Others' || selected.name === 'Other';
-
-            if (isOther && (!value || value.trim() === '')) {
-                throw new Error('other_group_type is required when "Other" is selected.');
-            }
-
-            if (!isOther && value) {
-                throw new Error(`other_group_type must be empty when Group Type is not "Other".`);
-            }
             return true;
         }),
 
