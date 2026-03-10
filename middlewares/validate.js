@@ -549,7 +549,8 @@ export const validateFinancialApplication = [
 
             const basics = await Financial.getBasicPlansByPlanId(planId);
             if (!basics.some(b => b.basic_plan_id === Number(value))) {
-                throw new Error(`Invalid basic_plan_id (${value}) for plan_id (${planId})`);
+                const validOptions = basics.map(b => `${b.basic_plan_id} - ${b.basic_plan_name}`).join(', ');
+                throw new Error(`Invalid basic_plan_id (${value}) for plan_id (${planId}). Valid options: ${validOptions || 'none available'}`);
             }
             return true;
         }),
@@ -563,7 +564,10 @@ export const validateFinancialApplication = [
 
             const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
             const invalidRiders = riders.filter(r => !validRiders.some(v => v.rider_id === Number(r)));
-            if (invalidRiders.length) throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}`);
+            if (invalidRiders.length) {
+                const validOptions = validRiders.map(r => `${r.rider_id} - ${r.rider_name}`).join(', ');
+                throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}. Valid options: ${validOptions || 'none available'}`);
+            }
             return true;
         }),
 
@@ -681,7 +685,8 @@ export const validateUpdateFinancialApplication = [
 
         const basics = await Financial.getBasicPlansByPlanId(planId);
         if (!basics.some(b => b.basic_plan_id === Number(value))) {
-            throw new Error(`Invalid basic_plan_id (${value}) for plan_id (${planId})`);
+            const validOptions = basics.map(b => `${b.basic_plan_id} - ${b.basic_plan_name}`).join(', ');
+            throw new Error(`Invalid basic_plan_id (${value}) for plan_id (${planId}). Valid options: ${validOptions || 'none available'}`);
         }
         return true;
     }),
@@ -696,7 +701,10 @@ export const validateUpdateFinancialApplication = [
 
         const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
         const invalidRiders = riders.filter(r => !validRiders.some(v => v.rider_id === Number(r)));
-        if (invalidRiders.length) throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}`);
+        if (invalidRiders.length) {
+            const validOptions = validRiders.map(r => `${r.rider_id} - ${r.rider_name}`).join(', ');
+            throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}. Valid options: ${validOptions || 'none available'}`);
+        }
         return true;
     }),
 

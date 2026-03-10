@@ -20,11 +20,12 @@ export const createUser = async ({ firstname, middlename, lastname, suffix, emai
         .input('phoneNumber', sql.VarChar, phoneNumber || null)
         .input('password_hash', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit,  1)
+        .input('is_active', sql.Bit, 1) 
         .query(`
             INSERT INTO DHUB.sg.financial_insurance_users
-            (firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, password_hash, mustChangePassword)
+            (firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, password_hash, mustChangePassword, is_active)
             OUTPUT INSERTED.user_id AS userId
-            VALUES (@firstname, @middlename, @lastname, @suffix, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @password_hash, @mustChangePassword)
+            VALUES (@firstname, @middlename, @lastname, @suffix, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @password_hash, @mustChangePassword, @is_active)
         `);
 
     return { ...result.recordset[0], tempPassword}

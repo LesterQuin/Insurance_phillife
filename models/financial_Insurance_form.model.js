@@ -73,15 +73,15 @@ export const getAllApplications = async () => {
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
-                p.proposal_plan AS plan_name,
+                p.product_name AS plan_name,
                 bp.basic_plan_name
             FROM sg.financial_insurance_application fia
             LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
             LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
             LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
-            LEFT JOIN sg.financial_insurance_plan p ON fia.plan_id = p.plan_id
-            LEFT JOIN sg.financial_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             ORDER BY fia.created_at DESC
         `);
 
@@ -122,7 +122,7 @@ export const getAllApplications = async () => {
     let ridersMap = new Map();
     if (riderIdsArray.length > 0) {
         const riderRes = await pool.request()
-            .query(`SELECT rider_id AS id, rider_name AS name FROM sg.financial_attachable_rider WHERE rider_id IN (${riderIdsArray.join(',')})`);
+            .query(`SELECT rider_id AS id, rider_name AS name FROM sg.financial_insurance_rider WHERE rider_id IN (${riderIdsArray.join(',')})`);
         riderRes.recordset.forEach(r => ridersMap.set(r.id, r.name));
     }
 
@@ -200,7 +200,7 @@ export const getApplicationById = async (id) => {
                 gt.name AS group_type_name,
                 pm.name AS payment_mode_name,
 
-                p.proposal_plan AS plan_name,
+                p.product_name AS plan_name,
                 bp.basic_plan_name
 
             FROM DHUB.sg.financial_insurance_application fia
@@ -220,10 +220,10 @@ export const getApplicationById = async (id) => {
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
 
-            LEFT JOIN DHUB.sg.financial_insurance_plan p
-                ON fia.plan_id = p.plan_id
+            LEFT JOIN DHUB.sg.financial_insurance_product p
+                ON fia.plan_id = p.product_id
 
-            LEFT JOIN DHUB.sg.financial_basic_plan bp
+            LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
 
             WHERE fia.application_id = @id
@@ -337,7 +337,7 @@ export const getApplicationById = async (id) => {
         const riderRes = await pool.request()
             .query(`
                 SELECT rider_id AS id, rider_name AS name
-                FROM sg.financial_attachable_rider
+                FROM sg.financial_insurance_rider
                 WHERE rider_id IN (${riderIds.join(',')})
             `);
 
@@ -515,8 +515,8 @@ export const getAllPlans = async () => {
     const pool = await poolPromise;
     const res = await pool.request()
         .query(`
-            SELECT plan_id, proposal_plan, acronym, is_active
-            FROM sg.financial_insurance_plan
+            SELECT product_id AS plan_id, product_name AS proposal_plan, acronym, is_active
+            FROM sg.financial_insurance_product
             WHERE is_active = 1
         `);
     return res.recordset ?? [];
@@ -529,8 +529,8 @@ export const getBasicPlansByPlanId = async (planId) => {
         .input('planId', sql.Int, planId)
         .query(`
             SELECT basic_plan_id, basic_plan_name, acronym, is_active
-            FROM sg.financial_basic_plan
-            WHERE plan_id = @planId AND is_active = 1
+            FROM sg.financial_insurance_basic_plan
+            WHERE product_id = @planId AND is_active = 1
         `);
     return res.recordset ?? [];
 };
@@ -542,7 +542,7 @@ export const getRidersByBasicPlanId = async (basicPlanId) => {
         .input('basicPlanId', sql.Int, basicPlanId)
         .query(`
             SELECT rider_id, rider_name, is_active
-            FROM sg.financial_attachable_rider
+            FROM sg.financial_insurance_rider
             WHERE basic_plan_id = @basicPlanId AND is_active = 1
         `);
     return res.recordset ?? [];

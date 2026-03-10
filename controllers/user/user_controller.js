@@ -108,10 +108,10 @@ export const login = async (req, res) => {
         // Validation is now handled by middleware
         // Fetch user from DB
         const user = await User.getUserByEmail(email);
-        if (!user) {
+        if (!user || !user.is_active) { // Check if user exists AND is active
             return res.status(401).json({
                 status: false,
-                message: "Invalid credentials"
+                message: "Invalid credentials or account is inactive."
             });
         }
 
