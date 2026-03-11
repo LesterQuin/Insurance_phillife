@@ -6,9 +6,6 @@ export const createApplication = async (data, userId) => {
     try {
         await transaction.begin();
 
-        const subGroupTypeIdsValue = data.sub_group_type_id ? JSON.stringify(data.sub_group_type_id) : null;
-        const levelRankingValue = data.level_ranking ? JSON.stringify(data.level_ranking) : null;
-        const salaryRankingValue = data.salary_ranking ? JSON.stringify(data.salary_ranking) : null;
 
         const appRequest = new sql.Request(transaction);
         const appResult = await appRequest
@@ -29,7 +26,6 @@ export const createApplication = async (data, userId) => {
             .input('business_type_id', sql.Int, data.business_type_id)
             .input('other_business_type', sql.NVarChar, data.other_business_type || null)
             .input('group_type_id', sql.Int, data.group_type_id)
-            .input('sub_group_type_id', sql.NVarChar, subGroupTypeIdsValue)
             .input('other_group_type', sql.NVarChar, data.other_group_type || null)
             .input('minimum_age', sql.Int, data.minimum_age)
             .input('maximum_age', sql.Int, data.maximum_age)
@@ -47,20 +43,34 @@ export const createApplication = async (data, userId) => {
                 INSERT INTO DHUB.sg.financial_insurance_application (
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
-                    other_group_classification, business_type_id, other_business_type, group_type_id, sub_group_type_id,
-                    other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
+                    other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
+                    minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
                     amount_loans_id, loans_amount, payment_term_id, sub_payment_term_id, coverage_type_id
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
-                    @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @sub_group_type_id,
-                    @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
+                    @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
+                    @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
                     @amount_loans_id, @loans_amount, @payment_term_id, @sub_payment_term_id, @coverage_type_id
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
 
         const applicationId = appResult.recordset[0].application_id;
+
+        // Insert sub_group_type_ids into the new table
+        if (data.sub_group_type_id && Array.isArray(data.sub_group_type_id) && data.sub_group_type_id.length > 0) {
+            for (const subGroupId of data.sub_group_type_id) {
+                const subGroupRequest = new sql.Request(transaction);
+                await subGroupRequest
+                    .input('application_id', sql.Int, applicationId)
+                    .input('sub_group_type_id', sql.Int, subGroupId)
+                    .query(`
+                        INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
+                        VALUES (@application_id, @sub_group_type_id);
+                    `);
+            }
+        }
 
         // Insert coverage ranking details if applicable
         const coverageTypeId = data.coverage_type_id;
@@ -134,8 +144,8 @@ export const getAllApplications = async () => {
             SELECT
                 fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives, fia.contact_person,
                 fia.status_id, fia.group_classification_id, fia.other_group_classification,
-                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type, // Removed rider_ids
-                fia.plan_id, fia.basic_plan_id, fia.sub_group_type_id,
+                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
+                fia.plan_id, fia.basic_plan_id,
                 fia.type_of_proposal_id,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
@@ -218,6 +228,24 @@ export const updateApplication = async (id, data) => {
 
     try {
         await transaction.begin();
+
+        // Handle sub_group_type_id update
+        if (data.sub_group_type_id !== undefined) {
+            const deleteSubGroupsRequest = new sql.Request(transaction);
+            await deleteSubGroupsRequest
+                .input('application_id', sql.Int, id)
+                .query('DELETE FROM DHUB.sg.financial_insurance_application_subgroup WHERE application_id = @application_id');
+
+            if (Array.isArray(data.sub_group_type_id) && data.sub_group_type_id.length > 0) {
+                for (const subGroupId of data.sub_group_type_id) {
+                    const insertSubGroupRequest = new sql.Request(transaction);
+                    await insertSubGroupRequest
+                        .input('application_id', sql.Int, id)
+                        .input('sub_group_type_id', sql.Int, subGroupId)
+                        .query('INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
+                }
+            }
+        }
 
         // Handle coverage ranking update
         if (data.level_ranking !== undefined || data.salary_ranking !== undefined || data.coverage_type_id !== undefined || data.uniform_coverage_amount !== undefined) {
@@ -315,13 +343,6 @@ export const updateApplication = async (id, data) => {
         addClause('business_type_id', data.business_type_id, sql.Int);
         addClause('other_business_type', data.other_business_type || null);
         addClause('group_type_id', data.group_type_id, sql.Int);
-        if (data.group_type_id !== undefined && data.sub_group_type_id === undefined) {
-             setClauses.push('sub_group_type_id = NULL');
-        }
-        if (data.sub_group_type_id !== undefined) {
-            const subGroupValue = data.sub_group_type_id ? JSON.stringify(data.sub_group_type_id) : null;
-            addClause('sub_group_type_id', subGroupValue);
-        }
         addClause('other_group_type', data.other_group_type || null);
         addClause('minimum_age', data.minimum_age, sql.Int);
         addClause('maximum_age', data.maximum_age, sql.Int);
@@ -482,6 +503,19 @@ export const getApplicationRiders = async (applicationId) => {
     return result.recordset ?? [];
 };
 
+// Get sub_group_types for a single application
+export const getApplicationSubGroups = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT l.id, l.name FROM DHUB.sg.financial_insurance_application_subgroup s
+            JOIN DHUB.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
+            WHERE s.application_id = @application_id
+        `);
+    return result.recordset ?? [];
+};
+
 // Get coverage rankings for a single application
 export const getCoverageRankingsByAppId = async (applicationId) => {
     const pool = await poolPromise;
@@ -495,6 +529,24 @@ export const getCoverageRankingsByAppId = async (applicationId) => {
     return result.recordset ?? [];
 };
 
+// Get sub_group_types for multiple applications
+export const getBulkApplicationSubGroups = async (applicationIds) => {
+    if (!applicationIds || applicationIds.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    const idParams = applicationIds.map((id, i) => {
+        const paramName = `appId${i}`;
+        request.input(paramName, sql.Int, id);
+        return `@${paramName}`;
+    }).join(',');
+
+    const result = await request.query(`
+        SELECT s.application_id, l.id, l.name FROM DHUB.sg.financial_insurance_application_subgroup s
+        JOIN DHUB.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
+        WHERE s.application_id IN (${idParams})`);
+    return result.recordset ?? [];
+};
 // Get riders for multiple applications in bulk
 export const getBulkApplicationRiders = async (applicationIds) => {
     if (!applicationIds || applicationIds.length === 0) return [];

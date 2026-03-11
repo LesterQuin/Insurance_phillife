@@ -78,42 +78,21 @@ export const getAllApplications = async (req, res) => {
 
         // --- Bulk fetch related data ---
         const appIds = rawApplications.map(app => app.application_id);
-        const allSubGroupTypeIds = new Set();
-
-        rawApplications.forEach(app => {
-            if (app.sub_group_type_id) {
-                try {
-                    const subGroupIds = JSON.parse(app.sub_group_type_id);
-                    const ids = Array.isArray(subGroupIds) ? subGroupIds : [subGroupIds];
-                    ids.forEach(id => allSubGroupTypeIds.add(parseInt(id, 10)));
-                } catch {
-                    allSubGroupTypeIds.add(parseInt(app.sub_group_type_id, 10));
-                }
-            }
-        });
-
-        const subGroupTypeIdsArray = [...allSubGroupTypeIds].filter(id => !isNaN(id));
 
         const allRiders = await Model.getBulkApplicationRiders(appIds);
         const ridersByAppId = allRiders.reduce((acc, rider) => {
             (acc[rider.application_id] = acc[rider.application_id] || []).push(rider);
             return acc;
         }, {});
-
-        const subGroupTypesMap = await Model.getLookupsByIds(subGroupTypeIdsArray);
+        
+        const allSubGroups = await Model.getBulkApplicationSubGroups(appIds);
+        const subGroupsByAppId = allSubGroups.reduce((acc, sg) => {
+            (acc[sg.application_id] = acc[sg.application_id] || []).push({ id: sg.id, name: sg.name });
+            return acc;
+        }, {});
 
         // --- Map the bulk-fetched data back to each application ---
         const formattedApplications = rawApplications.map(app => {
-            let currentSubGroupTypeIds = [];
-            if (app.sub_group_type_id) {
-                try {
-                    const parsed = JSON.parse(app.sub_group_type_id);
-                    currentSubGroupTypeIds = Array.isArray(parsed) ? parsed : [parsed];
-                } catch {
-                    currentSubGroupTypeIds = [app.sub_group_type_id];
-                }
-            }
-            currentSubGroupTypeIds = currentSubGroupTypeIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
 
             return {
                 application_id: app.application_id,
@@ -137,7 +116,7 @@ export const getAllApplications = async (req, res) => {
                     name: app.group_type_name,
                     other_value: app.other_group_type
                 },
-                sub_group_types: currentSubGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name),
+                sub_group_types: subGroupsByAppId[app.application_id] || [],
                 type_of_proposal: {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
@@ -164,19 +143,7 @@ export const getApplicationById = async (req, res) => {
         if (!app) return error(res, 'Application not found', 404);
 
         // --- Build structured response ---
-        let subGroupTypeIds = [];
-        if (app.sub_group_type_id) {
-            try {
-                const parsed = JSON.parse(app.sub_group_type_id);
-                subGroupTypeIds = (Array.isArray(parsed) ? parsed : [parsed]).map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-            } catch {
-                const numId = parseInt(app.sub_group_type_id, 10);
-                if (!isNaN(numId)) subGroupTypeIds = [numId];
-            }
-        }
-
-        const subGroupTypesMap = await Model.getLookupsByIds(subGroupTypeIds);
-        const subGroupTypes = subGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name);
+        const subGroupTypes = await Model.getApplicationSubGroups(req.params.id);
 
         // Fetch riders from the new table
         const riders = await Model.getApplicationRiders(req.params.id);
