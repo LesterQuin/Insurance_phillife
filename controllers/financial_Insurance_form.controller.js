@@ -55,8 +55,98 @@ export const createApplication = async (req, res) => {
 // Get All Applications
 export const getAllApplications = async (req, res) => {
     try {
-        const applications = await Model.getAllApplications();
-        return success(res, applications, 'Applications fetched successfully.');
+        const rawApplications = await Model.getAllApplications();
+        if (rawApplications.length === 0) {
+            return success(res, [], 'Applications fetched successfully.');
+        }
+
+        // --- Bulk fetch related data ---
+        const allRiderIds = new Set();
+        const allSubGroupTypeIds = new Set();
+
+        rawApplications.forEach(app => {
+            if (app.rider_ids) {
+                try {
+                    const riderIds = JSON.parse(app.rider_ids);
+                    if (Array.isArray(riderIds)) {
+                        riderIds.forEach(id => allRiderIds.add(id));
+                    }
+                } catch {}
+            }
+            if (app.sub_group_type_id) {
+                try {
+                    const subGroupIds = JSON.parse(app.sub_group_type_id);
+                    (Array.isArray(subGroupIds) ? subGroupIds : [subGroupIds]).forEach(id => {
+                        const numId = parseInt(id, 10);
+                        if (!isNaN(numId)) allSubGroupTypeIds.add(numId);
+                    });
+                } catch {
+                    const numId = parseInt(app.sub_group_type_id, 10);
+                    if (!isNaN(numId)) allSubGroupTypeIds.add(numId);
+                }
+            }
+        });
+
+        const riderIdsArray = [...allRiderIds];
+        const subGroupTypeIdsArray = [...allSubGroupTypeIds];
+
+        const ridersMap = await Model.getRidersByIds(riderIdsArray);
+        const subGroupTypesMap = await Model.getLookupsByIds(subGroupTypeIdsArray);
+
+        // --- Map the bulk-fetched data back to each application ---
+        const formattedApplications = rawApplications.map(app => {
+            let currentRiderIds = [];
+            try {
+                if (app.rider_ids) currentRiderIds = JSON.parse(app.rider_ids);
+            } catch {}
+
+            let currentSubGroupTypeIds = [];
+            if (app.sub_group_type_id) {
+                try {
+                    const parsed = JSON.parse(app.sub_group_type_id);
+                    currentSubGroupTypeIds = Array.isArray(parsed) ? parsed : [parsed];
+                } catch {
+                    currentSubGroupTypeIds = [app.sub_group_type_id];
+                }
+            }
+            currentSubGroupTypeIds = currentSubGroupTypeIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+
+            return {
+                application_id: app.application_id,
+                user_id: app.user_id,
+                group_name: app.group_name,
+                number_of_lives: app.number_of_lives,
+                contact_person: app.contact_person,
+                status: { id: app.status_id, name: app.status_name },
+                group_classification: { 
+                    id: app.group_classification_id, 
+                    name: app.group_classification_name,
+                    other_value: app.other_group_classification
+                },
+                business_type: {
+                    id: app.business_type_id,
+                    name: app.business_type_name,
+                    other_value: app.other_business_type
+                },
+                group_type: { 
+                    id: app.group_type_id, 
+                    name: app.group_type_name,
+                    other_value: app.other_group_type
+                },
+                sub_group_types: currentSubGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name),
+                type_of_proposal: {
+                    id: app.type_of_proposal_id,
+                    name: app.type_of_proposal_name
+                },
+                plan: { id: app.plan_id, name: app.plan_name },
+                basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+                riders: currentRiderIds.map(id => ({ id, name: ridersMap.get(id) })).filter(r => r.name),
+                created_at: app.created_at,
+                updated_at: app.updated_at,
+            };
+        });
+
+        return success(res, formattedApplications, 'Applications fetched successfully.');
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);
@@ -66,9 +156,52 @@ export const getAllApplications = async (req, res) => {
 // Get Application by ID
 export const getApplicationById = async (req, res) => {
     try {
-        const application = await Model.getApplicationById(req.params.id);
-        if (!application) return error(res, 'Application not found', 404);
-        return success(res, application);
+        const app = await Model.getApplicationById(req.params.id);
+        if (!app) return error(res, 'Application not found', 404);
+
+        // --- Build structured response ---
+        let subGroupTypeIds = [];
+        if (app.sub_group_type_id) {
+            try {
+                const parsed = JSON.parse(app.sub_group_type_id);
+                subGroupTypeIds = (Array.isArray(parsed) ? parsed : [parsed]).map(id => parseInt(id, 10)).filter(id => !isNaN(id));
+            } catch {
+                const numId = parseInt(app.sub_group_type_id, 10);
+                if (!isNaN(numId)) subGroupTypeIds = [numId];
+            }
+        }
+
+        const subGroupTypesMap = await Model.getLookupsByIds(subGroupTypeIds);
+        const subGroupTypes = subGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name);
+
+        let riderIds = [];
+        if (app.rider_ids) {
+            try { riderIds = JSON.parse(app.rider_ids); } catch {}
+        }
+
+        const ridersMap = await Model.getRidersByIds(riderIds);
+        const riders = riderIds.map(id => ({ id, name: ridersMap.get(id) })).filter(r => r.name);
+
+        const response = {
+            application_id: app.application_id, user_id: app.user_id, group_name: app.group_name,
+            business_nature: app.business_nature, number_of_lives: app.number_of_lives, business_address: app.business_address,
+            contact_number: app.contact_number, fax_number: app.fax_number, email: app.email,
+            contact_person: app.contact_person, designation: app.designation, proposal_addressee: app.proposal_addressee,
+            addressee_designation: app.addressee_designation, minimum_age: app.minimum_age, maximum_age: app.maximum_age,
+            status: { id: app.status_id, name: app.status_name },
+            group_classification: { id: app.group_classification_id, name: app.group_classification_name, other_value: app.other_group_classification || null },
+            business_type: { id: app.business_type_id, name: app.business_type_name, other_value: app.other_business_type || null },
+            group_type: { id: app.group_type_id, name: app.group_type_name, other_value: app.other_group_type || null },
+            sub_group_types: subGroupTypes,
+            payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
+            type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
+            plan: { id: app.plan_id, name: app.plan_name },
+            basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+            riders: riders,
+            created_at: app.created_at, updated_at: app.updated_at
+        };
+
+        return success(res, response);
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);

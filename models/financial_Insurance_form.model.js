@@ -69,13 +69,13 @@ export const getAllApplications = async () => {
                 fia.status_id, fia.group_classification_id, fia.other_group_classification,
                 fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
                 fia.plan_id, fia.basic_plan_id, fia.rider_ids, fia.sub_group_type_id,
-                fia.type_of_proposal_id, 
+                fia.type_of_proposal_id,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
-                top.name AS type_of_proposal_name,
+                topl.name AS type_of_proposal_name,
                 p.product_name AS plan_name,
                 bp.basic_plan_name
             FROM sg.financial_insurance_application fia
@@ -83,113 +83,13 @@ export const getAllApplications = async () => {
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
             LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
             LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
-            LEFT JOIN sg.financial_insurance_group_lookups top ON fia.type_of_proposal_id = top.id
+            LEFT JOIN sg.financial_insurance_group_lookups topl ON fia.type_of_proposal_id = topl.id
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             ORDER BY fia.created_at DESC
         `);
 
-    const applications = res.recordset ?? [];
-    if (applications.length === 0) return [];
-
-    // --- Bulk fetch related data 
-
-    const allRiderIds = new Set();
-    const allSubGroupTypeIds = new Set();
-
-    applications.forEach(app => {
-        if (app.rider_ids) {
-            try {
-                const riderIds = JSON.parse(app.rider_ids);
-                if (Array.isArray(riderIds)) {
-                    riderIds.forEach(id => allRiderIds.add(id));
-                }
-            } catch {}
-        }
-        if (app.sub_group_type_id) {
-            try {
-                const subGroupIds = JSON.parse(app.sub_group_type_id);
-                (Array.isArray(subGroupIds) ? subGroupIds : [subGroupIds]).forEach(id => {
-                    const numId = parseInt(id, 10);
-                    if (!isNaN(numId)) allSubGroupTypeIds.add(numId);
-                });
-            } catch {
-                const numId = parseInt(app.sub_group_type_id, 10);
-                if (!isNaN(numId)) allSubGroupTypeIds.add(numId);
-            }
-        }
-    });
-
-    const riderIdsArray = [...allRiderIds];
-    const subGroupTypeIdsArray = [...allSubGroupTypeIds];
-
-    let ridersMap = new Map();
-    if (riderIdsArray.length > 0) {
-        const riderRes = await pool.request()
-            .query(`SELECT rider_id AS id, rider_name AS name FROM sg.financial_insurance_rider WHERE rider_id IN (${riderIdsArray.join(',')})`);
-        riderRes.recordset.forEach(r => ridersMap.set(r.id, r.name));
-    }
-
-    let subGroupTypesMap = new Map();
-    if (subGroupTypeIdsArray.length > 0) {
-        const subGroupRes = await pool.request()
-            .query(`SELECT id, name FROM sg.financial_insurance_group_lookups WHERE id IN (${subGroupTypeIdsArray.join(',')})`);
-        subGroupRes.recordset.forEach(sg => subGroupTypesMap.set(sg.id, sg.name));
-    }
-
-    // --- Map the bulk-fetched data back to each application ---
-
-    return applications.map(app => {
-        let currentRiderIds = [];
-        try {
-            if (app.rider_ids) currentRiderIds = JSON.parse(app.rider_ids);
-        } catch {}
-
-        let currentSubGroupTypeIds = [];
-        if (app.sub_group_type_id) {
-            try {
-                const parsed = JSON.parse(app.sub_group_type_id);
-                currentSubGroupTypeIds = Array.isArray(parsed) ? parsed : [parsed];
-            } catch {
-                currentSubGroupTypeIds = [app.sub_group_type_id];
-            }
-        }
-        currentSubGroupTypeIds = currentSubGroupTypeIds.map(id => parseInt(id, 10)).filter(id => !isNaN(id));
-
-        return {
-            application_id: app.application_id,
-            user_id: app.user_id,
-            group_name: app.group_name,
-            number_of_lives: app.number_of_lives,
-            contact_person: app.contact_person,
-            status: { id: app.status_id, name: app.status_name },
-            group_classification: { 
-                id: app.group_classification_id, 
-                name: app.group_classification_name,
-                other_value: app.other_group_classification
-            },
-            business_type: {
-                id: app.business_type_id,
-                name: app.business_type_name,
-                other_value: app.other_business_type
-            },
-            group_type: { 
-                id: app.group_type_id, 
-                name: app.group_type_name,
-                other_value: app.other_group_type
-            },
-            sub_group_types: currentSubGroupTypeIds.map(id => ({ id, name: subGroupTypesMap.get(id) })).filter(sg => sg.name),
-            type_of_proposal: {
-                id: app.type_of_proposal_id,
-                name: app.type_of_proposal_name
-            },
-            plan: { id: app.plan_id, name: app.plan_name },
-            basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
-            riders: currentRiderIds.map(id => ({ id, name: ridersMap.get(id) })).filter(r => r.name),
-            created_at: app.created_at,
-            updated_at: app.updated_at,
-        };
-    });
+    return res.recordset ?? [];
 };
 
 // Get application by ID
@@ -207,7 +107,7 @@ export const getApplicationById = async (id) => {
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
                 pm.name AS payment_mode_name,
-                top.name AS type_of_proposal_name,
+                topl.name AS type_of_proposal_name,
 
                 p.product_name AS plan_name,
                 bp.basic_plan_name
@@ -229,8 +129,8 @@ export const getApplicationById = async (id) => {
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
 
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups top
-                ON fia.type_of_proposal_id = top.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups topl
+                ON fia.type_of_proposal_id = topl.id
 
             LEFT JOIN DHUB.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
@@ -241,126 +141,7 @@ export const getApplicationById = async (id) => {
             WHERE fia.application_id = @id
         `);
 
-    const app = res.recordset?.[0];
-    if (!app) return null;
-
-    /* -----------------------------
-    Build structured response
-       Parse sub_group_type_id (could be JSON array for Employer-Employee)
-    ----------------------------- */
-    
-    let subGroupTypeIds = [];
-    if (app.sub_group_type_id) {
-        try {
-            const parsed = JSON.parse(app.sub_group_type_id);
-            if (Array.isArray(parsed)) {
-                subGroupTypeIds = parsed;
-            } else {
-                subGroupTypeIds = [parsed];
-            }
-        } catch {
-            subGroupTypeIds = [app.sub_group_type_id];
-        }
-    }
-
-    let subGroupTypes = [];
-    if (subGroupTypeIds.length > 0) {
-        const subGroupRes = await pool.request()
-            .query(`
-                SELECT id, name
-                FROM sg.financial_insurance_group_lookups
-                WHERE id IN (${subGroupTypeIds.join(',')})
-            `);
-        subGroupTypes = subGroupRes.recordset;
-    }
-
-    /* -----------------------------
-       Build structured response
-    ----------------------------- */
-
-    const response = {
-        application_id: app.application_id,
-        user_id: app.user_id,
-        group_name: app.group_name,
-        business_nature: app.business_nature,
-        number_of_lives: app.number_of_lives,
-        business_address: app.business_address,
-        contact_number: app.contact_number,
-        fax_number: app.fax_number,
-        email: app.email,
-        contact_person: app.contact_person,
-        designation: app.designation,
-        proposal_addressee: app.proposal_addressee,
-        addressee_designation: app.addressee_designation,
-        minimum_age: app.minimum_age,
-        maximum_age: app.maximum_age,
-        status: {
-            id: app.status_id,
-            name: app.status_name
-        },
-        group_classification: {
-            id: app.group_classification_id,
-            name: app.group_classification_name,
-            other_value: app.other_group_classification || null
-        },
-        business_type: {
-            id: app.business_type_id,
-            name: app.business_type_name,
-            other_value: app.other_business_type || null
-        },
-        group_type: {
-            id: app.group_type_id,
-            name: app.group_type_name,
-            other_value: app.other_group_type || null
-        },
-        sub_group_types: subGroupTypes,
-        payment_mode: {
-            id: app.payment_mode_id,
-            name: app.payment_mode_name
-        },
-        type_of_proposal: {
-            id: app.type_of_proposal_id,
-            name: app.type_of_proposal_name
-        },
-        plan: {
-            id: app.plan_id,
-            name: app.plan_name
-        },
-        basic_plan: {
-            id: app.basic_plan_id,
-            name: app.basic_plan_name
-        },
-        riders: [],
-        created_at: app.created_at,
-        updated_at: app.updated_at
-    };
-
-    /* -----------------------------
-       Fetch Riders (Optimized)
-    ----------------------------- */
-
-    let riderIds = [];
-
-    if (app.rider_ids) {
-        try {
-            riderIds = JSON.parse(app.rider_ids);
-        } catch {
-            riderIds = [];
-        }
-    }
-
-    if (riderIds.length > 0) {
-        const riderRes = await pool.request()
-            .query(`
-                SELECT rider_id AS id, rider_name AS name
-                FROM sg.financial_insurance_rider
-                WHERE rider_id IN (${riderIds.join(',')})
-            `);
-
-        response.riders = riderRes.recordset;
-    }
-
-    return response;
+    return res.recordset?.[0] ?? null;
 };
 
 // Update application - handles partial updates
@@ -596,4 +377,26 @@ export const getLookupNamesByIds = async (ids) => {
         namesMap.set(row.id, row.name);
     });
     return namesMap;
+};
+
+// Get riders by a list of IDs
+export const getRidersByIds = async (ids) => {
+    if (!ids || ids.length === 0) return new Map();
+    const pool = await poolPromise;
+    const riderRes = await pool.request()
+        .query(`SELECT rider_id AS id, rider_name AS name FROM sg.financial_insurance_rider WHERE rider_id IN (${ids.join(',')})`);
+    const ridersMap = new Map();
+    riderRes.recordset.forEach(r => ridersMap.set(r.id, r.name));
+    return ridersMap;
+};
+
+// Get lookups by a list of IDs
+export const getLookupsByIds = async (ids) => {
+    if (!ids || ids.length === 0) return new Map();
+    const pool = await poolPromise;
+    const subGroupRes = await pool.request()
+        .query(`SELECT id, name FROM sg.financial_insurance_group_lookups WHERE id IN (${ids.join(',')})`);
+    const lookupsMap = new Map();
+    subGroupRes.recordset.forEach(sg => lookupsMap.set(sg.id, sg.name));
+    return lookupsMap;
 };
