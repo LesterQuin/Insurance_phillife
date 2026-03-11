@@ -35,8 +35,24 @@ const cleanupOtherFields = async (data) => {
 export const createApplication = async (req, res) => {
     try {
         const userId = req.user.userId;
+        let dataToSave = { ...req.body };
+
+        // If it's a Prototype, nullify product-specific fields.
+        if (Number(dataToSave.type_of_proposal_id) === 30) { // 30 is Prototype
+            dataToSave.plan_id = null;
+            dataToSave.basic_plan_id = null;
+            dataToSave.riders = [];
+            dataToSave.amount_loans_id = null;
+            dataToSave.loans_amount = null;
+            dataToSave.payment_term_id = null;
+            dataToSave.sub_payment_term_id = null;
+            dataToSave.coverage_type_id = null;
+            dataToSave.level_ranking = null;
+            dataToSave.uniform_coverage_amount = null;
+            dataToSave.salary_ranking = null;
+        }
         
-        const cleanedData = await cleanupOtherFields(req.body);
+        const cleanedData = await cleanupOtherFields(dataToSave);
         const newRecord = await Model.createApplication(cleanedData, userId);
 
         if (!newRecord || !newRecord.application_id) {

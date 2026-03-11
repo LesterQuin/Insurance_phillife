@@ -314,7 +314,7 @@ export const getAllPlans = async () => {
     const pool = await poolPromise;
     const res = await pool.request()
         .query(`
-            SELECT product_id AS plan_id, product_name AS proposal_plan, acronym, is_active
+            SELECT product_id AS plan_id, product_name AS plan_name, acronym, is_active
             FROM sg.financial_insurance_product
             WHERE is_active = 1
         `);

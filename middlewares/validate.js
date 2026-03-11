@@ -388,99 +388,56 @@ export const validateFinancialApplication = [
             req.body.group_type_name = item.name;
             return true;
         }),
-    async (req, res, next) => {
-        try {
+    body('sub_group_type_id')
+        .optional({ nullable: true })
+        .custom(async (value, { req }) => {
             const groupTypeId = Number(req.body.group_type_id);
-            const subGroupTypeId = req.body.sub_group_type_id;
-            
+            const subGroupTypeId = value;
+    
+            if (!groupTypeId) return true; // Let group_type_id validator handle it
+    
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.TYPE_OF_GROUP) {
                 req.lookupCache.TYPE_OF_GROUP = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
             }
             const lookups = req.lookupCache.TYPE_OF_GROUP;
             const groupTypeItem = lookups.find(l => l.id === groupTypeId);
-            
+    
             if (groupTypeItem && (groupTypeItem.name === 'Other' || groupTypeItem.name === 'Others')) {
                 if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                    return res.status(400).json({ 
-                        status: false, 
-                        errors: [{ msg: 'sub_group_type_id should not be provided when Group Type is "Other". Please use other_group_type field instead.' }] 
-                    });
+                    throw new Error('sub_group_type_id should not be provided when Group Type is "Other". Please use other_group_type field instead.');
                 }
-                return next();
+                return true;
             }
-            
-            // If no sub_group_type_id provided and it's required for this group_type
+    
             const validSubgroups = lookups.filter(l => Number(l.parent_id) === groupTypeId);
-            if (validSubgroups.length > 0 && !subGroupTypeId && subGroupTypeId !== 0) {
-                return res.status(400).json({ 
-                    status: false, 
-                    errors: [{ msg: 'sub_group_type_id is required for the selected Group Type' }] 
-                });
-            }
-            
-            // Employer-Employee (ID 11): allows array of sub_group_type_ids
-            if (groupTypeId === 11) {
+            if (validSubgroups.length > 0) {
+                if (subGroupTypeId === undefined || subGroupTypeId === null) {
+                    const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
+                    throw new Error(`sub_group_type_id is required for the selected Group Type. Valid options: ${validOptions}`);
+                }
+    
+                const idsToCheck = Array.isArray(subGroupTypeId) ? subGroupTypeId : [subGroupTypeId];
+                const invalidIds = idsToCheck.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
+    
+                if (invalidIds.length > 0) {
+                    const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
+                    throw new Error(`Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options: ${validOptions}`);
+                }
+    
+                // Group-specific rules for array input
                 if (Array.isArray(subGroupTypeId)) {
-                    // Validate each sub_group_type_id
-                    const invalidIds = subGroupTypeId.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
-                    if (invalidIds.length > 0) {
-                        return res.status(400).json({ 
-                            status: false, 
-                            errors: [{ msg: `Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options for Employer-Employee: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
-                        });
-                    }
-                } else if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                    if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
-                        return res.status(400).json({ 
-                            status: false, 
-                            errors: [{ msg: `Invalid sub_group_type_id: ${subGroupTypeId}. Valid options for Employer-Employee: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
-                        });
+                    if (groupTypeId !== 11) { // Only Employer-Employee allows multiple selections
+                        throw new Error(`Group Type '${groupTypeItem.name}' does not allow multiple sub-group selections.`);
                     }
                 }
+            } else if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
+                // This case handles when a sub-group is provided for a group-type that has no sub-groups.
+                throw new Error(`sub_group_type_id should not be provided as Group Type '${groupTypeItem.name}' has no sub-groups.`);
             }
-            // OFW (ID 16): allows only ONE selection
-            else if (groupTypeId === 16) {
-                if (Array.isArray(subGroupTypeId)) {
-                    return res.status(400).json({ 
-                        status: false, 
-                        errors: [{ msg: `Only select one. Valid options for OFW: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
-                    });
-                }
-                if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                    if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
-                        return res.status(400).json({ 
-                            status: false, 
-                            errors: [{ msg: `Invalid sub_group_type_id: ${subGroupTypeId}. Valid options for OFW: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
-                        });
-                    }
-                }
-            }
-            // Other group types with subgroups (not 11-Employer-Employee or 16-OFW)
-            else if (validSubgroups.length > 0) {
-                // Only Employer-Employee (ID 11) and OFW (ID 16) allow array input
-                if (Array.isArray(subGroupTypeId)) {
-                    return res.status(400).json({ 
-                        status: false, 
-                        errors: [{ msg: `Group Type ID ${groupTypeId} does not allow array input for sub_group_type_id. Only Employer-Employee (ID 11) and OFW (ID 16) allow multiple selections. Valid options: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
-                    });
-                }
-                if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                    if (!validSubgroups.some(sg => sg.id === Number(subGroupTypeId))) {
-                        return res.status(400).json({ 
-                            status: false, 
-                            errors: [{ msg: `Invalid sub_group_type_id: ${subGroupTypeId}. Valid options: ${validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ')}` }] 
-                        });
-                    }
-                }
-            }
-            
-            next();
-        } catch (error) {
-            console.error('sub_group_type_id validation error:', error);
-            return res.status(500).json({ status: false, errors: [{ msg: 'Error validating sub_group_type_id' }] });
-        }
-    },
+    
+            return true;
+        }),
     body('other_group_type')
         .optional().isLength({ max: 255 }).withMessage('other_group_type must not exceed 255 characters')
         .custom(async (value, { req }) => {
@@ -566,6 +523,7 @@ export const validateFinancialApplication = [
     // Product/Plan
     // -----------------------------
     body('plan_id')
+        .if(body('type_of_proposal_id').equals('31'))
         .notEmpty().withMessage('Plan is required')
         .isInt().withMessage('plan_id must be a valid integer')
         .custom(async (value) => {
@@ -577,6 +535,7 @@ export const validateFinancialApplication = [
             return true;
         }),
 body('basic_plan_id')
+        .if(body('type_of_proposal_id').equals('31'))
         .notEmpty().withMessage('Basic Plan is required')
         .isInt().withMessage('basic_plan_id must be a valid integer')
         .custom(async (value, { req }) => {
@@ -596,10 +555,12 @@ body('basic_plan_id')
             return true;
         }),
     body('riders')
+        .if(body('type_of_proposal_id').equals('31'))
         .optional()
         .isArray().withMessage('riders must be an array of objects'),
     body('riders.*.rider_id')
         .exists().withMessage('rider_id is required for each rider')
+        .if(body('type_of_proposal_id').equals('31'))
         .isInt().withMessage('rider_id must be an integer')
         .custom(async (value, { req }) => {
             const basicPlanId = Number(req.body.basic_plan_id);
@@ -612,23 +573,84 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('riders.*.amount').optional({ nullable: true }).isNumeric().withMessage('Rider amount must be a number'),
-    body('riders.*.unit').optional({ nullable: true }).isNumeric().withMessage('Rider unit must be a number'),
+    body('riders.*.amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isNumeric().withMessage('Rider amount must be a number'),
+    body('riders.*.unit').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isNumeric().withMessage('Rider unit must be a number'),
 
     // Optional validation for new product-specific fields
-    body('amount_loans_id').optional({ nullable: true }).isInt().withMessage('Amount Loans ID must be an integer'),
-    body('loans_amount').optional({ nullable: true }).isDecimal().withMessage('Loans Amount must be a decimal'),
-    body('payment_term_id').optional({ nullable: true }).isInt().withMessage('Payment Term ID must be an integer'),
-    body('sub_payment_term_id').optional({ nullable: true }).isInt().withMessage('Sub Payment Term ID must be an integer'),
-    body('coverage_type_id').optional({ nullable: true }).isInt().withMessage('Coverage Type ID must be an integer'),
-    body('uniform_coverage_amount').optional({ nullable: true }).isDecimal().withMessage('Uniform Coverage Amount must be a decimal'),
-    body('level_ranking').optional({ nullable: true }).isArray().withMessage('Level Ranking must be an array'),
-    body('level_ranking.*.designation').if(body('level_ranking').exists()).notEmpty().withMessage('Designation is required in Level Ranking'),
-    body('level_ranking.*.amount').if(body('level_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Level Ranking'),
-    body('salary_ranking').optional({ nullable: true }).isArray().withMessage('Salary Ranking must be an array'),
-    body('salary_ranking.*.salary_multiplier').if(body('salary_ranking').exists()).notEmpty().withMessage('Salary Multiplier is required in Salary Ranking'),
-    body('salary_ranking.*.designation').if(body('salary_ranking').exists()).notEmpty().withMessage('Designation is required in Salary Ranking'),
-    body('salary_ranking.*.amount').if(body('salary_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Salary Ranking'),
+    body('amount_loans_id')
+        .if(body('type_of_proposal_id').equals('31'))
+        .optional({ nullable: true })
+        .isInt().withMessage('Amount Loans ID must be an integer')
+        .custom(async (value) => {
+            if (value === null || value === undefined) return true;
+            const lookups = await Financial.getLookupListByCategory('LOAN_AMOUNT_TYPE');
+            if (!lookups.some(l => l.id === Number(value))) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid amount_loans_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('loans_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isDecimal().withMessage('Loans Amount must be a decimal'),
+    body('payment_term_id')
+        .if(body('type_of_proposal_id').equals('31'))
+        .optional({ nullable: true })
+        .isInt().withMessage('Payment Term ID must be an integer')
+        .custom(async (value) => {
+            if (value === null || value === undefined) return true;
+            const paymentTerms = await Financial.getLookupListByCategory('PAYMENT_TERM');
+            const paymentYears = await Financial.getLookupListByCategory('PAYMENT_YEAR');
+            const topLevelYears = paymentYears.filter(y => y.parent_id === null);
+            const validLookups = [...paymentTerms, ...topLevelYears];
+            if (!validLookups.some(l => l.id === Number(value))) {
+                const validOptions = validLookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid payment_term_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('sub_payment_term_id')
+        .if(body('type_of_proposal_id').equals('31'))
+        .optional({ nullable: true })
+        .isInt().withMessage('Sub Payment Term ID must be an integer')
+        .custom(async (value, { req }) => {
+            const paymentTermId = Number(req.body.payment_term_id);
+            if (paymentTermId === 44) { // Year
+                if (value === undefined || value === null) {
+                    throw new Error('sub_payment_term_id is required when Payment Term is Year.');
+                }
+                const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
+                const selectableYears = lookups.filter(l => l.parent_id === 44);
+                if (!selectableYears.some(l => l.id === Number(value))) {
+                    const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
+                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options for Year term: ${validOptions}`);
+                }
+            } else if (paymentTermId === 41 || paymentTermId === 42 || paymentTermId === 43) { // Single Pay, Annual, or Monthly
+                if (value !== undefined && value !== null) {
+                    throw new Error('sub_payment_term_id should not be provided for Single Pay, Annual, or Monthly Payment Term.');
+                }
+            }
+            return true;
+        }),
+    body('coverage_type_id')
+        .if(body('type_of_proposal_id').equals('31'))
+        .optional({ nullable: true })
+        .isInt().withMessage('Coverage Type ID must be an integer')
+        .custom(async (value) => {
+            if (value === null || value === undefined) return true;
+            const lookups = await Financial.getLookupListByCategory('COVERAGE_TYPE');
+            if (!lookups.some(l => l.id === Number(value))) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid coverage_type_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('uniform_coverage_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isDecimal().withMessage('Uniform Coverage Amount must be a decimal'),
+    body('level_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Level Ranking must be an array'),
+    body('level_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).notEmpty().withMessage('Designation is required in Level Ranking'),
+    body('level_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Level Ranking'),
+    body('salary_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Salary Ranking must be an array'),
+    body('salary_ranking.*.salary_multiplier').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Salary Multiplier is required in Salary Ranking'),
+    body('salary_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Designation is required in Salary Ranking'),
+    body('salary_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Salary Ranking'),
 
     // Optional status
     body('status_id').optional().isInt(),
@@ -802,11 +824,62 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
     }),
 
     // Optional validation for new product-specific fields on update
-    body('amount_loans_id').optional({ nullable: true }).isInt(),
+    body('amount_loans_id').optional({ nullable: true }).isInt().withMessage('Amount Loans ID must be an integer')
+        .custom(async (value) => {
+            if (value === null || value === undefined) return true;
+            const lookups = await Financial.getLookupListByCategory('LOAN_AMOUNT_TYPE');
+            if (!lookups.some(l => l.id === Number(value))) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid amount_loans_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
     body('loans_amount').optional({ nullable: true }).isDecimal(),
-    body('payment_term_id').optional({ nullable: true }).isInt(),
-    body('sub_payment_term_id').optional({ nullable: true }).isInt(),
-    body('coverage_type_id').optional({ nullable: true }).isInt(),
+    body('payment_term_id').optional({ nullable: true }).isInt().custom(async (value) => {
+        if (value === null || value === undefined) return true;
+        const paymentTerms = await Financial.getLookupListByCategory('PAYMENT_TERM');
+        const paymentYears = await Financial.getLookupListByCategory('PAYMENT_YEAR');
+        const topLevelYears = paymentYears.filter(y => y.parent_id === null);
+        const validLookups = [...paymentTerms, ...topLevelYears];
+        if (!validLookups.some(l => l.id === Number(value))) {
+            const validOptions = validLookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid payment_term_id (${value}). Valid options: ${validOptions}`);
+        }
+        return true;
+    }),
+    body('sub_payment_term_id').optional({ nullable: true }).isInt().withMessage('Sub Payment Term ID must be an integer')
+        .custom(async (value, { req }) => {
+        const paymentTermId = req.body.payment_term_id !== undefined ? Number(req.body.payment_term_id) : req.existingApplication?.payment_term_id;
+
+        if (paymentTermId === 44) { // Year
+            if (req.body.payment_term_id !== undefined && (value === undefined || value === null)) {
+                throw new Error('sub_payment_term_id is required when Payment Term is set to Year.');
+            }
+            if (value !== undefined && value !== null) {
+                const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
+                const selectableYears = lookups.filter(l => l.parent_id === 44);
+                if (!selectableYears.some(l => l.id === Number(value))) {
+                    const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
+                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options for Year term: ${validOptions}`);
+                }
+            }
+        } else if (paymentTermId === 41 || paymentTermId === 42 || paymentTermId === 43) { // Single Pay, Annual, or Monthly
+            if (value !== undefined && value !== null) {
+                throw new Error('sub_payment_term_id should not be provided for Single Pay, Annual, or Monthly Payment Term.');
+            }
+        }
+        return true;
+    }),
+    body('coverage_type_id').optional({ nullable: true }).isInt().withMessage('Coverage Type ID must be an integer')
+        .custom(async (value) => {
+            if (value === null || value === undefined) return true;
+            const lookups = await Financial.getLookupListByCategory('COVERAGE_TYPE');
+            if (!lookups.some(l => l.id === Number(value))) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid coverage_type_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
 
     // "Other" fields validation for updates
     body('other_group_classification').optional({ nullable: true }).isLength({ max: 255 }).withMessage('other_group_classification must not exceed 255 characters').custom(async (value, { req }) => {
