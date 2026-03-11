@@ -181,6 +181,23 @@ export const getApplicationById = async (req, res) => {
         // Fetch riders from the new table
         const riders = await Model.getApplicationRiders(req.params.id);
 
+        // Fetch coverage rankings
+        const rankings = await Model.getCoverageRankingsByAppId(req.params.id);
+
+        let levelRanking = null;
+        let salaryRanking = null;
+        if (app.coverage_type_id === 32) { // Level Ranking
+            levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, ...rest }) => rest);
+        } else if (app.coverage_type_id === 34) { // By Salary Rank
+            // Return the raw ranking entries without aggregation
+            salaryRanking = rankings.map(({ uniform_coverage_amount, ...rest }) => rest);
+        }
+
+        const coverage_totals = rankings.map(r => ({
+            designation: r.designation,
+            total_coverage_amount: r.total_coverage_amount
+        }));
+
         const response = {
             application_id: app.application_id, user_id: app.user_id, group_name: app.group_name,
             business_nature: app.business_nature, number_of_lives: app.number_of_lives, business_address: app.business_address,
@@ -197,6 +214,10 @@ export const getApplicationById = async (req, res) => {
             plan: { id: app.plan_id, name: app.plan_name },
             basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
             riders: riders,
+            level_ranking: levelRanking,
+            salary_ranking: salaryRanking,
+            uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
+            coverage_totals: coverage_totals,
             created_at: app.created_at, updated_at: app.updated_at
         };
 

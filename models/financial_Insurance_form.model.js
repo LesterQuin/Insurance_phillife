@@ -43,29 +43,63 @@ export const createApplication = async (data, userId) => {
             .input('payment_term_id', sql.Int, data.payment_term_id || null)
             .input('sub_payment_term_id', sql.Int, data.sub_payment_term_id || null)
             .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
-            .input('level_ranking', sql.NVarChar, levelRankingValue)
-            .input('uniform_coverage_amount', sql.Decimal(18, 2), data.uniform_coverage_amount || null)
-            .input('salary_ranking', sql.NVarChar, salaryRankingValue)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, sub_group_type_id,
                     other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
-                    amount_loans_id, loans_amount, payment_term_id, sub_payment_term_id, coverage_type_id, level_ranking,
-                    uniform_coverage_amount, salary_ranking
+                    amount_loans_id, loans_amount, payment_term_id, sub_payment_term_id, coverage_type_id
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @sub_group_type_id,
                     @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
-                    @amount_loans_id, @loans_amount, @payment_term_id, @sub_payment_term_id, @coverage_type_id, @level_ranking,
-                    @uniform_coverage_amount, @salary_ranking
+                    @amount_loans_id, @loans_amount, @payment_term_id, @sub_payment_term_id, @coverage_type_id
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
 
         const applicationId = appResult.recordset[0].application_id;
+
+        // Insert coverage ranking details if applicable
+        const coverageTypeId = data.coverage_type_id;
+        const levelRanking = data.level_ranking;
+        const salaryRanking = data.salary_ranking;
+        const uniformAmount = data.uniform_coverage_amount;
+
+        if (coverageTypeId === 32 && levelRanking && levelRanking.length > 0) { // Level Ranking
+            for (const rank of levelRanking) {
+                const rankRequest = new sql.Request(transaction);
+                await rankRequest
+                    .input('application_id', sql.Int, applicationId)
+                    .input('designation', sql.NVarChar, rank.designation)
+                    .input('amount', sql.Decimal(18, 2), rank.amount)
+                    .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount) // For Level Ranking, total is the same as amount
+                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount);`);
+            }
+        } else if (coverageTypeId === 34 && salaryRanking && salaryRanking.length > 0) { // By Salary Rank
+            for (const rank of salaryRanking) {
+                const multiplier = parseInt(rank.salary_multiplier.replace(/x/i, ''), 10) || 1;
+                const totalAmount = parseFloat(rank.amount) * multiplier;
+
+                const rankRequest = new sql.Request(transaction);
+                await rankRequest
+                    .input('application_id', sql.Int, applicationId)
+                    .input('designation', sql.NVarChar, rank.designation)
+                    .input('amount', sql.Decimal(18, 2), rank.amount)
+                    .input('salary_multiplier', sql.NVarChar, rank.salary_multiplier)
+                    .input('total_coverage_amount', sql.Decimal(18, 2), totalAmount)
+                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount);`);
+            }
+        } else if (coverageTypeId === 33 && uniformAmount != null) { // Uniform Coverage
+            const rankRequest = new sql.Request(transaction);
+            await rankRequest
+                .input('application_id', sql.Int, applicationId)
+                .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
+                .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
+                .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @uniform_coverage_amount, @total_coverage_amount);`);
+        }
 
         if (data.riders && Array.isArray(data.riders) && data.riders.length > 0) {
             for (const rider of data.riders) {
@@ -185,6 +219,52 @@ export const updateApplication = async (id, data) => {
     try {
         await transaction.begin();
 
+        // Handle coverage ranking update
+        if (data.level_ranking !== undefined || data.salary_ranking !== undefined || data.coverage_type_id !== undefined || data.uniform_coverage_amount !== undefined) {
+            const deleteRankingsRequest = new sql.Request(transaction);
+            await deleteRankingsRequest
+                .input('application_id', sql.Int, id)
+                .query('DELETE FROM DHUB.sg.financial_insurance_coverage_ranking WHERE application_id = @application_id');
+
+            const coverageTypeId = data.coverage_type_id;
+            const levelRanking = data.level_ranking;
+            const salaryRanking = data.salary_ranking;
+            const uniformAmount = data.uniform_coverage_amount;
+
+            if (coverageTypeId === 32 && levelRanking && levelRanking.length > 0) { // Level Ranking
+                for (const rank of levelRanking) {
+                    const rankRequest = new sql.Request(transaction);
+                    await rankRequest
+                        .input('application_id', sql.Int, id)
+                        .input('designation', sql.NVarChar, rank.designation)
+                        .input('amount', sql.Decimal(18, 2), rank.amount)
+                        .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount)
+                        .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount);`);
+                }
+            } else if (coverageTypeId === 34 && salaryRanking && salaryRanking.length > 0) { // By Salary Rank
+                for (const rank of salaryRanking) {
+                    const multiplier = parseInt(rank.salary_multiplier.replace(/x/i, ''), 10) || 1;
+                    const totalAmount = parseFloat(rank.amount) * multiplier;
+
+                    const rankRequest = new sql.Request(transaction);
+                    await rankRequest
+                        .input('application_id', sql.Int, id)
+                        .input('designation', sql.NVarChar, rank.designation)
+                        .input('amount', sql.Decimal(18, 2), rank.amount)
+                        .input('salary_multiplier', sql.NVarChar, rank.salary_multiplier)
+                        .input('total_coverage_amount', sql.Decimal(18, 2), totalAmount)
+                        .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount);`);
+                }
+            } else if (coverageTypeId === 33 && uniformAmount != null) { // Uniform Coverage
+                const rankRequest = new sql.Request(transaction);
+                await rankRequest
+                    .input('application_id', sql.Int, id)
+                    .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
+                    .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
+                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @uniform_coverage_amount, @total_coverage_amount);`);
+            }
+        }
+
         // Handle riders update first (delete and re-insert)
         if (data.riders !== undefined) {
             const deleteRidersRequest = new sql.Request(transaction);
@@ -257,13 +337,6 @@ export const updateApplication = async (id, data) => {
         addClause('payment_term_id', data.payment_term_id, sql.Int);
         addClause('sub_payment_term_id', data.sub_payment_term_id, sql.Int);
         addClause('coverage_type_id', data.coverage_type_id, sql.Int);
-        addClause('uniform_coverage_amount', data.uniform_coverage_amount, sql.Decimal(18, 2));
-        if (data.level_ranking !== undefined) {
-            addClause('level_ranking', data.level_ranking ? JSON.stringify(data.level_ranking) : null);
-        }
-        if (data.salary_ranking !== undefined) {
-            addClause('salary_ranking', data.salary_ranking ? JSON.stringify(data.salary_ranking) : null);
-        }
 
         if (setClauses.length > 0) {
             setClauses.push('updated_at = GETDATE()');
@@ -405,6 +478,19 @@ export const getApplicationRiders = async (applicationId) => {
             FROM sg.financial_insurance_application_rider ar
             JOIN sg.financial_insurance_rider r ON ar.rider_id = r.rider_id
             WHERE ar.application_id = @application_id
+        `);
+    return result.recordset ?? [];
+};
+
+// Get coverage rankings for a single application
+export const getCoverageRankingsByAppId = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT designation, amount, salary_multiplier, uniform_coverage_amount, total_coverage_amount
+            FROM DHUB.sg.financial_insurance_coverage_ranking
+            WHERE application_id = @application_id
         `);
     return result.recordset ?? [];
 };

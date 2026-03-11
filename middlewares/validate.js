@@ -660,10 +660,8 @@ body('basic_plan_id')
                         throw new Error('Uniform Coverage Amount is required and cannot be null for this coverage type.');
                     }
                     if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
-                        throw new Error('Uniform Coverage Amount must be a non-negative number.');
+                        throw new Error('Uniform Coverage Amount must be a non-negative decimal.');
                     }
-                } else if (value != null) { // For any other coverage type under plan 2
-                    throw new Error('Uniform Coverage Amount should only be provided for Uniform Coverage type.');
                 }
             }
             return true;
@@ -685,14 +683,14 @@ body('basic_plan_id')
                     if (value.length > 10) {
                         throw new Error('Level Ranking cannot have more than 10 entries.');
                     }
-                } else if (value != null) { // For any other coverage type under plan 2
-                    throw new Error('Level Ranking should null and only be provided for Level Ranking not in Uniform coverage type.');
+                } else if (value != null && value.length > 0) { // For any other coverage type under plan 2
+                    throw new Error('Level Ranking should only be provided for the "Level Ranking" coverage type.');
                 }
             }
             return true;
         }),
     body('level_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).notEmpty().withMessage('Designation is required in Level Ranking'),
-    body('level_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).isFloat({ min: 0 }).withMessage('Amount must be a non-negative number in Level Ranking'),
+    body('level_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).isFloat({ min: 0 }).withMessage('Amount must be a non-negative decimal in Level Ranking'),
     body('salary_ranking')
         .if(body('type_of_proposal_id').equals('31'))
         .custom((value, { req }) => {
@@ -704,8 +702,17 @@ body('basic_plan_id')
 
             if (planId === 2) {
                 if (coverageTypeId === 34) { // By Salary Rank
-                    if (value == null || value.length === 0) {
-                        throw new Error('Salary Ranking is required for this coverage type.');
+                    if (value == null || value.length < 2) {
+                        throw new Error('Salary Ranking is required and must have at least 2 entries.');
+                    }
+                    if (value.length > 4) {
+                        throw new Error('Salary Ranking cannot have more than 4 entries.');
+                    }
+                    // Check for uniqueness of salary_multiplier
+                    const multipliers = value.map(item => item.salary_multiplier);
+                    const uniqueMultipliers = new Set(multipliers);
+                    if (uniqueMultipliers.size !== multipliers.length) {
+                        throw new Error('Salary multipliers within Salary Ranking must be unique.');
                     }
                 } else if (value != null) { // For any other coverage type under plan 2
                     throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
@@ -713,7 +720,18 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('salary_ranking.*.salary_multiplier').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Salary Multiplier is required in Salary Ranking'),
+    body('salary_ranking.*.salary_multiplier')
+        .if(body('type_of_proposal_id').equals('31'))
+        .if(body('salary_ranking').exists())
+        .notEmpty().withMessage('Salary Multiplier is required in Salary Ranking')
+        .custom(async (value) => {
+            const lookups = await Financial.getLookupListByCategory('COVERAGE_MULTIPLIER');
+            const validMultipliers = lookups.map(l => l.name);
+            if (!validMultipliers.includes(value)) {
+                throw new Error(`Invalid salary_multiplier (${value}). Valid options: ${validMultipliers.join(', ')}`);
+            }
+            return true;
+        }),
     body('salary_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Designation is required in Salary Ranking'),
     body('salary_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).isFloat({ min: 0 }).withMessage('Amount must be a non-negative number in Salary Ranking'),
 
