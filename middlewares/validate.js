@@ -654,7 +654,7 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             const coverageTypeId = Number(req.body.coverage_type_id);
 
-            if (planId === 2) {
+            if (planId === 2 || planId === 3) {
                 if (coverageTypeId === 33) { // Uniform Coverage
                     if (value == null) {
                         throw new Error('Uniform Coverage Amount is required and cannot be null for this coverage type.');
@@ -662,6 +662,8 @@ body('basic_plan_id')
                     if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
                         throw new Error('Uniform Coverage Amount must be a non-negative decimal.');
                     }
+                } else if (coverageTypeId === 32 && value != null) { // Should be null for Level Ranking
+                    throw new Error('Uniform Coverage Amount must be null when Level Ranking is selected.');
                 }
             }
             return true;
@@ -675,7 +677,7 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             const coverageTypeId = Number(req.body.coverage_type_id);
 
-            if (planId === 2) {
+            if (planId === 2 || planId === 3) {
                 if (coverageTypeId === 32) { // Level Ranking
                     if (value == null || value.length < 2) {
                         throw new Error('Level Ranking is required for this coverage type and must have at least 2 entries.');
@@ -683,8 +685,8 @@ body('basic_plan_id')
                     if (value.length > 10) {
                         throw new Error('Level Ranking cannot have more than 10 entries.');
                     }
-                } else if (value != null && value.length > 0) { // For any other coverage type under plan 2
-                    throw new Error('Level Ranking should only be provided for the "Level Ranking" coverage type.');
+                } else if (value != null && value.length > 0) { // For any other coverage type under plan 2 or 3
+                    throw new Error('Level Ranking must be null and only be provided for the "Level Ranking" coverage type.');
                 }
             }
             return true;
@@ -700,7 +702,7 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             const coverageTypeId = Number(req.body.coverage_type_id);
 
-            if (planId === 2) {
+            if (planId === 2 || planId === 3) {
                 if (coverageTypeId === 34) { // By Salary Rank
                     if (value == null || value.length < 2) {
                         throw new Error('Salary Ranking is required and must have at least 2 entries.');
@@ -714,7 +716,7 @@ body('basic_plan_id')
                     if (uniqueMultipliers.size !== multipliers.length) {
                         throw new Error('Salary multipliers within Salary Ranking must be unique.');
                     }
-                } else if (value != null) { // For any other coverage type under plan 2
+                } else if (value != null) { // For any other coverage type under plan 2 or 3
                     throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
                 }
             }
