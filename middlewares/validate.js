@@ -643,11 +643,43 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('uniform_coverage_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isDecimal().withMessage('Uniform Coverage Amount must be a decimal'),
-    body('level_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Level Ranking must be an array'),
+    body('uniform_coverage_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isDecimal().withMessage('Uniform Coverage Amount must be a decimal')
+        .custom((value, { req }) => {
+            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) === 33 && !value) {
+                throw new Error('Uniform Coverage Amount is required for this coverage type.');
+            }
+            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) !== 33 && value) {
+                throw new Error('Uniform Coverage Amount should only be provided for Uniform Coverage type.');
+            }
+            return true;
+        }),
+    body('level_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Level Ranking must be an array')
+        .custom((value, { req }) => {
+            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) === 32) {
+                if (!value || value.length < 2) {
+                    throw new Error('Level Ranking is required for this coverage type and must have at least 2 entries.');
+                }
+                if (value.length > 10) {
+                    throw new Error('Level Ranking cannot have more than 10 entries.');
+                }
+            }
+            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) !== 32 && value && value.length > 0) {
+                throw new Error('Level Ranking should only be provided for Level Ranking coverage type.');
+            }
+            return true;
+        }),
     body('level_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).notEmpty().withMessage('Designation is required in Level Ranking'),
     body('level_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Level Ranking'),
-    body('salary_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Salary Ranking must be an array'),
+    body('salary_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Salary Ranking must be an array')
+        .custom((value, { req }) => {
+            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) === 34 && (!value || value.length === 0)) {
+                throw new Error('Salary Ranking is required for this coverage type.');
+            }
+            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) !== 34 && value) {
+                throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
+            }
+            return true;
+        }),
     body('salary_ranking.*.salary_multiplier').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Salary Multiplier is required in Salary Ranking'),
     body('salary_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Designation is required in Salary Ranking'),
     body('salary_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Salary Ranking'),
