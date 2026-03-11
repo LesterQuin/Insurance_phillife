@@ -595,22 +595,40 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('rider_ids')
+    body('riders')
         .optional()
-        .isArray().withMessage('rider_ids must be an array of integers')
-        .custom(async (riders, { req }) => {
-            if (!Array.isArray(riders)) return true;
+        .isArray().withMessage('riders must be an array of objects'),
+    body('riders.*.rider_id')
+        .exists().withMessage('rider_id is required for each rider')
+        .isInt().withMessage('rider_id must be an integer')
+        .custom(async (value, { req }) => {
             const basicPlanId = Number(req.body.basic_plan_id);
-            if (!basicPlanId) throw new Error('basic_plan_id is required to validate rider_ids');
+            if (!basicPlanId) return true; // Let other validator catch missing basic_plan_id
 
             const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
-            const invalidRiders = riders.filter(r => !validRiders.some(v => v.rider_id === Number(r)));
-            if (invalidRiders.length) {
+            if (!validRiders.some(v => v.rider_id === Number(value))) {
                 const validOptions = validRiders.map(r => `${r.rider_id} - ${r.rider_name}`).join(', ');
-                throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}. Valid options: ${validOptions || 'none available'}`);
+                throw new Error(`Invalid rider_id (${value}) for basic_plan_id (${basicPlanId}). Valid options: ${validOptions || 'none available'}`);
             }
             return true;
         }),
+    body('riders.*.amount').optional({ nullable: true }).isNumeric().withMessage('Rider amount must be a number'),
+    body('riders.*.unit').optional({ nullable: true }).isNumeric().withMessage('Rider unit must be a number'),
+
+    // Optional validation for new product-specific fields
+    body('amount_loans_id').optional({ nullable: true }).isInt().withMessage('Amount Loans ID must be an integer'),
+    body('loans_amount').optional({ nullable: true }).isDecimal().withMessage('Loans Amount must be a decimal'),
+    body('payment_term_id').optional({ nullable: true }).isInt().withMessage('Payment Term ID must be an integer'),
+    body('sub_payment_term_id').optional({ nullable: true }).isInt().withMessage('Sub Payment Term ID must be an integer'),
+    body('coverage_type_id').optional({ nullable: true }).isInt().withMessage('Coverage Type ID must be an integer'),
+    body('uniform_coverage_amount').optional({ nullable: true }).isDecimal().withMessage('Uniform Coverage Amount must be a decimal'),
+    body('level_ranking').optional({ nullable: true }).isArray().withMessage('Level Ranking must be an array'),
+    body('level_ranking.*.designation').if(body('level_ranking').exists()).notEmpty().withMessage('Designation is required in Level Ranking'),
+    body('level_ranking.*.amount').if(body('level_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Level Ranking'),
+    body('salary_ranking').optional({ nullable: true }).isArray().withMessage('Salary Ranking must be an array'),
+    body('salary_ranking.*.salary_multiplier').if(body('salary_ranking').exists()).notEmpty().withMessage('Salary Multiplier is required in Salary Ranking'),
+    body('salary_ranking.*.designation').if(body('salary_ranking').exists()).notEmpty().withMessage('Designation is required in Salary Ranking'),
+    body('salary_ranking.*.amount').if(body('salary_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Salary Ranking'),
 
     // Optional status
     body('status_id').optional().isInt(),
@@ -759,7 +777,7 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
         }
         return true;
     }),
-    body('rider_ids').optional({ nullable: true }).isArray().withMessage('rider_ids must be an array of integers').custom(async (riders, { req }) => {
+    body('riders').optional({ nullable: true }).isArray().withMessage('riders must be an array of objects').custom(async (riders, { req }) => {
         if (!Array.isArray(riders)) return true;
 
         const basicPlanId = req.body.basic_plan_id !== undefined
@@ -768,14 +786,27 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
 
         if (!basicPlanId) throw new Error('basic_plan_id is required to validate rider_ids');
 
-        const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
-        const invalidRiders = riders.filter(r => !validRiders.some(v => v.rider_id === Number(r)));
-        if (invalidRiders.length) {
-            const validOptions = validRiders.map(r => `${r.rider_id} - ${r.rider_name}`).join(', ');
-            throw new Error(`Invalid rider_ids for basic_plan_id (${basicPlanId}): ${invalidRiders.join(', ')}. Valid options: ${validOptions || 'none available'}`);
+        // Since this is a custom validator on the array, we check each item.
+        for (const rider of riders) {
+            if (rider.rider_id === undefined || isNaN(parseInt(rider.rider_id, 10))) {
+                throw new Error('Each rider in the array must have a valid integer rider_id.');
+            }
+            if (rider.amount !== undefined && isNaN(parseFloat(rider.amount))) {
+                throw new Error(`Rider amount for rider_id ${rider.rider_id} must be a number.`);
+            }
+            if (rider.unit !== undefined && isNaN(parseInt(rider.unit, 10))) {
+                throw new Error(`Rider unit for rider_id ${rider.rider_id} must be an integer.`);
+            }
         }
         return true;
     }),
+
+    // Optional validation for new product-specific fields on update
+    body('amount_loans_id').optional({ nullable: true }).isInt(),
+    body('loans_amount').optional({ nullable: true }).isDecimal(),
+    body('payment_term_id').optional({ nullable: true }).isInt(),
+    body('sub_payment_term_id').optional({ nullable: true }).isInt(),
+    body('coverage_type_id').optional({ nullable: true }).isInt(),
 
     // "Other" fields validation for updates
     body('other_group_classification').optional({ nullable: true }).isLength({ max: 255 }).withMessage('other_group_classification must not exceed 255 characters').custom(async (value, { req }) => {

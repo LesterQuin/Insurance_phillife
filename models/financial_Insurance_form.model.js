@@ -2,60 +2,93 @@ import { poolPromise, sql } from '../config/db.js';
 
 export const createApplication = async (data, userId) => {
     const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
 
-    // Convert rider_ids array to JSON string if it's an array
-    const riderIdsValue = data.rider_ids
-        ? Array.isArray(data.rider_ids) ? JSON.stringify(data.rider_ids) : data.rider_ids
-        : null;
+        const subGroupTypeIdsValue = data.sub_group_type_id ? JSON.stringify(data.sub_group_type_id) : null;
+        const levelRankingValue = data.level_ranking ? JSON.stringify(data.level_ranking) : null;
+        const salaryRankingValue = data.salary_ranking ? JSON.stringify(data.salary_ranking) : null;
 
-    // Convert sub_group_type_id array to JSON string if it's an array (for Employer-Employee)
-    const subGroupTypeIdsValue = data.sub_group_type_id
-        ? Array.isArray(data.sub_group_type_id) ? JSON.stringify(data.sub_group_type_id) : data.sub_group_type_id
-        : null;
+        const appRequest = new sql.Request(transaction);
+        const appResult = await appRequest
+            .input('user_id', sql.Int, userId)
+            .input('group_name', sql.NVarChar, data.group_name)
+            .input('business_nature', sql.NVarChar, data.business_nature)
+            .input('number_of_lives', sql.Int, data.number_of_lives)
+            .input('business_address', sql.NVarChar, data.business_address)
+            .input('contact_number', sql.NVarChar, data.contact_number)
+            .input('fax_number', sql.NVarChar, data.fax_number || null)
+            .input('email', sql.NVarChar, data.email)
+            .input('contact_person', sql.NVarChar, data.contact_person)
+            .input('designation', sql.NVarChar, data.designation)
+            .input('proposal_addressee', sql.NVarChar, data.proposal_addressee)
+            .input('addressee_designation', sql.NVarChar, data.addressee_designation)
+            .input('group_classification_id', sql.Int, data.group_classification_id)
+            .input('other_group_classification', sql.NVarChar, data.other_group_classification || null)
+            .input('business_type_id', sql.Int, data.business_type_id)
+            .input('other_business_type', sql.NVarChar, data.other_business_type || null)
+            .input('group_type_id', sql.Int, data.group_type_id)
+            .input('sub_group_type_id', sql.NVarChar, subGroupTypeIdsValue)
+            .input('other_group_type', sql.NVarChar, data.other_group_type || null)
+            .input('minimum_age', sql.Int, data.minimum_age)
+            .input('maximum_age', sql.Int, data.maximum_age)
+            .input('payment_mode_id', sql.Int, data.payment_mode_id)
+            .input('plan_id', sql.Int, data.plan_id || null)
+            .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
+            .input('type_of_proposal_id', sql.Int, data.type_of_proposal_id)
+            .input('status_id', sql.Int, data.status_id || 1)
+            .input('amount_loans_id', sql.Int, data.amount_loans_id || null)
+            .input('loans_amount', sql.Decimal(18, 2), data.loans_amount || null)
+            .input('payment_term_id', sql.Int, data.payment_term_id || null)
+            .input('sub_payment_term_id', sql.Int, data.sub_payment_term_id || null)
+            .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
+            .input('level_ranking', sql.NVarChar, levelRankingValue)
+            .input('uniform_coverage_amount', sql.Decimal(18, 2), data.uniform_coverage_amount || null)
+            .input('salary_ranking', sql.NVarChar, salaryRankingValue)
+            .query(`
+                INSERT INTO DHUB.sg.financial_insurance_application (
+                    user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
+                    contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
+                    other_group_classification, business_type_id, other_business_type, group_type_id, sub_group_type_id,
+                    other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
+                    amount_loans_id, loans_amount, payment_term_id, sub_payment_term_id, coverage_type_id, level_ranking,
+                    uniform_coverage_amount, salary_ranking
+                ) VALUES (
+                    @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
+                    @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
+                    @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @sub_group_type_id,
+                    @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
+                    @amount_loans_id, @loans_amount, @payment_term_id, @sub_payment_term_id, @coverage_type_id, @level_ranking,
+                    @uniform_coverage_amount, @salary_ranking
+                );
+                SELECT SCOPE_IDENTITY() AS application_id;
+            `);
 
-    const res = await pool.request()
-        .input('user_id', sql.Int, userId)
-        .input('group_name', sql.NVarChar, data.group_name)
-        .input('business_nature', sql.NVarChar, data.business_nature)
-        .input('number_of_lives', sql.Int, data.number_of_lives)
-        .input('business_address', sql.NVarChar, data.business_address)
-        .input('contact_number', sql.NVarChar, data.contact_number)
-        .input('fax_number', sql.NVarChar, data.fax_number || null)
-        .input('email', sql.NVarChar, data.email)
-        .input('contact_person', sql.NVarChar, data.contact_person)
-        .input('designation', sql.NVarChar, data.designation)
-        .input('proposal_addressee', sql.NVarChar, data.proposal_addressee)
-        .input('addressee_designation', sql.NVarChar, data.addressee_designation)
-        .input('group_classification_id', sql.Int, data.group_classification_id)
-        .input('other_group_classification', sql.NVarChar, data.other_group_classification || null)
-        .input('business_type_id', sql.Int, data.business_type_id)
-        .input('other_business_type', sql.NVarChar, data.other_business_type || null)
-        .input('group_type_id', sql.Int, data.group_type_id)
-        .input('sub_group_type_id', sql.NVarChar, subGroupTypeIdsValue)
-        .input('other_group_type', sql.NVarChar, data.other_group_type || null)
-        .input('minimum_age', sql.Int, data.minimum_age)
-        .input('maximum_age', sql.Int, data.maximum_age)
-        .input('payment_mode_id', sql.Int, data.payment_mode_id)
-        .input('plan_id', sql.Int, data.plan_id || null)
-        .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
-        .input('rider_ids', sql.NVarChar, riderIdsValue)
-        .input('type_of_proposal_id', sql.Int, data.type_of_proposal_id)
-        .input('status_id', sql.Int, data.status_id || 1)
-        .query(`
-            INSERT INTO DHUB.sg.financial_insurance_application
-            (user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
-            contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
-            other_group_classification, business_type_id, other_business_type, group_type_id, sub_group_type_id,
-            other_group_type, minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, rider_ids, type_of_proposal_id, status_id)
-            VALUES
-            (@user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
-            @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
-            @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @sub_group_type_id,
-            @other_group_type, @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @rider_ids, @type_of_proposal_id, @status_id);
-            SELECT SCOPE_IDENTITY() AS application_id;
-        `);
+        const applicationId = appResult.recordset[0].application_id;
 
-    return res.recordset?.[0] ?? null;
+        if (data.riders && Array.isArray(data.riders) && data.riders.length > 0) {
+            for (const rider of data.riders) {
+                const riderRequest = new sql.Request(transaction);
+                await riderRequest
+                    .input('application_id', sql.Int, applicationId)
+                    .input('rider_id', sql.Int, rider.rider_id)
+                    .input('rider_amount', sql.Decimal(18, 2), rider.amount || null)
+                    .input('rider_unit', sql.Int, rider.unit || null)
+                    .query(`
+                        INSERT INTO DHUB.sg.financial_insurance_application_rider
+                        (application_id, rider_id, rider_amount, rider_unit)
+                        VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
+                    `);
+            }
+        }
+
+        await transaction.commit();
+        return { application_id: applicationId };
+    } catch (err) {
+        await transaction.rollback();
+        throw err; // Re-throw the error to be caught by the controller
+    }
 };
 
 
@@ -67,8 +100,8 @@ export const getAllApplications = async () => {
             SELECT
                 fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives, fia.contact_person,
                 fia.status_id, fia.group_classification_id, fia.other_group_classification,
-                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
-                fia.plan_id, fia.basic_plan_id, fia.rider_ids, fia.sub_group_type_id,
+                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type, // Removed rider_ids
+                fia.plan_id, fia.basic_plan_id, fia.sub_group_type_id,
                 fia.type_of_proposal_id,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
@@ -147,143 +180,108 @@ export const getApplicationById = async (id) => {
 // Update application - handles partial updates
 export const updateApplication = async (id, data) => {
     const pool = await poolPromise;
-    
-    const setClauses = [];
-    const inputs = [];
-    
-    if (data.group_name !== undefined) {
-        setClauses.push('group_name = @group_name');
-        inputs.push({ name: 'group_name', value: data.group_name });
-    }
-    if (data.business_nature !== undefined) {
-        setClauses.push('business_nature = @business_nature');
-        inputs.push({ name: 'business_nature', value: data.business_nature });
-    }
-    if (data.number_of_lives !== undefined) {
-        setClauses.push('number_of_lives = @number_of_lives');
-        inputs.push({ name: 'number_of_lives', value: data.number_of_lives });
-    }
-    if (data.business_address !== undefined) {
-        setClauses.push('business_address = @business_address');
-        inputs.push({ name: 'business_address', value: data.business_address });
-    }
-    if (data.contact_number !== undefined) {
-        setClauses.push('contact_number = @contact_number');
-        inputs.push({ name: 'contact_number', value: data.contact_number });
-    }
-    if (data.fax_number !== undefined) {
-        setClauses.push('fax_number = @fax_number');
-        inputs.push({ name: 'fax_number', value: data.fax_number || null });
-    }
-    if (data.email !== undefined) {
-        setClauses.push('email = @email');
-        inputs.push({ name: 'email', value: data.email });
-    }
-    if (data.contact_person !== undefined) {
-        setClauses.push('contact_person = @contact_person');
-        inputs.push({ name: 'contact_person', value: data.contact_person });
-    }
-    if (data.designation !== undefined) {
-        setClauses.push('designation = @designation');
-        inputs.push({ name: 'designation', value: data.designation });
-    }
-    if (data.proposal_addressee !== undefined) {
-        setClauses.push('proposal_addressee = @proposal_addressee');
-        inputs.push({ name: 'proposal_addressee', value: data.proposal_addressee });
-    }
-    if (data.addressee_designation !== undefined) {
-        setClauses.push('addressee_designation = @addressee_designation');
-        inputs.push({ name: 'addressee_designation', value: data.addressee_designation });
-    }
-    if (data.group_classification_id !== undefined) {
-        setClauses.push('group_classification_id = @group_classification_id');
-        inputs.push({ name: 'group_classification_id', value: data.group_classification_id });
-    }
-    if (data.other_group_classification !== undefined) {
-        setClauses.push('other_group_classification = @other_group_classification');
-        inputs.push({ name: 'other_group_classification', value: data.other_group_classification || null });
-    }
-    if (data.business_type_id !== undefined) {
-        setClauses.push('business_type_id = @business_type_id');
-        inputs.push({ name: 'business_type_id', value: data.business_type_id });
-    }
-    if (data.other_business_type !== undefined) {
-        setClauses.push('other_business_type = @other_business_type');
-        inputs.push({ name: 'other_business_type', value: data.other_business_type || null });
-    }
-    if (data.group_type_id !== undefined) {
-        setClauses.push('group_type_id = @group_type_id');
-        inputs.push({ name: 'group_type_id', value: data.group_type_id });
+    const transaction = new sql.Transaction(pool);
 
-        if (data.sub_group_type_id === undefined) {
-            setClauses.push('sub_group_type_id = NULL');
+    try {
+        await transaction.begin();
+
+        // Handle riders update first (delete and re-insert)
+        if (data.riders !== undefined) {
+            const deleteRidersRequest = new sql.Request(transaction);
+            await deleteRidersRequest
+                .input('application_id', sql.Int, id)
+                .query('DELETE FROM DHUB.sg.financial_insurance_application_rider WHERE application_id = @application_id');
+
+            if (Array.isArray(data.riders) && data.riders.length > 0) {
+                for (const rider of data.riders) {
+                    const insertRiderRequest = new sql.Request(transaction);
+                    await insertRiderRequest
+                        .input('application_id', sql.Int, id)
+                        .input('rider_id', sql.Int, rider.rider_id)
+                        .input('rider_amount', sql.Decimal(18, 2), rider.amount || null)
+                        .input('rider_unit', sql.Int, rider.unit || null)
+                        .query(`
+                            INSERT INTO DHUB.sg.financial_insurance_application_rider
+                            (application_id, rider_id, rider_amount, rider_unit)
+                            VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
+                        `);
+                }
+            }
         }
-    }
-    if (data.sub_group_type_id !== undefined) {
-        const subGroupTypeIdsValue = data.sub_group_type_id
-            ? Array.isArray(data.sub_group_type_id) ? JSON.stringify(data.sub_group_type_id) : data.sub_group_type_id
-            : null;
-        setClauses.push('sub_group_type_id = @sub_group_type_id');
-        inputs.push({ name: 'sub_group_type_id', value: subGroupTypeIdsValue });
-    }
-    if (data.other_group_type !== undefined) {
-        setClauses.push('other_group_type = @other_group_type');
-        inputs.push({ name: 'other_group_type', value: data.other_group_type || null });
-    }
-    if (data.minimum_age !== undefined) {
-        setClauses.push('minimum_age = @minimum_age');
-        inputs.push({ name: 'minimum_age', value: data.minimum_age });
-    }
-    if (data.maximum_age !== undefined) {
-        setClauses.push('maximum_age = @maximum_age');
-        inputs.push({ name: 'maximum_age', value: data.maximum_age });
-    }
-    if (data.payment_mode_id !== undefined) {
-        setClauses.push('payment_mode_id = @payment_mode_id');
-        inputs.push({ name: 'payment_mode_id', value: data.payment_mode_id });
-    }
-    if (data.type_of_proposal_id !== undefined) {
-        setClauses.push('type_of_proposal_id = @type_of_proposal_id');
-        inputs.push({ name: 'type_of_proposal_id', value: data.type_of_proposal_id });
-    }
-    if (data.plan_id !== undefined) {
-        setClauses.push('plan_id = @plan_id');
-        inputs.push({ name: 'plan_id', value: data.plan_id || null });
-    }
-    if (data.basic_plan_id !== undefined) {
-        setClauses.push('basic_plan_id = @basic_plan_id');
-        inputs.push({ name: 'basic_plan_id', value: data.basic_plan_id || null });
-    }
-    if (data.rider_ids !== undefined) {
-        const riderIdsValue = data.rider_ids
-            ? Array.isArray(data.rider_ids) ? JSON.stringify(data.rider_ids) : data.rider_ids
-            : null;
-        setClauses.push('rider_ids = @rider_ids');
-        inputs.push({ name: 'rider_ids', value: riderIdsValue });
-    }
-    if (data.status_id !== undefined) {
-        setClauses.push('status_id = @status_id');
-        inputs.push({ name: 'status_id', value: data.status_id });
-    }
-    
-    // Always update timestamp
-    setClauses.push('updated_at = GETDATE()');
-    
-    // Add WHERE clause
-    const whereClause = 'WHERE application_id = @id';
-    
-    // Build and execute query
-    const request = pool.request();
-    request.input('id', sql.Int, id);
-    
-    for (const input of inputs) {
-        request.input(input.name, input.name.includes('age') || input.name.includes('id') ? sql.Int : sql.NVarChar, input.value);
-    }
-    
-    const query = `UPDATE DHUB.sg.financial_insurance_application SET ${setClauses.join(', ')} ${whereClause}`;
-    await request.query(query);
 
-    return getApplicationById(id);
+        const setClauses = [];
+        const inputs = [];
+
+        const addClause = (field, value, type = sql.NVarChar) => {
+            if (value !== undefined) {
+                setClauses.push(`${field} = @${field}`);
+                inputs.push({ name: field, value: value, type: type });
+            }
+        };
+
+        addClause('group_name', data.group_name);
+        addClause('business_nature', data.business_nature);
+        addClause('number_of_lives', data.number_of_lives, sql.Int);
+        addClause('business_address', data.business_address);
+        addClause('contact_number', data.contact_number);
+        addClause('fax_number', data.fax_number || null);
+        addClause('email', data.email);
+        addClause('contact_person', data.contact_person);
+        addClause('designation', data.designation);
+        addClause('proposal_addressee', data.proposal_addressee);
+        addClause('addressee_designation', data.addressee_designation);
+        addClause('group_classification_id', data.group_classification_id, sql.Int);
+        addClause('other_group_classification', data.other_group_classification || null);
+        addClause('business_type_id', data.business_type_id, sql.Int);
+        addClause('other_business_type', data.other_business_type || null);
+        addClause('group_type_id', data.group_type_id, sql.Int);
+        if (data.group_type_id !== undefined && data.sub_group_type_id === undefined) {
+             setClauses.push('sub_group_type_id = NULL');
+        }
+        if (data.sub_group_type_id !== undefined) {
+            const subGroupValue = data.sub_group_type_id ? JSON.stringify(data.sub_group_type_id) : null;
+            addClause('sub_group_type_id', subGroupValue);
+        }
+        addClause('other_group_type', data.other_group_type || null);
+        addClause('minimum_age', data.minimum_age, sql.Int);
+        addClause('maximum_age', data.maximum_age, sql.Int);
+        addClause('payment_mode_id', data.payment_mode_id, sql.Int);
+        addClause('type_of_proposal_id', data.type_of_proposal_id, sql.Int);
+        addClause('plan_id', data.plan_id, sql.Int);
+        addClause('basic_plan_id', data.basic_plan_id, sql.Int);
+        addClause('status_id', data.status_id, sql.Int);
+
+        // New product-specific fields
+        addClause('amount_loans_id', data.amount_loans_id, sql.Int);
+        addClause('loans_amount', data.loans_amount, sql.Decimal(18, 2));
+        addClause('payment_term_id', data.payment_term_id, sql.Int);
+        addClause('sub_payment_term_id', data.sub_payment_term_id, sql.Int);
+        addClause('coverage_type_id', data.coverage_type_id, sql.Int);
+        addClause('uniform_coverage_amount', data.uniform_coverage_amount, sql.Decimal(18, 2));
+        if (data.level_ranking !== undefined) {
+            addClause('level_ranking', data.level_ranking ? JSON.stringify(data.level_ranking) : null);
+        }
+        if (data.salary_ranking !== undefined) {
+            addClause('salary_ranking', data.salary_ranking ? JSON.stringify(data.salary_ranking) : null);
+        }
+
+        if (setClauses.length > 0) {
+            setClauses.push('updated_at = GETDATE()');
+            const request = new sql.Request(transaction);
+            request.input('id', sql.Int, id);
+            for (const input of inputs) {
+                request.input(input.name, input.type, input.value);
+            }
+            const query = `UPDATE DHUB.sg.financial_insurance_application SET ${setClauses.join(', ')} WHERE application_id = @id`;
+            await request.query(query);
+        }
+
+        await transaction.commit();
+        return getApplicationById(id);
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
 };
 
 // Delete application
@@ -380,16 +378,6 @@ export const getLookupNamesByIds = async (ids) => {
 };
 
 // Get riders by a list of IDs
-export const getRidersByIds = async (ids) => {
-    if (!ids || ids.length === 0) return new Map();
-    const pool = await poolPromise;
-    const riderRes = await pool.request()
-        .query(`SELECT rider_id AS id, rider_name AS name FROM sg.financial_insurance_rider WHERE rider_id IN (${ids.join(',')})`);
-    const ridersMap = new Map();
-    riderRes.recordset.forEach(r => ridersMap.set(r.id, r.name));
-    return ridersMap;
-};
-
 // Get lookups by a list of IDs
 export const getLookupsByIds = async (ids) => {
     if (!ids || ids.length === 0) return new Map();
@@ -399,4 +387,45 @@ export const getLookupsByIds = async (ids) => {
     const lookupsMap = new Map();
     subGroupRes.recordset.forEach(sg => lookupsMap.set(sg.id, sg.name));
     return lookupsMap;
+};
+
+// Get riders for a single application
+export const getApplicationRiders = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT 
+                r.rider_id,
+                r.rider_name,
+                r.input_type,
+                r.unit_value,
+                ar.rider_amount as amount,
+                ar.rider_unit as unit
+            FROM sg.financial_insurance_application_rider ar
+            JOIN sg.financial_insurance_rider r ON ar.rider_id = r.rider_id
+            WHERE ar.application_id = @application_id
+        `);
+    return result.recordset ?? [];
+};
+
+// Get riders for multiple applications in bulk
+export const getBulkApplicationRiders = async (applicationIds) => {
+    if (!applicationIds || applicationIds.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    const idParams = applicationIds.map((id, i) => {
+        const paramName = `appId${i}`;
+        request.input(paramName, sql.Int, id);
+        return `@${paramName}`;
+    }).join(',');
+
+    const result = await request.query(`
+        SELECT ar.application_id, r.rider_id, r.rider_name, r.input_type, r.unit_value, ar.rider_amount as amount, ar.rider_unit as unit
+        FROM sg.financial_insurance_application_rider ar
+        JOIN sg.financial_insurance_rider r ON ar.rider_id = r.rider_id
+        WHERE ar.application_id IN (${idParams})
+    `);
+    return result.recordset ?? [];
 };
