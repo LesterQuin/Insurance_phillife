@@ -51,7 +51,7 @@ export const validateRegister = [
         .isLength({ max: 50 }).withMessage('Agent code must not exceed 50 characters'),
     body('role_id')
     .notEmpty().withMessage('Role ID is required')
-    .isInt().withMessage('Role ID must be a valid integer')
+    .isInt({ min: 0 }).withMessage('Role ID must be a non-negative integer')
     .custom(async (value) => {
         const roles = await User.getLookupListByCategory('ROLE');
         const validIds = roles.map(r => r.id);
@@ -65,7 +65,7 @@ export const validateRegister = [
     }),
     body('department_id')
     .optional()
-    .isInt().withMessage('Department ID must be a valid integer')
+    .isInt({ min: 0 }).withMessage('Department ID must be a non-negative integer')
     .custom(async (value) => {
         const departments = await User.getLookupListByCategory('DEPARTMENT');
         const validIds = departments.map(d => d.id);
@@ -79,7 +79,7 @@ export const validateRegister = [
     }),
     body('location_id')
     .optional()
-    .isInt().withMessage('Location ID must be a valid integer')
+    .isInt({ min: 0 }).withMessage('Location ID must be a non-negative integer')
     .custom(async (value) => {
         const locations = await User.getLookupListByCategory('LOCATION');
         const validIds = locations.map(l => l.id);
@@ -281,7 +281,7 @@ export const validateFinancialApplication = [
     // -----------------------------
     body('group_classification_id')
         .notEmpty().withMessage('Group Classification is required')
-        .isInt().withMessage('group_classification_id must be an integer')
+        .isInt({ min: 0 }).withMessage('group_classification_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.GROUP_CLASSIFICATION) {
@@ -327,7 +327,7 @@ export const validateFinancialApplication = [
     // -----------------------------
     body('business_type_id')
         .notEmpty().withMessage('Business Type is required')
-        .isInt().withMessage('business_type_id must be an integer')
+        .isInt({ min: 0 }).withMessage('business_type_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.BUSINESS_TYPE) {
@@ -372,7 +372,7 @@ export const validateFinancialApplication = [
     // -----------------------------
     body('group_type_id')
         .notEmpty().withMessage('Group Type is required')
-        .isInt().withMessage('group_type_id must be an integer')
+        .isInt({ min: 0 }).withMessage('group_type_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.TYPE_OF_GROUP) {
@@ -418,6 +418,11 @@ export const validateFinancialApplication = [
                 }
     
                 const idsToCheck = Array.isArray(subGroupTypeId) ? subGroupTypeId : [subGroupTypeId];
+                for (const id of idsToCheck) {
+                    if (Number(id) < 0) {
+                        throw new Error(`sub_group_type_id values must be non-negative. Found: ${id}`);
+                    }
+                }
                 const invalidIds = idsToCheck.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
     
                 if (invalidIds.length > 0) {
@@ -484,7 +489,7 @@ export const validateFinancialApplication = [
     // -----------------------------
     body('payment_mode_id')
         .notEmpty().withMessage('Payment Mode is required')
-        .isInt().withMessage('payment_mode_id must be an integer')
+        .isInt({ min: 0 }).withMessage('payment_mode_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.MODE_OF_PAYMENT) {
@@ -504,7 +509,7 @@ export const validateFinancialApplication = [
     // -----------------------------
     body('type_of_proposal_id')
         .notEmpty().withMessage('Type of Proposal is required')
-        .isInt().withMessage('type_of_proposal_id must be an integer')
+        .isInt({ min: 0 }).withMessage('type_of_proposal_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.TYPE_OF_PROPOSAL) {
@@ -525,7 +530,7 @@ export const validateFinancialApplication = [
     body('plan_id')
         .if(body('type_of_proposal_id').equals('31'))
         .notEmpty().withMessage('Plan is required')
-        .isInt().withMessage('plan_id must be a valid integer')
+        .isInt({ min: 0 }).withMessage('plan_id must be a non-negative integer')
         .custom(async (value) => {
             const plans = await Financial.getAllPlans();
             if (!plans.some(p => p.plan_id === Number(value))) {
@@ -537,7 +542,7 @@ export const validateFinancialApplication = [
 body('basic_plan_id')
         .if(body('type_of_proposal_id').equals('31'))
         .notEmpty().withMessage('Basic Plan is required')
-        .isInt().withMessage('basic_plan_id must be a valid integer')
+        .isInt({ min: 0 }).withMessage('basic_plan_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             // Check if basic_plan_id is an array - only one allowed
             if (Array.isArray(value)) {
@@ -561,7 +566,7 @@ body('basic_plan_id')
     body('riders.*.rider_id')
         .exists().withMessage('rider_id is required for each rider')
         .if(body('type_of_proposal_id').equals('31'))
-        .isInt().withMessage('rider_id must be an integer')
+        .isInt({ min: 0 }).withMessage('rider_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             const basicPlanId = Number(req.body.basic_plan_id);
             if (!basicPlanId) return true; // Let other validator catch missing basic_plan_id
@@ -573,14 +578,14 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('riders.*.amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isNumeric().withMessage('Rider amount must be a number'),
-    body('riders.*.unit').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isNumeric().withMessage('Rider unit must be a number'),
+    body('riders.*.amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Rider amount must be a non-negative number'),
+    body('riders.*.unit').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isInt({ min: 0 }).withMessage('Rider unit must be a non-negative integer'),
 
     // Optional validation for new product-specific fields
     body('amount_loans_id')
         .if(body('type_of_proposal_id').equals('31'))
         .optional({ nullable: true })
-        .isInt().withMessage('Amount Loans ID must be an integer')
+        .isInt({ min: 0 }).withMessage('Amount Loans ID must be a non-negative integer')
         .custom(async (value) => {
             if (value === null || value === undefined) return true;
             const lookups = await Financial.getLookupListByCategory('LOAN_AMOUNT_TYPE');
@@ -590,11 +595,11 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('loans_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isDecimal().withMessage('Loans Amount must be a decimal'),
+    body('loans_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Loans Amount must be a non-negative number'),
     body('payment_term_id')
         .if(body('type_of_proposal_id').equals('31'))
         .optional({ nullable: true })
-        .isInt().withMessage('Payment Term ID must be an integer')
+        .isInt({ min: 0 }).withMessage('Payment Term ID must be a non-negative integer')
         .custom(async (value) => {
             if (value === null || value === undefined) return true;
             const paymentTerms = await Financial.getLookupListByCategory('PAYMENT_TERM');
@@ -610,7 +615,7 @@ body('basic_plan_id')
     body('sub_payment_term_id')
         .if(body('type_of_proposal_id').equals('31'))
         .optional({ nullable: true })
-        .isInt().withMessage('Sub Payment Term ID must be an integer')
+        .isInt({ min: 0 }).withMessage('Sub Payment Term ID must be a non-negative integer')
         .custom(async (value, { req }) => {
             const paymentTermId = Number(req.body.payment_term_id);
             if (paymentTermId === 44) { // Year
@@ -633,7 +638,7 @@ body('basic_plan_id')
     body('coverage_type_id')
         .if(body('type_of_proposal_id').equals('31'))
         .optional({ nullable: true })
-        .isInt().withMessage('Coverage Type ID must be an integer')
+        .isInt({ min: 0 }).withMessage('Coverage Type ID must be a non-negative integer')
         .custom(async (value) => {
             if (value === null || value === undefined) return true;
             const lookups = await Financial.getLookupListByCategory('COVERAGE_TYPE');
@@ -643,49 +648,77 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('uniform_coverage_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isDecimal().withMessage('Uniform Coverage Amount must be a decimal')
+    body('uniform_coverage_amount')
+        .if(body('type_of_proposal_id').equals('31'))
         .custom((value, { req }) => {
-            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) === 33 && !value) {
-                throw new Error('Uniform Coverage Amount is required for this coverage type.');
-            }
-            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) !== 33 && value) {
-                throw new Error('Uniform Coverage Amount should only be provided for Uniform Coverage type.');
+            const planId = Number(req.body.plan_id);
+            const coverageTypeId = Number(req.body.coverage_type_id);
+
+            if (planId === 2) {
+                if (coverageTypeId === 33) { // Uniform Coverage
+                    if (value == null) {
+                        throw new Error('Uniform Coverage Amount is required and cannot be null for this coverage type.');
+                    }
+                    if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
+                        throw new Error('Uniform Coverage Amount must be a non-negative number.');
+                    }
+                } else if (value != null) { // For any other coverage type under plan 2
+                    throw new Error('Uniform Coverage Amount should only be provided for Uniform Coverage type.');
+                }
             }
             return true;
         }),
-    body('level_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Level Ranking must be an array')
+    body('level_ranking')
+        .if(body('type_of_proposal_id').equals('31'))
         .custom((value, { req }) => {
-            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) === 32) {
-                if (!value || value.length < 2) {
-                    throw new Error('Level Ranking is required for this coverage type and must have at least 2 entries.');
-                }
-                if (value.length > 10) {
-                    throw new Error('Level Ranking cannot have more than 10 entries.');
-                }
+            if (value != null && !Array.isArray(value)) {
+                throw new Error('Level Ranking must be an array.');
             }
-            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) !== 32 && value && value.length > 0) {
-                throw new Error('Level Ranking should only be provided for Level Ranking coverage type.');
+            const planId = Number(req.body.plan_id);
+            const coverageTypeId = Number(req.body.coverage_type_id);
+
+            if (planId === 2) {
+                if (coverageTypeId === 32) { // Level Ranking
+                    if (value == null || value.length < 2) {
+                        throw new Error('Level Ranking is required for this coverage type and must have at least 2 entries.');
+                    }
+                    if (value.length > 10) {
+                        throw new Error('Level Ranking cannot have more than 10 entries.');
+                    }
+                } else if (value != null) { // For any other coverage type under plan 2
+                    throw new Error('Level Ranking should null and only be provided for Level Ranking not in Uniform coverage type.');
+                }
             }
             return true;
         }),
     body('level_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).notEmpty().withMessage('Designation is required in Level Ranking'),
-    body('level_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Level Ranking'),
-    body('salary_ranking').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isArray().withMessage('Salary Ranking must be an array')
+    body('level_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('level_ranking').exists()).isFloat({ min: 0 }).withMessage('Amount must be a non-negative number in Level Ranking'),
+    body('salary_ranking')
+        .if(body('type_of_proposal_id').equals('31'))
         .custom((value, { req }) => {
-            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) === 34 && (!value || value.length === 0)) {
-                throw new Error('Salary Ranking is required for this coverage type.');
+            if (value != null && !Array.isArray(value)) {
+                throw new Error('Salary Ranking must be an array.');
             }
-            if (Number(req.body.plan_id) === 2 && Number(req.body.coverage_type_id) !== 34 && value) {
-                throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
+            const planId = Number(req.body.plan_id);
+            const coverageTypeId = Number(req.body.coverage_type_id);
+
+            if (planId === 2) {
+                if (coverageTypeId === 34) { // By Salary Rank
+                    if (value == null || value.length === 0) {
+                        throw new Error('Salary Ranking is required for this coverage type.');
+                    }
+                } else if (value != null) { // For any other coverage type under plan 2
+                    throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
+                }
             }
             return true;
         }),
     body('salary_ranking.*.salary_multiplier').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Salary Multiplier is required in Salary Ranking'),
     body('salary_ranking.*.designation').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).notEmpty().withMessage('Designation is required in Salary Ranking'),
-    body('salary_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).isDecimal().withMessage('Amount must be a decimal in Salary Ranking'),
+    body('salary_ranking.*.amount').if(body('type_of_proposal_id').equals('31')).if(body('salary_ranking').exists()).isFloat({ min: 0 }).withMessage('Amount must be a non-negative number in Salary Ranking'),
 
     // Optional status
-    body('status_id').optional().isInt(),
+    body('status_id').optional().isInt({ min: 0 }),
 
     // Validation result
     (req, res, next) => {
@@ -741,7 +774,7 @@ export const validateUpdateFinancialApplication = [
         }),
 
     // Lookup ID validations (optional, but validated if present)
-    body('group_classification_id').optional().isInt().withMessage('group_classification_id must be an integer').custom(async (value) => {
+    body('group_classification_id').optional().isInt({ min: 0 }).withMessage('group_classification_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
         if (!lookups.some(l => l.id === Number(value))) {
             const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -749,7 +782,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
-    body('business_type_id').optional().isInt().withMessage('business_type_id must be an integer').custom(async (value) => {
+    body('business_type_id').optional().isInt({ min: 0 }).withMessage('business_type_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('BUSINESS_TYPE');
         if (!lookups.some(l => l.id === Number(value))) {
             const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -757,7 +790,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
-    body('group_type_id').optional().isInt().withMessage('group_type_id must be an integer').custom(async (value) => {
+    body('group_type_id').optional().isInt({ min: 0 }).withMessage('group_type_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
         if (!lookups.some(l => l.id === Number(value))) {
             const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -765,7 +798,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
-    body('payment_mode_id').optional().isInt().withMessage('payment_mode_id must be an integer').custom(async (value) => {
+    body('payment_mode_id').optional().isInt({ min: 0 }).withMessage('payment_mode_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('MODE_OF_PAYMENT');
         if (!lookups.some(l => l.id === Number(value))) {
             const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -773,7 +806,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
-    body('type_of_proposal_id').optional().isInt().withMessage('type_of_proposal_id must be an integer').custom(async (value) => {
+    body('type_of_proposal_id').optional().isInt({ min: 0 }).withMessage('type_of_proposal_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('TYPE_OF_PROPOSAL');
         if (!lookups.some(l => l.id === Number(value))) {
             const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -790,21 +823,21 @@ export const validateUpdateFinancialApplication = [
         // If it's an array, validate each element
         if (Array.isArray(value)) {
             for (const id of value) {
-                if (isNaN(Number(id))) {
-                    throw new Error('sub_group_type_id array must contain only integers');
+                if (isNaN(Number(id)) || Number(id) < 0) {
+                    throw new Error('sub_group_type_id array must contain only non-negative integers');
                 }
             }
             return true;
         }
         
         // If it's a single value, validate it's a number
-        if (isNaN(Number(value))) {
-            throw new Error('sub_group_type_id must be an integer or array of integers');
+        if (isNaN(Number(value)) || Number(value) < 0) {
+            throw new Error('sub_group_type_id must be a non-negative integer or array of non-negative integers');
         }
         
         return true;
     }),
-    body('plan_id').optional().isInt().withMessage('plan_id must be a valid integer').custom(async (value) => {
+    body('plan_id').optional().isInt({ min: 0 }).withMessage('plan_id must be a non-negative integer').custom(async (value) => {
         const plans = await Financial.getAllPlans();
         if (!plans.some(p => p.plan_id === Number(value))) {
             const validOptions = plans.map(p => `${p.plan_id} - ${p.plan_name}`).join(', ');
@@ -812,7 +845,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
-body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a valid integer').custom(async (value, { req }) => {
+body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id must be a non-negative integer').custom(async (value, { req }) => {
         // Check if basic_plan_id is an array - only one allowed
         if (Array.isArray(value)) {
             throw new Error('Only select one');
@@ -842,21 +875,21 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
 
         // Since this is a custom validator on the array, we check each item.
         for (const rider of riders) {
-            if (rider.rider_id === undefined || isNaN(parseInt(rider.rider_id, 10))) {
-                throw new Error('Each rider in the array must have a valid integer rider_id.');
+            if (rider.rider_id === undefined || isNaN(parseInt(rider.rider_id, 10)) || parseInt(rider.rider_id, 10) < 0) {
+                throw new Error('Each rider in the array must have a valid non-negative integer rider_id.');
             }
-            if (rider.amount !== undefined && isNaN(parseFloat(rider.amount))) {
-                throw new Error(`Rider amount for rider_id ${rider.rider_id} must be a number.`);
+            if (rider.amount !== undefined && (isNaN(parseFloat(rider.amount)) || parseFloat(rider.amount) < 0)) {
+                throw new Error(`Rider amount for rider_id ${rider.rider_id} must be a non-negative number.`);
             }
-            if (rider.unit !== undefined && isNaN(parseInt(rider.unit, 10))) {
-                throw new Error(`Rider unit for rider_id ${rider.rider_id} must be an integer.`);
+            if (rider.unit !== undefined && (isNaN(parseInt(rider.unit, 10)) || parseInt(rider.unit, 10) < 0)) {
+                throw new Error(`Rider unit for rider_id ${rider.rider_id} must be a non-negative integer.`);
             }
         }
         return true;
     }),
 
     // Optional validation for new product-specific fields on update
-    body('amount_loans_id').optional({ nullable: true }).isInt().withMessage('Amount Loans ID must be an integer')
+    body('amount_loans_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Amount Loans ID must be a non-negative integer')
         .custom(async (value) => {
             if (value === null || value === undefined) return true;
             const lookups = await Financial.getLookupListByCategory('LOAN_AMOUNT_TYPE');
@@ -866,8 +899,8 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
             }
             return true;
         }),
-    body('loans_amount').optional({ nullable: true }).isDecimal(),
-    body('payment_term_id').optional({ nullable: true }).isInt().custom(async (value) => {
+    body('loans_amount').optional({ nullable: true }).isFloat({ min: 0 }),
+    body('payment_term_id').optional({ nullable: true }).isInt({ min: 0 }).custom(async (value) => {
         if (value === null || value === undefined) return true;
         const paymentTerms = await Financial.getLookupListByCategory('PAYMENT_TERM');
         const paymentYears = await Financial.getLookupListByCategory('PAYMENT_YEAR');
@@ -879,7 +912,7 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
         }
         return true;
     }),
-    body('sub_payment_term_id').optional({ nullable: true }).isInt().withMessage('Sub Payment Term ID must be an integer')
+    body('sub_payment_term_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Sub Payment Term ID must be a non-negative integer')
         .custom(async (value, { req }) => {
         const paymentTermId = req.body.payment_term_id !== undefined ? Number(req.body.payment_term_id) : req.existingApplication?.payment_term_id;
 
@@ -902,7 +935,7 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
         }
         return true;
     }),
-    body('coverage_type_id').optional({ nullable: true }).isInt().withMessage('Coverage Type ID must be an integer')
+    body('coverage_type_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Coverage Type ID must be a non-negative integer')
         .custom(async (value) => {
             if (value === null || value === undefined) return true;
             const lookups = await Financial.getLookupListByCategory('COVERAGE_TYPE');
@@ -988,7 +1021,7 @@ body('basic_plan_id').optional().isInt().withMessage('basic_plan_id must be a va
     }),
 
     // Optional status
-    body('status_id').optional().isInt(),
+    body('status_id').optional().isInt({ min: 0 }),
 
     // Validation result
     (req, res, next) => {
