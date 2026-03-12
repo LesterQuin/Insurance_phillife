@@ -44,8 +44,7 @@ export const createApplication = async (req, res) => {
             dataToSave.riders = [];
             dataToSave.amount_loans_id = null;
             dataToSave.loans_amount = null;
-            dataToSave.payment_term_id = null;
-            dataToSave.sub_payment_term_id = null;
+            dataToSave.payment = [];
             dataToSave.coverage_type_id = null;
             dataToSave.level_ranking = null;
             dataToSave.uniform_coverage_amount = null;
@@ -91,6 +90,15 @@ export const getAllApplications = async (req, res) => {
             return acc;
         }, {});
 
+        const allPayments = await Model.getBulkApplicationPaymentTerms(appIds);
+        const paymentsByAppId = allPayments.reduce((acc, p) => {
+            (acc[p.application_id] = acc[p.application_id] || []).push({
+                payment_term: { id: p.payment_term_id, name: p.payment_term_name },
+                sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+            });
+            return acc;
+        }, {});
+
         // --- Map the bulk-fetched data back to each application ---
         const formattedApplications = rawApplications.map(app => {
 
@@ -117,6 +125,7 @@ export const getAllApplications = async (req, res) => {
                     other_value: app.other_group_type
                 },
                 sub_group_types: subGroupsByAppId[app.application_id] || [],
+                payment: paymentsByAppId[app.application_id] || [],
                 type_of_proposal: {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
@@ -144,6 +153,12 @@ export const getApplicationById = async (req, res) => {
 
         // --- Build structured response ---
         const subGroupTypes = await Model.getApplicationSubGroups(req.params.id);
+
+        const paymentTermsRaw = await Model.getApplicationPaymentTerms(req.params.id);
+        const paymentTerms = paymentTermsRaw.map(p => ({
+            payment_term: { id: p.payment_term_id, name: p.payment_term_name },
+            sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+        }));
 
         // Fetch riders from the new table
         const riders = await Model.getApplicationRiders(req.params.id);
@@ -185,6 +200,7 @@ export const getApplicationById = async (req, res) => {
             group_type: { id: app.group_type_id, name: app.group_type_name, other_value: app.other_group_type || null },
             sub_group_types: subGroupTypes,
             payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
+            payment: paymentTerms,
             type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
             plan: { id: app.plan_id, name: app.plan_name },
             basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },

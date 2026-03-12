@@ -39,8 +39,6 @@ export const createApplication = async (data, userId) => {
             .input('status_id', sql.Int, data.status_id || 1)
             .input('amount_loans_id', sql.Int, data.amount_loans_id || null)
             .input('loans_amount', sql.Decimal(18, 2), data.loans_amount || null)
-            .input('payment_term_id', sql.Int, data.payment_term_id || null)
-            .input('sub_payment_term_id', sql.Int, data.sub_payment_term_id || null)
             .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
@@ -48,13 +46,13 @@ export const createApplication = async (data, userId) => {
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
-                    amount_loans_id, loans_amount, payment_term_id, sub_payment_term_id, coverage_type_id
+                    amount_loans_id, loans_amount, coverage_type_id
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
-                    @amount_loans_id, @loans_amount, @payment_term_id, @sub_payment_term_id, @coverage_type_id
+                    @amount_loans_id, @loans_amount, @coverage_type_id
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -75,6 +73,21 @@ export const createApplication = async (data, userId) => {
                             VALUES (@application_id, @sub_group_type_id);
                         `);
                 }
+            }
+        }
+
+        // Insert payment terms
+        if (data.payment && Array.isArray(data.payment) && data.payment.length > 0) {
+            for (const paymentTerm of data.payment) {
+                const paymentRequest = new sql.Request(transaction);
+                await paymentRequest
+                    .input('application_id', sql.Int, applicationId)
+                    .input('payment_term_id', sql.Int, paymentTerm.payment_term_id)
+                    .input('sub_payment_term_id', sql.Int, paymentTerm.sub_payment_term_id)
+                    .query(`
+                        INSERT INTO DHUB.sg.financial_insurance_application_payment (application_id, payment_term_id, sub_payment_term_id)
+                        VALUES (@application_id, @payment_term_id, @sub_payment_term_id);
+                    `);
             }
         }
 
@@ -236,6 +249,25 @@ export const updateApplication = async (id, data) => {
     try {
         await transaction.begin();
 
+        // Handle payment update
+        if (data.payment !== undefined) {
+            const deletePaymentsRequest = new sql.Request(transaction);
+            await deletePaymentsRequest
+                .input('application_id', sql.Int, id)
+                .query('DELETE FROM DHUB.sg.financial_insurance_application_payment WHERE application_id = @application_id');
+
+            if (Array.isArray(data.payment) && data.payment.length > 0) {
+                for (const paymentTerm of data.payment) {
+                    const insertPaymentRequest = new sql.Request(transaction);
+                    await insertPaymentRequest
+                        .input('application_id', sql.Int, id)
+                        .input('payment_term_id', sql.Int, paymentTerm.payment_term_id)
+                        .input('sub_payment_term_id', sql.Int, paymentTerm.sub_payment_term_id)
+                        .query('INSERT INTO DHUB.sg.financial_insurance_application_payment (application_id, payment_term_id, sub_payment_term_id) VALUES (@application_id, @payment_term_id, @sub_payment_term_id);');
+                }
+            }
+        }
+
         // Handle sub_group_type_id update
         if (data.sub_group_type_id !== undefined) {
             const deleteSubGroupsRequest = new sql.Request(transaction);
@@ -368,8 +400,6 @@ export const updateApplication = async (id, data) => {
         // New product-specific fields
         addClause('amount_loans_id', data.amount_loans_id, sql.Int);
         addClause('loans_amount', data.loans_amount, sql.Decimal(18, 2));
-        addClause('payment_term_id', data.payment_term_id, sql.Int);
-        addClause('sub_payment_term_id', data.sub_payment_term_id, sql.Int);
         addClause('coverage_type_id', data.coverage_type_id, sql.Int);
 
         if (setClauses.length > 0) {
@@ -529,6 +559,25 @@ export const getApplicationSubGroups = async (applicationId) => {
     return result.recordset ?? [];
 };
 
+// Get payment terms for a single application
+export const getApplicationPaymentTerms = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT 
+                pt.id as payment_term_id, 
+                pt.name as payment_term_name,
+                spt.id as sub_payment_term_id,
+                spt.name as sub_payment_term_name
+            FROM DHUB.sg.financial_insurance_application_payment p
+            JOIN DHUB.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups spt ON p.sub_payment_term_id = spt.id
+            WHERE p.application_id = @application_id
+        `);
+    return result.recordset ?? [];
+};
+
 // Get coverage rankings for a single application
 export const getCoverageRankingsByAppId = async (applicationId) => {
     const pool = await poolPromise;
@@ -560,6 +609,34 @@ export const getBulkApplicationSubGroups = async (applicationIds) => {
         WHERE s.application_id IN (${idParams})`);
     return result.recordset ?? [];
 };
+
+// Get payment terms for multiple applications
+export const getBulkApplicationPaymentTerms = async (applicationIds) => {
+    if (!applicationIds || applicationIds.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    const idParams = applicationIds.map((id, i) => {
+        const paramName = `appId${i}`;
+        request.input(paramName, sql.Int, id);
+        return `@${paramName}`;
+    }).join(',');
+
+    const result = await request.query(`
+        SELECT 
+            p.application_id,
+            pt.id as payment_term_id, 
+            pt.name as payment_term_name,
+            spt.id as sub_payment_term_id,
+            spt.name as sub_payment_term_name
+        FROM DHUB.sg.financial_insurance_application_payment p
+        JOIN DHUB.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+        LEFT JOIN DHUB.sg.financial_insurance_group_lookups spt ON p.sub_payment_term_id = spt.id
+        WHERE p.application_id IN (${idParams})
+    `);
+    return result.recordset ?? [];
+};
+
 // Get riders for multiple applications in bulk
 export const getBulkApplicationRiders = async (applicationIds) => {
     if (!applicationIds || applicationIds.length === 0) return [];
