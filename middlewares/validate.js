@@ -241,7 +241,7 @@ export const validateUpdateProfile = [
 export const validateFinancialApplication = [
     // -----------------------------
     // KYC
-    // -----------------------------
+    // ----------------------------- q
     body('group_name')
         .notEmpty().withMessage('Group Name is required')
         .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
@@ -596,45 +596,32 @@ body('basic_plan_id')
             return true;
         }),
     body('loans_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Loans Amount must be a non-negative number'),
-    body('payment_term_id')
-        .if(body('type_of_proposal_id').equals('31'))
-        .optional({ nullable: true })
-        .isInt({ min: 0 }).withMessage('Payment Term ID must be a non-negative integer')
-        .custom(async (value) => {
-            if (value === null || value === undefined) return true;
-            const paymentTerms = await Financial.getLookupListByCategory('PAYMENT_TERM');
-            const paymentYears = await Financial.getLookupListByCategory('PAYMENT_YEAR');
-            const topLevelYears = paymentYears.filter(y => y.parent_id === null);
-            const validLookups = [...paymentTerms, ...topLevelYears];
-            if (!validLookups.some(l => l.id === Number(value))) {
-                const validOptions = validLookups.map(l => `${l.id} - ${l.name}`).join(', ');
-                throw new Error(`Invalid payment_term_id (${value}). Valid options: ${validOptions}`);
+    body('payment_term_id').if(body('plan_id').equals('1')).notEmpty().withMessage('Payment Term is required for GCLI plan.').isInt().custom(async (value, { req }) => {
+        const lookups = await Financial.getLookupListByCategory('PAYMENT_TERM');
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid payment_term_id (${value}). Valid options: ${validOptions}`);
+        }
+        return true;
+    }),
+    body('sub_payment_term_id').if(body('plan_id').equals('1')).custom(async (value, { req }) => {
+        const paymentTermId = Number(req.body.payment_term_id);
+        if ([41, 42, 43].includes(paymentTermId)) { // Single Pay, Annual, or Monthly
+            if (value == null) {
+                throw new Error('sub_payment_term_id is required when Payment Term is Single Pay, Annual, or Monthly.');
             }
-            return true;
-        }),
-    body('sub_payment_term_id')
-        .if(body('type_of_proposal_id').equals('31'))
-        .optional({ nullable: true })
-        .isInt({ min: 0 }).withMessage('Sub Payment Term ID must be a non-negative integer')
-        .custom(async (value, { req }) => {
-            const paymentTermId = Number(req.body.payment_term_id);
-            if (paymentTermId === 44) { // Year
-                if (value === undefined || value === null) {
-                    throw new Error('sub_payment_term_id is required when Payment Term is Year.');
-                }
-                const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
-                const selectableYears = lookups.filter(l => l.parent_id === 44);
-                if (!selectableYears.some(l => l.id === Number(value))) {
-                    const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
-                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options for Year term: ${validOptions}`);
-                }
-            } else if (paymentTermId === 41 || paymentTermId === 42 || paymentTermId === 43) { // Single Pay, Annual, or Monthly
-                if (value !== undefined && value !== null) {
-                    throw new Error('sub_payment_term_id should not be provided for Single Pay, Annual, or Monthly Payment Term.');
-                }
+            if (isNaN(Number(value)) || Number(value) < 0) {
+                throw new Error('sub_payment_term_id must be a non-negative integer.');
             }
-            return true;
-        }),
+            const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
+            const selectableYears = lookups.filter(l => l.parent_id === 44);
+            if (!selectableYears.some(l => l.id === Number(value))) {
+                const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid sub_payment_term_id (${value}). Valid options: ${validOptions}`);
+            }
+        }
+        return true;
+    }),
     body('coverage_type_id')
         .if(body('type_of_proposal_id').equals('31'))
         .optional({ nullable: true })
@@ -920,37 +907,33 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
             return true;
         }),
     body('loans_amount').optional({ nullable: true }).isFloat({ min: 0 }),
-    body('payment_term_id').optional({ nullable: true }).isInt({ min: 0 }).custom(async (value) => {
-        if (value === null || value === undefined) return true;
-        const paymentTerms = await Financial.getLookupListByCategory('PAYMENT_TERM');
-        const paymentYears = await Financial.getLookupListByCategory('PAYMENT_YEAR');
-        const topLevelYears = paymentYears.filter(y => y.parent_id === null);
-        const validLookups = [...paymentTerms, ...topLevelYears];
-        if (!validLookups.some(l => l.id === Number(value))) {
-            const validOptions = validLookups.map(l => `${l.id} - ${l.name}`).join(', ');
-            throw new Error(`Invalid payment_term_id (${value}). Valid options: ${validOptions}`);
+    body('payment_term_id').optional({ nullable: true }).isInt({ min: 0 }).custom(async (value, { req }) => {
+        if (req.body.plan_id == 1 && value == null) {
+            throw new Error('Payment Term is required for GCLI plan.');
+        }
+        if (value != null) {
+            const lookups = await Financial.getLookupListByCategory('PAYMENT_TERM');
+            if (!lookups.some(l => l.id === Number(value))) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid payment_term_id (${value}). Valid options: ${validOptions}`);
+            }
         }
         return true;
     }),
-    body('sub_payment_term_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Sub Payment Term ID must be a non-negative integer')
-        .custom(async (value, { req }) => {
+    body('sub_payment_term_id').optional({ nullable: true }).isInt({ min: 0 }).custom(async (value, { req }) => {
         const paymentTermId = req.body.payment_term_id !== undefined ? Number(req.body.payment_term_id) : req.existingApplication?.payment_term_id;
 
-        if (paymentTermId === 44) { // Year
-            if (req.body.payment_term_id !== undefined && (value === undefined || value === null)) {
-                throw new Error('sub_payment_term_id is required when Payment Term is set to Year.');
+        if ([41, 42, 43].includes(paymentTermId)) { // Single Pay, Annual, or Monthly
+            if (req.body.payment_term_id !== undefined && value == null) {
+                throw new Error('sub_payment_term_id is required when Payment Term is set to Single Pay, Annual, or Monthly.');
             }
-            if (value !== undefined && value !== null) {
+            if (value != null) {
                 const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
                 const selectableYears = lookups.filter(l => l.parent_id === 44);
                 if (!selectableYears.some(l => l.id === Number(value))) {
                     const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
-                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options for Year term: ${validOptions}`);
+                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options: ${validOptions}`);
                 }
-            }
-        } else if (paymentTermId === 41 || paymentTermId === 42 || paymentTermId === 43) { // Single Pay, Annual, or Monthly
-            if (value !== undefined && value !== null) {
-                throw new Error('sub_payment_term_id should not be provided for Single Pay, Annual, or Monthly Payment Term.');
             }
         }
         return true;

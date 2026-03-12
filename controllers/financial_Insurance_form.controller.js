@@ -160,10 +160,14 @@ export const getApplicationById = async (req, res) => {
             salaryRanking = rankings.map(({ uniform_coverage_amount, ...rest }) => rest);
         }
 
-        const coverage_totals = rankings.map(r => ({
-            designation: r.designation,
-            total_coverage_amount: r.total_coverage_amount
-        }));
+        let coverage_totals = [];
+        // Only populate coverage_totals if it's not "By Salary Rank" to avoid redundancy
+        if (app.coverage_type_id !== 34) {
+            coverage_totals = rankings.map(r => ({
+                designation: r.designation,
+                total_coverage_amount: r.total_coverage_amount
+            }));
+        }
 
         const response = {
             application_id: app.application_id, user_id: app.user_id, group_name: app.group_name,
