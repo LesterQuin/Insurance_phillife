@@ -398,13 +398,15 @@ export const validateFinancialApplication = [
             return true;
         }),
     body('sub_group_type_id')
-        .optional({ nullable: true })
         .custom(async (value, { req }) => {
             const groupTypeId = Number(req.body.group_type_id);
             const subGroupTypeId = value;
     
-            if (!groupTypeId) return true; // Let group_type_id validator handle it
+            if (!groupTypeId) {
+                return true; // Let group_type_id validator handle missing group_type_id
+            }
     
+            // Fetch lookups if not already cached on the request
             if (!req.lookupCache) req.lookupCache = {};
             if (!req.lookupCache.TYPE_OF_GROUP) {
                 req.lookupCache.TYPE_OF_GROUP = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
@@ -412,42 +414,44 @@ export const validateFinancialApplication = [
             const lookups = req.lookupCache.TYPE_OF_GROUP;
             const groupTypeItem = lookups.find(l => l.id === groupTypeId);
     
+            // Handle 'Other' Group Type
             if (groupTypeItem && (groupTypeItem.name === 'Other' || groupTypeItem.name === 'Others')) {
-                if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                    throw new Error('sub_group_type_id should not be provided when Group Type is "Other". Please use other_group_type field instead.');
+                if (subGroupTypeId != null) {
+                    throw new Error('sub_group_type_id must be null when Group Type is "Other". Use other_group_type instead.');
                 }
                 return true;
             }
     
+            // Find valid subgroups for the selected Group Type
             const validSubgroups = lookups.filter(l => Number(l.parent_id) === groupTypeId);
+    
+            // If subgroups exist, sub_group_type_id is required and must be valid
             if (validSubgroups.length > 0) {
-                if (subGroupTypeId === undefined || subGroupTypeId === null) {
+                if (subGroupTypeId == null) {
                     const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
-                    throw new Error(`sub_group_type_id is required for the selected Group Type. Valid options: ${validOptions}`);
+                    throw new Error(`sub_group_type_id is required for Group Type '${groupTypeItem.name}'. Valid options: ${validOptions}`);
                 }
     
-                const idsToCheck = Array.isArray(subGroupTypeId) ? subGroupTypeId : [subGroupTypeId];
-                for (const id of idsToCheck) {
-                    if (Number(id) < 0) {
-                        throw new Error(`sub_group_type_id values must be non-negative. Found: ${id}`);
+                // --- Handle single vs. multiple selections ---
+                // 'Employer-Employee' (ID 11) allows multiple sub-group selections.
+                // Other types like 'OFW' (ID 16) allow only one.
+                if (Array.isArray(subGroupTypeId)) {
+                    if (groupTypeId !== 11) { // ID 11 is 'Employer-Employee'
+                        throw new Error(`Group Type '${groupTypeItem.name}' only allows a single sub-group selection.`);
                     }
                 }
+    
+                // Validate the provided ID(s)
+                const idsToCheck = Array.isArray(subGroupTypeId) ? subGroupTypeId : [subGroupTypeId];
                 const invalidIds = idsToCheck.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
     
                 if (invalidIds.length > 0) {
                     const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
-                    throw new Error(`Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options: ${validOptions}`);
+                    throw new Error(`Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options for '${groupTypeItem.name}': ${validOptions}`);
                 }
-    
-                // Group-specific rules for array input
-                if (Array.isArray(subGroupTypeId)) {
-                    if (groupTypeId !== 11) { // Only Employer-Employee allows multiple selections
-                        throw new Error(`Group Type '${groupTypeItem.name}' does not allow multiple sub-group selections.`);
-                    }
-                }
-            } else if (subGroupTypeId !== undefined && subGroupTypeId !== null) {
-                // This case handles when a sub-group is provided for a group-type that has no sub-groups.
-                throw new Error(`sub_group_type_id should not be provided as Group Type '${groupTypeItem.name}' has no sub-groups.`);
+            } else if (subGroupTypeId != null) {
+                // If no subgroups exist, sub_group_type_id must be null
+                throw new Error(`sub_group_type_id must be null as Group Type '${groupTypeItem.name}' has no sub-groups.`);
             }
     
             return true;
@@ -861,25 +865,72 @@ export const validateUpdateFinancialApplication = [
     }),
 
     // Dependent field validations - sub_group_type_id can be array or string
-    body('sub_group_type_id').optional({ nullable: true }).custom(async (value, { req }) => {
-        // Allow null, arrays (for Employer-Employee), or single values
-        if (value === null || value === undefined) return true;
-        
-        // If it's an array, validate each element
-        if (Array.isArray(value)) {
-            for (const id of value) {
-                if (isNaN(Number(id)) || Number(id) < 0) {
-                    throw new Error('sub_group_type_id array must contain only non-negative integers');
-                }
+    body('sub_group_type_id').optional().custom(async (value, { req }) => {
+        const subGroupTypeId = value;
+        // Determine the groupTypeId from the request body or the existing application
+        const groupTypeId = req.body.group_type_id !== undefined
+            ? Number(req.body.group_type_id)
+            : req.existingApplication?.group_type_id;
+
+        if (!groupTypeId) {
+            if (subGroupTypeId != null) {
+                // If group_type_id is being removed, sub_group_type_id should also be removed.
+                throw new Error('Cannot have sub_group_type_id without a group_type_id.');
             }
             return true;
         }
-        
-        // If it's a single value, validate it's a number
-        if (isNaN(Number(value)) || Number(value) < 0) {
-            throw new Error('sub_group_type_id must be a non-negative integer or array of non-negative integers');
+
+        // Fetch lookups if not already cached on the request
+        if (!req.lookupCache) req.lookupCache = {};
+        if (!req.lookupCache.TYPE_OF_GROUP) {
+            req.lookupCache.TYPE_OF_GROUP = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
         }
-        
+        const lookups = req.lookupCache.TYPE_OF_GROUP;
+        const groupTypeItem = lookups.find(l => l.id === groupTypeId);
+
+        if (!groupTypeItem) {
+            // This should be caught by group_type_id validator, but as a safeguard:
+            return true;
+        }
+
+        // Handle 'Other' Group Type
+        if (groupTypeItem.name === 'Other' || groupTypeItem.name === 'Others') {
+            if (subGroupTypeId != null) {
+                throw new Error('sub_group_type_id must be null when Group Type is "Other". Use other_group_type instead.');
+            }
+            return true;
+        }
+
+        // Find valid subgroups for the selected Group Type
+        const validSubgroups = lookups.filter(l => Number(l.parent_id) === groupTypeId);
+
+        if (validSubgroups.length > 0) {
+            if (subGroupTypeId == null) {
+                const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
+                throw new Error(`sub_group_type_id is required for Group Type '${groupTypeItem.name}'. Valid options: ${validOptions}`);
+            }
+
+            if (subGroupTypeId != null) {
+                // --- Handle single vs. multiple selections ---
+                if (Array.isArray(subGroupTypeId)) {
+                    if (groupTypeId !== 11) { // ID 11 is 'Employer-Employee'
+                        throw new Error(`Group Type '${groupTypeItem.name}' only allows a single sub-group selection.`);
+                    }
+                }
+
+                // Validate the provided ID(s)
+                const idsToCheck = Array.isArray(subGroupTypeId) ? subGroupTypeId : [subGroupTypeId];
+                const invalidIds = idsToCheck.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
+
+                if (invalidIds.length > 0) {
+                    const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
+                    throw new Error(`Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options for '${groupTypeItem.name}': ${validOptions}`);
+                }
+            }
+        } else if (subGroupTypeId != null) {
+            // If no subgroups exist, sub_group_type_id must be null
+            throw new Error(`sub_group_type_id must be null as Group Type '${groupTypeItem.name}' has no sub-groups.`);
+        }
         return true;
     }),
     body('plan_id').optional().isInt({ min: 0 }).withMessage('plan_id must be a non-negative integer').custom(async (value) => {

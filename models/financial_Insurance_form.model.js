@@ -62,16 +62,19 @@ export const createApplication = async (data, userId) => {
         const applicationId = appResult.recordset[0].application_id;
 
         // Insert sub_group_type_ids into the new table
-        if (data.sub_group_type_id && Array.isArray(data.sub_group_type_id) && data.sub_group_type_id.length > 0) {
-            for (const subGroupId of data.sub_group_type_id) {
-                const subGroupRequest = new sql.Request(transaction);
-                await subGroupRequest
-                    .input('application_id', sql.Int, applicationId)
-                    .input('sub_group_type_id', sql.Int, subGroupId)
-                    .query(`
-                        INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
-                        VALUES (@application_id, @sub_group_type_id);
-                    `);
+        if (data.sub_group_type_id) {
+            const subGroupIds = Array.isArray(data.sub_group_type_id) ? data.sub_group_type_id : [data.sub_group_type_id];
+            if (subGroupIds.length > 0) {
+                for (const subGroupId of subGroupIds) {
+                    const subGroupRequest = new sql.Request(transaction);
+                    await subGroupRequest
+                        .input('application_id', sql.Int, applicationId)
+                        .input('sub_group_type_id', sql.Int, subGroupId)
+                        .query(`
+                            INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
+                            VALUES (@application_id, @sub_group_type_id);
+                        `);
+                }
             }
         }
 
@@ -239,14 +242,17 @@ export const updateApplication = async (id, data) => {
             await deleteSubGroupsRequest
                 .input('application_id', sql.Int, id)
                 .query('DELETE FROM DHUB.sg.financial_insurance_application_subgroup WHERE application_id = @application_id');
-
-            if (Array.isArray(data.sub_group_type_id) && data.sub_group_type_id.length > 0) {
-                for (const subGroupId of data.sub_group_type_id) {
-                    const insertSubGroupRequest = new sql.Request(transaction);
-                    await insertSubGroupRequest
-                        .input('application_id', sql.Int, id)
-                        .input('sub_group_type_id', sql.Int, subGroupId)
-                        .query('INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
+            
+            if (data.sub_group_type_id) {
+                const subGroupIds = Array.isArray(data.sub_group_type_id) ? data.sub_group_type_id : [data.sub_group_type_id];
+                if (subGroupIds.length > 0) {
+                    for (const subGroupId of subGroupIds) {
+                        const insertSubGroupRequest = new sql.Request(transaction);
+                        await insertSubGroupRequest
+                            .input('application_id', sql.Int, id)
+                            .input('sub_group_type_id', sql.Int, subGroupId)
+                            .query('INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
+                    }
                 }
             }
         }
