@@ -17,7 +17,10 @@ export const createApplication = async (data, userId) => {
             .input('contact_number', sql.NVarChar, data.contact_number)
             .input('fax_number', sql.NVarChar, data.fax_number || null)
             .input('email', sql.NVarChar, data.email)
-            .input('contact_person', sql.NVarChar, data.contact_person)
+            .input('contact_person_salutation', sql.NVarChar, data.contact_person_salutation)
+            .input('contact_person_firstname', sql.NVarChar, data.contact_person_firstname)
+            .input('contact_person_mi', sql.NVarChar, data.contact_person_mi || null)
+            .input('contact_person_lastname', sql.NVarChar, data.contact_person_lastname)
             .input('designation', sql.NVarChar, data.designation)
             .input('proposal_addressee', sql.NVarChar, data.proposal_addressee)
             .input('addressee_designation', sql.NVarChar, data.addressee_designation)
@@ -42,13 +45,13 @@ export const createApplication = async (data, userId) => {
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
-                    contact_person, designation, proposal_addressee, addressee_designation, group_classification_id,
+                    contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
                     amount_loans_id, loans_amount, payment_term_id, sub_payment_term_id, coverage_type_id
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
-                    @contact_person, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
+                    @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
                     @amount_loans_id, @loans_amount, @payment_term_id, @sub_payment_term_id, @coverage_type_id
@@ -142,7 +145,8 @@ export const getAllApplications = async () => {
     const res = await pool.request()
         .query(`
             SELECT
-                fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives, fia.contact_person,
+                fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives,
+                fia.contact_person_salutation, fia.contact_person_firstname, fia.contact_person_mi, fia.contact_person_lastname,
                 fia.status_id, fia.group_classification_id, fia.other_group_classification,
                 fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
                 fia.plan_id, fia.basic_plan_id,
@@ -334,7 +338,10 @@ export const updateApplication = async (id, data) => {
         addClause('contact_number', data.contact_number);
         addClause('fax_number', data.fax_number || null);
         addClause('email', data.email);
-        addClause('contact_person', data.contact_person);
+        addClause('contact_person_salutation', data.contact_person_salutation);
+        addClause('contact_person_firstname', data.contact_person_firstname);
+        addClause('contact_person_mi', data.contact_person_mi);
+        addClause('contact_person_lastname', data.contact_person_lastname);
         addClause('designation', data.designation);
         addClause('proposal_addressee', data.proposal_addressee);
         addClause('addressee_designation', data.addressee_designation);

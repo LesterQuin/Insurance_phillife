@@ -263,9 +263,18 @@ export const validateFinancialApplication = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .isEmail().withMessage('Valid Email is required'),
-    body('contact_person')
-        .notEmpty().withMessage('Contact Person is required')
-        .isLength({ max: 255 }).withMessage('Contact Person must not exceed 255 characters'),
+    body('contact_person_salutation')
+        .notEmpty().withMessage('Contact Person Salutation is required')
+        .isLength({ max: 20 }).withMessage('Salutation must not exceed 20 characters'),
+    body('contact_person_firstname')
+        .notEmpty().withMessage('Contact Person First Name is required')
+        .isLength({ max: 100 }).withMessage('First Name must not exceed 100 characters'),
+    body('contact_person_mi')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 5 }).withMessage('Middle Initial must not exceed 5 characters'),
+    body('contact_person_lastname')
+        .notEmpty().withMessage('Contact Person Last Name is required')
+        .isLength({ max: 100 }).withMessage('Last Name must not exceed 100 characters'),
     body('designation')
         .notEmpty().withMessage('Designation is required')
         .isLength({ max: 255 }).withMessage('Designation must not exceed 255 characters'),
@@ -789,7 +798,10 @@ export const validateUpdateFinancialApplication = [
     body('contact_number').optional().isLength({ max: 20 }).withMessage('Contact Number must not exceed 20 characters'),
     body('fax_number').optional({ nullable: true }).isLength({ max: 20 }).withMessage('Fax Number must not exceed 20 characters'),
     body('email').optional().isEmail().withMessage('Valid Email is required'),
-    body('contact_person').optional().isLength({ max: 255 }).withMessage('Contact Person must not exceed 255 characters'),
+    body('contact_person_salutation').optional().isLength({ max: 20 }).withMessage('Salutation must not exceed 20 characters'),
+    body('contact_person_firstname').optional().isLength({ max: 100 }).withMessage('First Name must not exceed 100 characters'),
+    body('contact_person_mi').optional({ nullable: true, checkFalsy: true }).isLength({ max: 5 }).withMessage('Middle Initial must not exceed 5 characters'),
+    body('contact_person_lastname').optional().isLength({ max: 100 }).withMessage('Last Name must not exceed 100 characters'),
     body('designation').optional().isLength({ max: 255 }).withMessage('Designation must not exceed 255 characters'),
     body('proposal_addressee').optional().isLength({ max: 255 }).withMessage('Proposal Addressee must not exceed 255 characters'),
     body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
