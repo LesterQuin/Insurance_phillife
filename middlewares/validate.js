@@ -562,7 +562,33 @@ body('basic_plan_id')
     body('riders')
         .if(body('type_of_proposal_id').equals('31'))
         .optional()
-        .isArray().withMessage('riders must be an array of objects'),
+        .isArray().withMessage('riders must be an array of objects')
+        .custom(async (riders, { req }) => {
+            if (!riders || riders.length === 0) return true;
+            
+            const basicPlanId = Number(req.body.basic_plan_id);
+            if (!basicPlanId) return true; 
+
+            const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
+            
+            for (const rider of riders) {
+                const riderId = Number(rider.rider_id);
+                const amount = Number(rider.amount);
+                const riderDef = validRiders.find(r => r.rider_id === riderId);
+                
+                if (riderDef) {
+                    const name = riderDef.rider_name.trim();
+                    if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
+                        throw new Error(`${name} amount must be least 500 minimum.`);
+                    } else if (name === 'Group Hospital Income Rider' && (amount < 100 || amount > 300)) {
+                        throw new Error(`${name} amount must be between 100 and 300.`);
+                    } else if (name === 'Burial (Memorial/Service)' && amount !== 50000) {
+                        throw new Error(`${name} amount must be fixed at 50,000.`);
+                    }
+                }
+            }
+            return true;
+        }),
     body('riders.*.rider_id')
         .exists().withMessage('rider_id is required for each rider')
         .if(body('type_of_proposal_id').equals('31'))
@@ -880,13 +906,30 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 
         if (!basicPlanId) throw new Error('basic_plan_id is required to validate rider_ids');
 
+        const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
+
         // Since this is a custom validator on the array, we check each item.
         for (const rider of riders) {
             if (rider.rider_id === undefined || isNaN(parseInt(rider.rider_id, 10)) || parseInt(rider.rider_id, 10) < 0) {
                 throw new Error('Each rider in the array must have a valid non-negative integer rider_id.');
             }
-            if (rider.amount !== undefined && (isNaN(parseFloat(rider.amount)) || parseFloat(rider.amount) < 0)) {
-                throw new Error(`Rider amount for rider_id ${rider.rider_id} must be a non-negative number.`);
+
+            if (rider.amount !== undefined) {
+                if (isNaN(parseFloat(rider.amount)) || parseFloat(rider.amount) < 0) {
+                    throw new Error(`Rider amount for rider_id ${rider.rider_id} must be a non-negative number.`);
+                }
+                const amount = parseFloat(rider.amount);
+                const riderDef = validRiders.find(r => r.rider_id === parseInt(rider.rider_id, 10));
+                if (riderDef) {
+                    const name = riderDef.rider_name.trim();
+                    if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
+                        throw new Error(`${name} amount must be least 500 minimum.`);
+                    } else if (name === 'Group Hospital Income Rider' && (amount < 100 || amount > 300)) {
+                        throw new Error(`${name} amount must be between 100 and 300.`);
+                    } else if (name === 'Burial (Memorial/Service)' && amount !== 50000) {
+                        throw new Error(`${name} amount must be fixed at 50,000.`);
+                    }
+                }
             }
             if (rider.unit !== undefined && (isNaN(parseInt(rider.unit, 10)) || parseInt(rider.unit, 10) < 0)) {
                 throw new Error(`Rider unit for rider_id ${rider.rider_id} must be a non-negative integer.`);
