@@ -6,6 +6,9 @@ export const createApplication = async (data, userId) => {
     try {
         await transaction.begin();
 
+        // Extract payment info if present (taking the first one since logic implies 1:1 relation on main table)
+        const paymentTerm = (data.payment && Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;
+
 
         const appRequest = new sql.Request(transaction);
         const appResult = await appRequest
@@ -40,19 +43,21 @@ export const createApplication = async (data, userId) => {
             .input('amount_loans_id', sql.Int, data.amount_loans_id || null)
             .input('loans_amount', sql.Decimal(18, 2), data.loans_amount || null)
             .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
+            .input('payment_term_id', sql.Int, paymentTerm ? paymentTerm.payment_term_id : null)
+            .input('sub_payment_term_id', sql.Int, paymentTerm ? paymentTerm.sub_payment_term_id : null)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
-                    amount_loans_id, loans_amount, coverage_type_id
+                    amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
-                    @amount_loans_id, @loans_amount, @coverage_type_id
+                    @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -73,21 +78,6 @@ export const createApplication = async (data, userId) => {
                             VALUES (@application_id, @sub_group_type_id);
                         `);
                 }
-            }
-        }
-
-        // Insert payment terms
-        if (data.payment && Array.isArray(data.payment) && data.payment.length > 0) {
-            for (const paymentTerm of data.payment) {
-                const paymentRequest = new sql.Request(transaction);
-                await paymentRequest
-                    .input('application_id', sql.Int, applicationId)
-                    .input('payment_term_id', sql.Int, paymentTerm.payment_term_id)
-                    .input('sub_payment_term_id', sql.Int, paymentTerm.sub_payment_term_id)
-                    .query(`
-                        INSERT INTO DHUB.sg.financial_insurance_application (application_id, payment_term_id, sub_payment_term_id)
-                        VALUES (@application_id, @payment_term_id, @sub_payment_term_id);
-                    `);
             }
         }
 
@@ -249,25 +239,6 @@ export const updateApplication = async (id, data) => {
     try {
         await transaction.begin();
 
-        // Handle payment update
-        if (data.payment !== undefined) {
-            const deletePaymentsRequest = new sql.Request(transaction);
-            await deletePaymentsRequest
-                .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB.sg.financial_insurance_application WHERE application_id = @application_id');
-
-            if (Array.isArray(data.payment) && data.payment.length > 0) {
-                for (const paymentTerm of data.payment) {
-                    const insertPaymentRequest = new sql.Request(transaction);
-                    await insertPaymentRequest
-                        .input('application_id', sql.Int, id)
-                        .input('payment_term_id', sql.Int, paymentTerm.payment_term_id)
-                        .input('sub_payment_term_id', sql.Int, paymentTerm.sub_payment_term_id)
-                        .query('INSERT INTO DHUB.sg.financial_insurance_application (application_id, payment_term_id, sub_payment_term_id) VALUES (@application_id, @payment_term_id, @sub_payment_term_id);');
-                }
-            }
-        }
-
         // Handle sub_group_type_id update
         if (data.sub_group_type_id !== undefined) {
             const deleteSubGroupsRequest = new sql.Request(transaction);
@@ -402,6 +373,12 @@ export const updateApplication = async (id, data) => {
         addClause('loans_amount', data.loans_amount, sql.Decimal(18, 2));
         addClause('coverage_type_id', data.coverage_type_id, sql.Int);
 
+        if (data.payment !== undefined) {
+            const paymentTerm = (Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;
+            addClause('payment_term_id', paymentTerm ? paymentTerm.payment_term_id : null, sql.Int);
+            addClause('sub_payment_term_id', paymentTerm ? paymentTerm.sub_payment_term_id : null, sql.Int);
+        }
+
         if (setClauses.length > 0) {
             setClauses.push('updated_at = GETDATE()');
             const request = new sql.Request(transaction);
@@ -467,6 +444,19 @@ export const getBasicPlansByPlanId = async (planId) => {
             SELECT basic_plan_id, basic_plan_name, acronym, is_active
             FROM sg.financial_insurance_basic_plan
             WHERE product_id = @planId AND is_active = 1
+        `);
+    return res.recordset ?? [];
+};
+
+// Get attachable riders for a specific product (plan)
+export const getRidersByProductId = async (productId) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('productId', sql.Int, productId)
+        .query(`
+            SELECT rider_id, rider_name, is_active
+            FROM sg.financial_insurance_riders
+            WHERE product_id = @productId AND is_active = 1
         `);
     return res.recordset ?? [];
 };

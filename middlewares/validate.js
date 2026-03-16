@@ -579,10 +579,10 @@ body('basic_plan_id')
         .custom(async (riders, { req }) => {
             if (!riders || riders.length === 0) return true;
             
-            const basicPlanId = Number(req.body.basic_plan_id);
-            if (!basicPlanId) return true; 
+            const planId = Number(req.body.plan_id);
+            if (!planId) return true; 
 
-            const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
+            const validRiders = await Financial.getRidersByProductId(planId);
             
             for (const rider of riders) {
                 const riderId = Number(rider.rider_id);
@@ -607,13 +607,13 @@ body('basic_plan_id')
         .if(body('type_of_proposal_id').equals('31'))
         .isInt({ min: 0 }).withMessage('rider_id must be a non-negative integer')
         .custom(async (value, { req }) => {
-            const basicPlanId = Number(req.body.basic_plan_id);
-            if (!basicPlanId) return true; // Let other validator catch missing basic_plan_id
+            const planId = Number(req.body.plan_id);
+            if (!planId) return true; // Let other validator catch missing plan_id
 
-            const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
+            const validRiders = await Financial.getRidersByProductId(planId);
             if (!validRiders.some(v => v.rider_id === Number(value))) {
                 const validOptions = validRiders.map(r => `${r.rider_id} - ${r.rider_name}`).join(', ');
-                throw new Error(`Invalid rider_id (${value}) for basic_plan_id (${basicPlanId}). Valid options: ${validOptions || 'none available'}`);
+                throw new Error(`Invalid rider_id (${value}) for plan_id (${planId}). Valid options: ${validOptions || 'none available'}`);
             }
             return true;
         }),
@@ -978,13 +978,13 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     body('riders').optional({ nullable: true }).isArray().withMessage('riders must be an array of objects').custom(async (riders, { req }) => {
         if (!Array.isArray(riders)) return true;
 
-        const basicPlanId = req.body.basic_plan_id !== undefined
-            ? Number(req.body.basic_plan_id)
-            : req.existingApplication?.basic_plan?.id;
+        const planId = req.body.plan_id !== undefined
+            ? Number(req.body.plan_id)
+            : req.existingApplication?.plan?.id;
 
-        if (!basicPlanId) throw new Error('basic_plan_id is required to validate rider_ids');
+        if (!planId) throw new Error('plan_id is required to validate rider_ids');
 
-        const validRiders = await Financial.getRidersByBasicPlanId(basicPlanId);
+        const validRiders = await Financial.getRidersByProductId(planId);
 
         // Since this is a custom validator on the array, we check each item.
         for (const rider of riders) {
