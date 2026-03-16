@@ -1,0 +1,21 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Nodemon in New Terminal",
+      "type": "shell",
+      "command": "nodemon server.js",
+      "runOptions": {
+        "runOn": "folderOpen"
+      },
+      "presentation": {
+        "panel": "dedicated",   // use "dedicated" to keep it separate
+        "reveal": "always",
+        "focus": false,
+        "clear": true
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    }
+  ]
+}

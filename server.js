@@ -5,15 +5,9 @@ import cookieParser from "cookie-parser";
 //import path from "path";
 
 import financialInsuranceRoutes from './routes/financial_Insurance_form.routes.js';
-import groupClassificationRoutes from './routes/group_classification/group_Classification.routes.js'
-import businessTypeRoutes from './routes/business_type/business_type.routes.js'
-import groupTypeRoutes from './routes/type_of_group/type_of_group.routes.js'
-import paymentModeRoutes from './routes/mode_of_payment/mode_of_payment.routes.js'
-import groupPlanRoutes from './routes/group_plan/group_plan.route.js'
 import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
-import accidentPlanRoutes from './routes/accident_plan/accident_plan.routes.js'
-import ageProfileRoutes from './routes/age_profile/age_profile.routes.js'
 import userRoutes from './routes/user/user_route.js'
+import groupLookupRoutes from './routes/financial_insurance_group_lookups/financial_insurance_group_lookups.routes.js'
 
 dotenv.config();
 const app = express();
@@ -27,25 +21,13 @@ app.get("/api/hello", (req, res) => {
 });
 
 // form routes
-app.use('/api/financial-insurance', financialInsuranceRoutes);
-// group classcifition 
-app.use('/api/group-classification', groupClassificationRoutes) //
-// business type
-app.use("/api/business-types", businessTypeRoutes); //
-// Groupe type
-app.use("/api/typeof-group", groupTypeRoutes); //
-// Type of payment
-app.use("/api/payment-modes", paymentModeRoutes);
-// Group plans
-app.use("/api/group-plans", groupPlanRoutes);
+app.use('/api/financial-insurance', financialInsuranceRoutes); 
 // Group riders
 app.use("/api/group-riders", groupRiderRoutes);
-// Accident plans
-app.use("/api/accident-plan", accidentPlanRoutes)
-// Age Profile
-app.use("/api/age-profiles", ageProfileRoutes); //
 // User
 app.use("/api/user", userRoutes)
+// group lookup
+app.use("/api/group-lookup", groupLookupRoutes)
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

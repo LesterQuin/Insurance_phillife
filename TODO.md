@@ -1,23 +1,13 @@
-# TODO - Add Validation to User Controller - COMPLETED
+# TODO: Financial Insurance Application - User Authentication & Ownership
 
-## Task: Add validation middleware for user authentication endpoints - COMPLETED
+## Task Description
+Add user authentication to create and update routes, and track application ownership by user_id and agent_code.
 
-### Steps:
-1. [x] Update middlewares/validate.js - Add validation rules for all user endpoints
-2. [x] Update routes/user/user_route.js - Import and apply validation middleware
-3. [x] Add getValidLookupIds function to models/user/user_model.js
-4. [x] Update validate.js to use dynamic validation for role_id, location_id, department_id
+## Steps to Complete:
 
-### Validation Rules Added:
-- **register**: firstname (required, max 100 chars), lastname (required, max 100 chars), email (required, valid email, domain restricted), role_id (required, integer, dynamic from DB), phoneNumber (optional, 10-15 digits), agent_code (optional, max 50 chars), department_id (optional, integer, dynamic from DB), location_id (optional, integer, dynamic from DB)
-- **login**: email (required, valid email), password (required), newPassword (optional, min 6 chars)
-- **verifyOTP**: email (required, valid email), otp (required, exactly 6 numeric digits)
-- **resendOTP**: email (required, valid email)
-- **resetPassword**: email (required, valid email), newPassword (required, min 6 chars)
-- **logout**: email (required, valid email)
-- **refreshToken**: refreshToken (required)
+- [x] 1. Update routes/financial_Insurance_form.routes.js - Add authenticate middleware to create and update routes
+- [x] 2. Update models/financial_Insurance_form.model.js - Add user_id parameter to createApplication
+- [x] 3. Update controllers/financial_Insurance_form.controller.js - Get userId from req.user, handle ownership check on update
 
-### Dynamic Validation (Future-Proof):
-- role_id, location_id, department_id now fetch valid IDs from database lookup table
-- When new roles/locations/departments are added to the system, validation automatically updates
-- No code changes needed when adding new categories
+## Status: Completed
+
