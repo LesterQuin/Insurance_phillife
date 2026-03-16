@@ -1,35 +1,15 @@
 import { poolPromise, sql} from "../../config/db.js"
 
-// CREATE 
-export const create = async (name) => {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input("name", sql.VarChar, name)
-        .query(`
-            INSERT INTO sg.financial_insurance_business_types (name)
-            OUTPUT INSERTED.*
-            VALUES (@name)
-        `);
-    return result.recordset[0];
-};
-
-// GET BY NAME
-export const getByName = async (name) => {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input("name", sql.VarChar, name)
-        .query(`SELECT * FROM sg.financial_insurance_business_types WHERE LOWER(name) = LOWER(@name)`);
-    return result.recordset[0];
-};
-
 // GET ALL
 export const getAll = async () => {
     const pool = await poolPromise;
     const result = await pool.request()
+        .input('category', sql.NVarChar, 'BUSINESS_TYPE')
         .query(`
-            SELECT *
-            FROM sg.financial_insurance_business_types
-            ORDER BY business_type_id
+            SELECT id, name, parent_id
+            FROM sg.financial_insurance_group_lookups
+            WHERE category = @category AND is_active = 1
+            ORDER BY id ASC
         `);
     return result.recordset;
 }
@@ -39,38 +19,10 @@ export const getById = async (id) => {
     const pool = await poolPromise;
     const result = await pool.request()
         .input("id", sql.Int, id)
+        .input('category', sql.NVarChar, 'BUSINESS_TYPE')
         .query(`
-            SELECT *
-            FROM sg.financial_insurance_business_types
-            WHERE business_type_id = @id
-        `);
-    return result.recordset[0];
-};
-
-// UPDATE
-export const update = async (id, name) => {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input("id", sql.Int, id)
-        .input("name", sql. VarChar, name)
-        .query(`
-            UPDATE sg.financial_insurance_business_types
-            SET name = @name
-            OUTPUT INSERTED.*
-            WHERE business_type_id = @id
-        `);
-    return result.recordset[0];
-};
-
-// DELETE
-export const remove = async (id) => {
-    const pool = await poolPromise;
-    const result = await pool.request()
-        .input("id", sql.Int, id)
-        .query(`
-            DELETE FROM sg.financial_insurance_business_types
-            OUTPUT DELETED.*
-            WHERE business_type_id = @id
+            SELECT id, name, parent_id FROM sg.financial_insurance_group_lookups
+            WHERE id = @id AND category = @category AND is_active = 1
         `);
     return result.recordset[0];
 };
