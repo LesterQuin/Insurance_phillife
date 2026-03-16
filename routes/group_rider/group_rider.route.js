@@ -3,10 +3,10 @@ import * as Controller from "../../controllers/group_rider/group_rider.controlle
 
 const router = express.Router();
 
-router.post("/", Controller.createRider);
 router.get("/", Controller.getAllRiders);
-router.get("/:id", Controller.getRiderById);
-router.put("/:id", Controller.updateRider);
-router.delete("/:id", Controller.deleteRider);
+router.get("/product/:productName", Controller.getRidersByProductName);
+router.get("/product/GCLI", Controller.getRidersForGCLI);
+router.get("/product/GYRT", Controller.getRidersForGYRT);
+router.get("/product/GPA", Controller.getRidersForGPA);
 
 export default router;

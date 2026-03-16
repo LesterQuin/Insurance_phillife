@@ -1,87 +1,130 @@
 import { poolPromise, sql } from "../../config/db.js";
 
-// CREATE
-export const createRider = async (name) => {
-    const pool = await poolPromise;
-    const res = await pool.request()
-        .input("name", sql.VarChar, name)
-        .query(`
-        INSERT INTO sg.financial_insurance_riders (name)
-        OUTPUT INSERTED.*
-        VALUES (@name)
-        `);
-
-    return res.recordset[0];
-};
-
-// GET BY NAME
-export const getRiderByName = async (name) => {
-    const pool = await poolPromise;
-    const res = await pool.request()
-        .input("name", sql.VarChar, name)
-        .query(`
-        SELECT TOP 1 *
-        FROM sg.financial_insurance_riders
-        WHERE name = @name
-        `);
-
-    return res.recordset[0] || null;
-};
-
-// GET ALL
+// GET ALL RIDERS (Joined with Basic Plan and Product)
 export const getAllRiders = async () => {
     const pool = await poolPromise;
-    const res = await pool.request()
+    const result = await pool.request()
         .query(`
-            SELECT *
-            FROM sg.financial_insurance_riders
-            ORDER BY rider_id
+            SELECT 
+                r.rider_id,
+                r.rider_name,
+                r.acronym,
+                r.basic_plan_id,
+                bp.basic_plan_name,
+                p.product_id,
+                p.product_name,
+                r.input_type,
+                r.min_amount,
+                r.max_amount,
+                r.unit_value,
+                r.is_active,
+                r.created_at,
+                r.updated_at
+            FROM [DHUB].[sg].[financial_insurance_rider] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON bp.product_id = p.product_id
+            WHERE r.is_active = 1
+            ORDER BY p.product_name, bp.basic_plan_name, r.rider_name
         `);
-
-    return res.recordset;
+    return result.recordset;
 };
 
-// GET BY ID
+// GET RIDERS BY PRODUCT NAME
+export const getRidersByProductName = async (productName) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('productName', sql.VarChar, productName)
+        .query(`
+            SELECT 
+                r.rider_id,
+                r.rider_name,
+                r.acronym,
+                r.basic_plan_id,
+                bp.basic_plan_name,
+                p.product_id,
+                p.product_name,
+                r.input_type,
+                r.min_amount,
+                r.max_amount,
+                r.unit_value,
+                r.is_active,
+                r.created_at,
+                r.updated_at
+            FROM [DHUB].[sg].[financial_insurance_rider] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp 
+                ON r.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p 
+                ON bp.product_id = p.product_id
+            WHERE (
+                p.acronym LIKE '%' + @productName + '%'
+                OR p.product_name LIKE '%' + @productName + '%'
+            )
+            AND r.is_active = 1
+            ORDER BY r.rider_name
+        `);
+    return result.recordset;
+};
+
+// GET RIDERS BY PRODUCT ACRONYM
+export const getRidersByProductAcronym = async (acronym) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('acronym', sql.VarChar, acronym)
+        .query(`
+            SELECT 
+                r.rider_id,
+                r.rider_name,
+                r.acronym,
+                r.basic_plan_id,
+                bp.basic_plan_name,
+                p.product_id,
+                p.product_name,
+                p.acronym as product_acronym,
+                r.input_type,
+                r.min_amount,
+                r.max_amount,
+                r.unit_value,
+                r.is_active,
+                r.created_at,
+                r.updated_at
+            FROM [DHUB].[sg].[financial_insurance_rider] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON bp.product_id = p.product_id
+            WHERE LTRIM(RTRIM(p.acronym)) = LTRIM(RTRIM(@acronym)) AND r.is_active = 1
+            ORDER BY bp.basic_plan_name, r.rider_name
+        `);
+    return result.recordset;
+};
+
+// GET RIDER BY ID
 export const getRiderById = async (id) => {
     const pool = await poolPromise;
-    const res = await pool.request()
+    const result = await pool.request()
         .input("id", sql.Int, id)
         .query(`
-            SELECT *
-            FROM sg.financial_insurance_riders
-            WHERE rider_id = @id
+            SELECT 
+                r.*,
+                bp.basic_plan_name,
+                p.product_name
+            FROM [DHUB].[sg].[financial_insurance_rider] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON bp.product_id = p.product_id
+            WHERE r.rider_id = @id
         `);
-    
-    return res.recordset[0] || null;
+    return result.recordset[0];
 };
 
-// UPDATE
-export const updateRider = async (id, name) => {
+// GET RIDER BY NAME (For duplicate check)
+export const getRiderByName = async (name) => {
     const pool = await poolPromise;
-    const res = await pool.request()
-        .input("id", sql.Int, id)
+    const result = await pool.request()
         .input("name", sql.VarChar, name)
         .query(`
-            UPDATE sg.financial_insurance_riders
-            SET name = @name
-            OUTPUT INSERTED.*
-            WHERE rider_id = @id
+            SELECT * FROM [DHUB].[sg].[financial_insurance_rider]
+            WHERE rider_name = @name AND is_active = 1
         `);
-
-    return res.recordset[0] || null;
+    return result.recordset[0];
 };
 
-// DELETE
-export const deleteRider = async (id) => {
-    const pool = await poolPromise;
-    const res = await pool.request()
-        .input("id", sql.Int, id)
-        .query(`
-            DELETE 
-            FROM sg.financial_insurance_riders
-            OUTPUT DELETED.*
-            WHERE rider_id = @id
-        `);
-
-    return res.recordset[0] || null;
-};
+// NOTE: 'createRider', 'updateRider', and 'deleteRider' functions should be implemented 
+// here as well to fully support the controller, using 'financial_insurance_rider' table.
