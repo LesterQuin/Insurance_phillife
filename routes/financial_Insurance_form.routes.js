@@ -14,4 +14,6 @@ router.get('/list', Controller.getAllApplications);
 router.get('/:id', Controller.getApplicationById);
 router.delete('/:id', Controller.deleteApplication);
 
+router.get('/template/:id', Controller.getTemplateById);
+
 export default router;

@@ -36,7 +36,12 @@ export const getUserByEmail = async (email) => {
     const result = await pool.request()
         .input('email', sql.VarChar, email)
         .query(`
-            SELECT u.*, r.name AS roleName, l.name AS locationName, d.name AS departmentName
+            SELECT
+                u.user_id, u.firstname, u.middlename, u.lastname, u.suffix, u.email, u.agent_code, u.phoneNumber,
+                u.is_active, u.mustChangePassword, u.password_hash,
+                u.role_id, r.name as roleName,
+                u.location_id, l.name as locationName,
+                u.department_id, d.name as departmentName, d.code as departmentCode
             FROM DHUB.sg.financial_insurance_users u
             LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
             LEFT JOIN DHUB.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
@@ -51,7 +56,12 @@ export const getUserById = async (userId) => {
     const result = await pool.request()
         .input('userId', sql.Int, userId)
         .query(`
-            SELECT u.*, r.name AS roleName, l.name AS locationName, d.name AS departmentName
+            SELECT
+                u.user_id, u.firstname, u.middlename, u.lastname, u.suffix, u.email, u.agent_code, u.phoneNumber,
+                u.is_active, u.mustChangePassword, u.password_hash,
+                u.role_id, r.name as roleName,
+                u.location_id, l.name as locationName,
+                u.department_id, d.name as departmentName, d.code as departmentCode
             FROM DHUB.sg.financial_insurance_users u
             LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
             LEFT JOIN DHUB.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'

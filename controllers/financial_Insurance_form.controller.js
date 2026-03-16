@@ -1,6 +1,7 @@
 import * as Model from '../models/financial_Insurance_form.model.js';
 import * as User from '../models/user/user_model.js';
 import { success, error } from '../utils/response.js';
+import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
 
 // Helper to clean "other" fields based on selected IDs
 const cleanupOtherFields = async (data) => {
@@ -64,6 +65,73 @@ export const createApplication = async (req, res) => {
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);
+    }
+};
+
+// Get Template By ID
+export const getTemplateById = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+            return error(res, "Invalid ID format.", 400);
+        }
+
+        // 1. Fetch Application Data
+        const appData = await Model.getApplicationById(id);
+        if (!appData) {
+            return error(res, "Application not found.", 404);
+        }
+
+        // 2. Fetch User Data (CFE / Agent) who created the application
+        const user = await User.getUserById(appData.user_id);
+        if (!user) {
+            return error(res, "User not found.", 404);
+        }
+
+        // 3. Map flat DB structure to the nested structure required by the template
+        const application = {
+            ...appData,
+            status: { name: appData.status_name || 'Pending' },
+            basic_plan: { name: appData.basic_plan_name || 'N/A' },
+            payment_mode: { name: appData.payment_mode_name || 'N/A' },
+            // Ensure fields used in the template are explicit
+            group_name: appData.group_name,
+            proposal_addressee: appData.proposal_addressee,
+            addressee_designation: appData.addressee_designation,
+            business_address: appData.business_address,
+            minimum_age: appData.minimum_age,
+            maximum_age: appData.maximum_age,
+        };
+
+        // 4. Prepare Details (Rates, Limits, etc.)
+        // In a real app, these should probably come from a database lookup or calculation service.
+        // For now, hardcoding as per previous examples/requests.
+        const details = {
+            totalAnnualPremium: 0, 
+            contactLocal: '123',
+            // Default rates can be passed here or handled in template defaults. 
+            // Providing some here to ensure they render.
+            rates18_64: { 6: '5.00', 12: '6.00', 18: '7.00', 24: '8.00', 30: '9.00', 36: '10.00' },
+            rates65_67: { 6: '6.00', 12: '7.00', 18: '8.00', 24: '9.00', 30: '10.00', 36: '11.00' },
+            rates68_70: { 6: '7.00', 12: '8.00', 18: '9.00', 24: '10.00', 30: '11.00', 36: '12.00' },
+            rates71_74: { 71: '12.00', 72: '13.00', 73: '14.00', 74: '15.00' },
+            nelAmount: 500000,
+            nelAge: 65,
+            nmlAmount: 1000000,
+            nmlAge: 60,
+            participationPercentage: 100
+        };
+
+        // 5. Generate HTML
+        const htmlContent = generateGCLIPDFContent(application, user, details);
+
+        // 6. Return HTML response
+        res.setHeader('Content-Type', 'text/html');
+        res.send(htmlContent);
+
+    } catch (err) {
+        console.error("Proposal Generation Error:", err);
+        return error(res, err.message, 500);
     }
 };
 
