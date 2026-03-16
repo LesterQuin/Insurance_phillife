@@ -12,6 +12,7 @@ import paymentModeRoutes from './routes/mode_of_payment/mode_of_payment.routes.j
 import groupPlanRoutes from './routes/group_plan/group_plan.route.js'
 import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
 import accidentPlanRoutes from './routes/accident_plan/accident_plan.routes.js'
+import ageProfileRoutes from './routes/age_profile/age_profile.routes.js'
 import userRoutes from './routes/user/user_route.js'
 
 dotenv.config();
@@ -28,11 +29,11 @@ app.get("/api/hello", (req, res) => {
 // form routes
 app.use('/api/financial-insurance', financialInsuranceRoutes);
 // group classcifition 
-app.use('/api/group-classification', groupClassificationRoutes)
+app.use('/api/group-classification', groupClassificationRoutes) //
 // business type
-app.use("/api/business-types", businessTypeRoutes);
+app.use("/api/business-types", businessTypeRoutes); //
 // Groupe type
-app.use("/api/typeof-group", groupTypeRoutes);
+app.use("/api/typeof-group", groupTypeRoutes); //
 // Type of payment
 app.use("/api/payment-modes", paymentModeRoutes);
 // Group plans
@@ -41,6 +42,8 @@ app.use("/api/group-plans", groupPlanRoutes);
 app.use("/api/group-riders", groupRiderRoutes);
 // Accident plans
 app.use("/api/accident-plan", accidentPlanRoutes)
+// Age Profile
+app.use("/api/age-profiles", ageProfileRoutes); //
 // User
 app.use("/api/user", userRoutes)
 
