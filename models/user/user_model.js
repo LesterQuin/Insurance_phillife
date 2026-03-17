@@ -150,6 +150,43 @@ export const updateProfile = async (userId, { firstname, middlename, lastname, s
     return await getUserById(userId);
 }
 
+export const adminUpdateUser = async (userId, { role_id, department_id, location_id }) => {
+    const pool = await poolPromise;
+
+    // Build the SET part of the query dynamically
+    const setClauses = [];
+    const request = pool.request().input('userId', sql.Int, userId);
+
+    if (role_id !== undefined) {
+        setClauses.push('role_id = @role_id');
+        request.input('role_id', sql.Int, role_id);
+    }
+    if (department_id !== undefined) {
+        setClauses.push('department_id = @department_id');
+        request.input('department_id', sql.Int, department_id);
+    }
+    if (location_id !== undefined) {
+        setClauses.push('location_id = @location_id');
+        request.input('location_id', sql.Int, location_id);
+    }
+
+    // If no fields to update, just return the user without a DB call
+    if (setClauses.length === 0) {
+        return await getUserById(userId);
+    }
+
+    const query = `
+        UPDATE DHUB.sg.financial_insurance_users
+        SET ${setClauses.join(', ')}
+        WHERE user_id = @userId
+    `;
+
+    await request.query(query);
+
+    // Return the updated user object
+    return await getUserById(userId);
+};
+
 export const saveOTP = async (userId, otp) => {
     const pool = await poolPromise;
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);

@@ -10,10 +10,18 @@ export const authenticate = async (req, res, next) => {
         const user = await User.getUserById(payload.userId);
         if (!user) return res.status(404).json({ status: false, message: 'User not found' });
 
-        req.user = { userId: user.user_id };
+        req.user = user;
         next();
     } catch (err) {
         console.error('AUTH ERROR:', err);
         return res.status(401).json({ status: false, message: 'Invalid token' });
+    }
+};
+
+export const isSuperAdmin = (req, res, next) => {
+    if (req.user && req.user.roleName === 'Super Admin') {
+        next();
+    } else {
+        return res.status(403).json({ status: false, message: 'Forbidden: Super Admin access required.' });
     }
 };

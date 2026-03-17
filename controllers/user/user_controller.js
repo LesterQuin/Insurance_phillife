@@ -366,7 +366,7 @@ export const updateProfile = async (req, res) => {
         const { password, newPassword, firstname, middlename, lastname, suffix, phoneNumber } = req.body;
 
         // Get userId from accessToken (set by authenticate middleware)
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
 
         // Fetch user from DB
         const user = await User.getUserById(userId);
@@ -404,6 +404,41 @@ export const updateProfile = async (req, res) => {
 
     } catch (err) {
         console.error('UPDATE PROFILE ERROR:', err);
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
+    }
+};
+
+export const adminUpdateUser = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { role_id, department_id, location_id } = req.body;
+
+        // Prevent a super admin from modifying their own role/department/location via this route
+        if (Number(req.user.user_id) === Number(userId)) {
+            return res.status(403).json({ status: false, message: "Super admins cannot modify their own role, department, or location via this endpoint. Please use the standard profile update." });
+        }
+
+        // Check if user to be updated exists
+        const userToUpdate = await User.getUserById(userId);
+        if (!userToUpdate) {
+            return res.status(404).json({ status: false, message: 'User not found.' });
+        }
+
+        // The validation middleware has already checked if the IDs are valid.
+        // Now, call a new model function to perform the update.
+        const updatedUser = await User.adminUpdateUser(userId, {
+            role_id,
+            department_id,
+            location_id
+        });
+
+        res.json({
+            status: true,
+            message: "User profile updated successfully by admin.",
+            user: updatedUser
+        });
+    } catch (err) {
+        console.error('ADMIN UPDATE USER ERROR:', err);
         res.status(500).json({ status: false, message: 'Server error', error: err.message });
     }
 };

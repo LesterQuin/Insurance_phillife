@@ -235,6 +235,57 @@ export const validateUpdateProfile = [
     }
 ];
 
+// Validation for admin updating user credentials
+export const validateAdminUpdateUser = [
+    body('role_id')
+        .optional()
+        .isInt({ min: 0 }).withMessage('Role ID must be a non-negative integer')
+        .custom(async (value) => {
+            const roles = await User.getLookupListByCategory('ROLE');
+            const validIds = roles.map(r => r.id);
+            if (!validIds.includes(Number(value))) {
+                const roleList = roles.map(r => `${r.id} - ${r.name}`).join(', ');
+                throw new Error(
+                    `Invalid role_id (${value}). Please select one of the following: ${roleList}`
+                );
+            }
+            return true;
+        }),
+    body('department_id')
+        .optional()
+        .isInt({ min: 0 }).withMessage('Department ID must be a non-negative integer')
+        .custom(async (value) => {
+            const departments = await User.getLookupListByCategory('DEPARTMENT');
+            const validIds = departments.map(d => d.id);
+            if (!validIds.includes(Number(value))) {
+                const deptList = departments.map(d => `${d.id} - ${d.name}`).join(', ');
+                throw new Error(
+                    `Invalid department_id (${value}). Please select one of the following: ${deptList}`
+                );
+            }
+            return true;
+        }),
+    body('location_id')
+        .optional()
+        .isInt({ min: 0 }).withMessage('Location ID must be a non-negative integer')
+        .custom(async (value) => {
+            const locations = await User.getLookupListByCategory('LOCATION');
+            const validIds = locations.map(l => l.id);
+            if (!validIds.includes(Number(value))) {
+                const locationList = locations.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(
+                    `Invalid location_id (${value}). Please select one of the following: ${locationList}`
+                );
+            }
+            return true;
+        }),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
 // -----------------------------
 // Form validation
 // -----------------------------
