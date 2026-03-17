@@ -83,9 +83,14 @@ export const getTemplateById = async (req, res) => {
         }
 
         // 2. Fetch User Data (CFE / Agent) who created the application
-        const user = await User.getUserById(appData.user_id);
+        let user;
+        if (appData.user_id) {
+            user = await User.getUserById(appData.user_id);
+        }
+
         if (!user) {
-            return error(res, "User not found.", 404);
+            // Fallback if user is missing or ID is null so the template can still generate
+            user = { firstname: 'Phillife', lastname: 'Representative', departmentName: 'Head Office', locationName: 'Main Office' };
         }
 
         // 3. Map flat DB structure to the nested structure required by the template

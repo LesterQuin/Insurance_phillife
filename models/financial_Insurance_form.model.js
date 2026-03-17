@@ -45,19 +45,24 @@ export const createApplication = async (data, userId) => {
             .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
             .input('payment_term_id', sql.Int, paymentTerm ? paymentTerm.payment_term_id : null)
             .input('sub_payment_term_id', sql.Int, paymentTerm ? paymentTerm.sub_payment_term_id : null)
+            .input('borrower_age_65_67', sql.Bit, data.borrower_age_65_67 || false)
+            .input('borrower_age_68_70', sql.Bit, data.borrower_age_68_70 || false)
+            .input('borrower_age_71_74', sql.Bit, data.borrower_age_71_74 || false)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
-                    amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id
+                    amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id,
+                    borrower_age_65_67, borrower_age_68_70, borrower_age_71_74
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
-                    @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id
+                    @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id,
+                    @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -372,6 +377,11 @@ export const updateApplication = async (id, data) => {
         addClause('amount_loans_id', data.amount_loans_id, sql.Int);
         addClause('loans_amount', data.loans_amount, sql.Decimal(18, 2));
         addClause('coverage_type_id', data.coverage_type_id, sql.Int);
+
+        // Borrower age selections
+        addClause('borrower_age_65_67', data.borrower_age_65_67, sql.Bit);
+        addClause('borrower_age_68_70', data.borrower_age_68_70, sql.Bit);
+        addClause('borrower_age_71_74', data.borrower_age_71_74, sql.Bit);
 
         if (data.payment !== undefined) {
             const paymentTerm = (Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;

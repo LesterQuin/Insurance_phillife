@@ -671,6 +671,20 @@ body('basic_plan_id')
     body('riders.*.amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Rider amount must be a non-negative number'),
     body('riders.*.unit').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isInt({ min: 0 }).withMessage('Rider unit must be a non-negative integer'),
 
+    // Single Rate for Borrowers
+    body('borrower_age_65_67')
+        .if(body('type_of_proposal_id').equals('31'))
+        .exists({ checkNull: true }).withMessage('Selection for Borrower age 65-67 is required.')
+        .isBoolean().withMessage('Borrower age 65-67 selection must be a boolean (true/false)'),
+    body('borrower_age_68_70')
+        .if(body('type_of_proposal_id').equals('31'))
+        .exists({ checkNull: true }).withMessage('Selection for Borrower age 68-70 is required.')
+        .isBoolean().withMessage('Borrower age 68-70 selection must be a boolean (true/false)'),
+    body('borrower_age_71_74')
+        .if(body('type_of_proposal_id').equals('31'))
+        .exists({ checkNull: true }).withMessage('Selection for Borrower age 71-74 is required.')
+        .isBoolean().withMessage('Borrower age 71-74 selection must be a boolean (true/false)'),
+
     // Optional validation for new product-specific fields
     body('amount_loans_id')
         .if(body('type_of_proposal_id').equals('31'))
@@ -1066,6 +1080,11 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
         }
         return true;
     }),
+
+    // Single Rate for Borrowers (Update)
+    body('borrower_age_65_67').optional({ nullable: true }).isBoolean().withMessage('Borrower age 65-67 selection must be a boolean'),
+    body('borrower_age_68_70').optional({ nullable: true }).isBoolean().withMessage('Borrower age 68-70 selection must be a boolean'),
+    body('borrower_age_71_74').optional({ nullable: true }).isBoolean().withMessage('Borrower age 71-74 selection must be a boolean'),
 
     // Optional validation for new product-specific fields on update
     body('amount_loans_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Amount Loans ID must be a non-negative integer')

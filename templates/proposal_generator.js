@@ -105,6 +105,10 @@ th, td{
     color:#0066cc;
     text-decoration:underline;
 }
+
+.page-break {
+    page-break-before: always;
+}
 </style>
 </head>
 
@@ -170,9 +174,11 @@ Thank you and looking forward to have a mutually beneficial partnership with you
 Sincerely,<br><br>
 
 <strong>${cfeFullName}</strong> <br>
-${user.roleName || 'N/A'} <br>
+${user.departmentName || 'N/A'} <br>
 <strong>${user.locationName || 'N/A'}</strong>
 </p>
+
+<div class="page-break"></div>
 
 <h2>Summary of Benefits</h2>
 
@@ -218,6 +224,8 @@ Death benefit is the Amount of Insurance at loan effective date. It is level
 throughout the term of the loan.
 </p>
 
+<div class="page-break"></div>
+
 <h3>Single Rate per 1,000 – Borrowers Age ${application.minimum_age}-${application.maximum_age}</h3>
 
 <table>
@@ -257,112 +265,101 @@ throughout the term of the loan.
 </tr>
 </table>
 
-<h3>Single Rate per 1,000 – Borrowers Age 65-67</h3>
+${application.borrower_age_65_67 ? `
+    <h3>Single Rate per 1,000 – Borrowers Age 65-67</h3>
+    <table>
+        <tr>
+            <th>Term of Loan</th>
+            <th>Rate</th>
+        </tr>
+        <tr>
+            <td>6 months</td>
+            <td>${rates65_67[6] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>12 months</td>
+            <td>${rates65_67[12] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>18 months</td>
+            <td>${rates65_67[18] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>24 months</td>
+            <td>${rates65_67[24] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>30 months</td>
+            <td>${rates65_67[30] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>36 months</td>
+            <td>${rates65_67[36] || 'N/A'}</td>
+        </tr>
+    </table>
+` : ''}
 
-<table>
-<tr>
-<th>Term of Loan</th>
-<th>Rate</th>
-</tr>
+${application.borrower_age_68_70 ? `
+    <h3>Single Rate per 1,000 – Borrowers Age 68-70</h3>
+    <table>
+        <tr>
+            <th>Term of Loan</th>
+            <th>Rate</th>
+        </tr>
+        <tr>
+            <td>6 months</td>
+            <td>${rates68_70[6] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>12 months</td>
+            <td>${rates68_70[12] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>18 months</td>
+            <td>${rates68_70[18] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>24 months</td>
+            <td>${rates68_70[24] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>30 months</td>
+            <td>${rates68_70[30] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>36 months</td>
+            <td>${rates68_70[36] || 'N/A'}</td>
+        </tr>
+    </table>
+` : ''}
 
-<tr>
-<td>6 months</td>
-<td>${rates65_67[6] || 'N/A'}</td>
-</tr>
+${application.borrower_age_71_74 ? `
+    <h3>Attained Age Rates (12 Months) – Borrowers Age 71-74</h3>
+    <table>
+        <tr>
+            <th>Age</th>
+            <th>Rate</th>
+        </tr>
+        <tr>
+            <td>71</td>
+            <td>${rates71_74[71] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>72</td>
+            <td>${rates71_74[72] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>73</td>
+            <td>${rates71_74[73] || 'N/A'}</td>
+        </tr>
+        <tr>
+            <td>74</td>
+            <td>${rates71_74[74] || 'N/A'}</td>
+        </tr>
+    </table>
+` : ''}
 
-<tr>
-<td>12 months</td>
-<td>${rates65_67[12] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>18 months</td>
-<td>${rates65_67[18] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>24 months</td>
-<td>${rates65_67[24] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>30 months</td>
-<td>${rates65_67[30] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>36 months</td>
-<td>${rates65_67[36] || 'N/A'}</td>
-</tr>
-</table>
-
-<h3>Single Rate per 1,000 – Borrowers Age 68-70</h3>
-
-<table>
-<tr>
-<th>Term of Loan</th>
-<th>Rate</th>
-</tr>
-
-<tr>
-<td>6 months</td>
-<td>${rates68_70[6] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>12 months</td>
-<td>${rates68_70[12] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>18 months</td>
-<td>${rates68_70[18] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>24 months</td>
-<td>${rates68_70[24] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>30 months</td>
-<td>${rates68_70[30] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>36 months</td>
-<td>${rates68_70[36] || 'N/A'}</td>
-</tr>
-</table>
-
-<h3>Attained Age Rates (12 Months)</h3>
-
-<table>
-<tr>
-<th>Age</th>
-<th>Rate</th>
-</tr>
-
-<tr>
-<td>71</td>
-<td>${rates71_74[71] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>72</td>
-<td>${rates71_74[72] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>73</td>
-<td>${rates71_74[73] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>74</td>
-<td>${rates71_74[74] || 'N/A'}</td>
-</tr>
-</table>
+<div class="page-break"></div>
 
 <h2>Notes</h2>
 
@@ -375,9 +372,13 @@ depending on the claims experience of the policy.
 
 <p>
 2. <strong>Eligibility Requirements</strong><br>
-Any in good health and actively-at-work debtor of the Policyholder who is at
+    A. Any in good health and actively-at-work debtor of the Policyholder who is at
 least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
-at the time of loan application.
+at the time of loan application. Actively-at-work means
+<ul>
+    <li>Performing usual duties of occupation and/or performing activities of daily living</li>
+    <li>Engaged in lawful employment or business</li>
+</ul>
 </p>
 
 <p>
@@ -400,18 +401,21 @@ At least ${participationPercentage}% individuals within the policy year
 
 <p>
 5. <strong>Evidence of Insurability</strong><br>
-No Evidence Limit (NEL): Php ${formatNumber(nelAmount)} before ${nelAge} birthday<br>
-Non-Medical Limit (NML): Php ${formatNumber(nmlAmount)} before ${nmlAge} birthday
+Individual application - borrower,
+<ul>
+    <li>No Evidence Limit (NEL): Php ${formatNumber(nelAmount)} provided eligible individual has not attained his ${nelAge} birthday<br></li>
+    <li>Non-Medical Limit (NML): Php ${formatNumber(nmlAmount)} provided eligible individual has not attained his ${nmlAge} birthday</li>
+</ul>
 </p>
 
 <p>
 6. <strong>Payment of Benefits</strong><br>
-Upon approval of proof of death of the Debtor:
+Upon approval of proof of death of the Debtor while the insurance is in force , PHILLIFE shall pay the following:
 </p>
 
 <ul>
-<li>To the Policyholder: Outstanding loan balance</li>
-<li>To the Beneficiaries: Difference between insurance amount and loan balance</li>
+<li>To the Policyholder: the Outstanding balance of the Debtor's loan</li>
+<li>To the Debtor's benefeciaries: the difference, if any, between the amount of insurance and the outstanding balance of the Debtor's loan. Outstanding balance were derived from amortization of the insured.</li>
 </ul>
 
 <p>
