@@ -1,4 +1,3 @@
-import { json } from "express";
 import * as Model from "../../models/group_rider/group_rider.model.js"
 import { error } from "../../utils/response.js";
 
@@ -21,9 +20,7 @@ export const createRider = async (req, res) => {
         });
     } catch (err) {
         console.error("Service Error:",err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 }
 
@@ -73,9 +70,7 @@ export const getAllRiders =async (req ,res) => {
         });
     } catch (err) {
         console.error("Service Error:",err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 };
 
@@ -93,9 +88,7 @@ export const getRidersByProductName = async (req, res) => {
         });
     } catch (err) {
         console.error("Service Error:", err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 };
 
@@ -135,9 +128,7 @@ const fetchRidersByAcronym = async (res, acronym) => {
         });
     } catch (err) {
         console.error("Service Error:", err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 };
 
@@ -161,9 +152,7 @@ export const getRiderById = async (req, res) => {
         });
     } catch (err) {
         console.error("Service Error:",err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 };
 
@@ -196,9 +185,7 @@ export const updateRider = async (req, res) => {
         });
     } catch (err) {
         console.error("Service Error:",err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 };
 
@@ -220,8 +207,6 @@ export const deleteRider = async (req, res) => {
         });
     } catch (err) {
         console.error("Service Error:",err);
-        res.status(500).json({
-            error: err.message
-        });
+        return error(res, err.message);
     }
 }
