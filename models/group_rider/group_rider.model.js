@@ -9,9 +9,7 @@ export const getAllRiders = async () => {
                 r.rider_id,
                 r.rider_name,
                 r.acronym,
-                r.basic_plan_id,
-                bp.basic_plan_name,
-                p.product_id,
+                r.product_id,
                 p.product_name,
                 r.input_type,
                 r.min_amount,
@@ -20,11 +18,10 @@ export const getAllRiders = async () => {
                 r.is_active,
                 r.created_at,
                 r.updated_at
-            FROM [DHUB].[sg].[financial_insurance_rider] r
-            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON bp.product_id = p.product_id
+            FROM [DHUB].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
             WHERE r.is_active = 1
-            ORDER BY p.product_name, bp.basic_plan_name, r.rider_name
+            ORDER BY p.product_name, r.rider_name
         `);
     return result.recordset;
 };
@@ -39,9 +36,7 @@ export const getRidersByProductName = async (productName) => {
                 r.rider_id,
                 r.rider_name,
                 r.acronym,
-                r.basic_plan_id,
-                bp.basic_plan_name,
-                p.product_id,
+                r.product_id,
                 p.product_name,
                 r.input_type,
                 r.min_amount,
@@ -50,11 +45,9 @@ export const getRidersByProductName = async (productName) => {
                 r.is_active,
                 r.created_at,
                 r.updated_at
-            FROM [DHUB].[sg].[financial_insurance_rider] r
-            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp 
-                ON r.basic_plan_id = bp.basic_plan_id
+            FROM [DHUB].[sg].[financial_insurance_riders] r
             LEFT JOIN [DHUB].[sg].[financial_insurance_product] p 
-                ON bp.product_id = p.product_id
+                ON r.product_id = p.product_id
             WHERE (
                 p.acronym LIKE '%' + @productName + '%'
                 OR p.product_name LIKE '%' + @productName + '%'
@@ -75,9 +68,7 @@ export const getRidersByProductAcronym = async (acronym) => {
                 r.rider_id,
                 r.rider_name,
                 r.acronym,
-                r.basic_plan_id,
-                bp.basic_plan_name,
-                p.product_id,
+                r.product_id,
                 p.product_name,
                 p.acronym as product_acronym,
                 r.input_type,
@@ -87,11 +78,10 @@ export const getRidersByProductAcronym = async (acronym) => {
                 r.is_active,
                 r.created_at,
                 r.updated_at
-            FROM [DHUB].[sg].[financial_insurance_rider] r
-            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON bp.product_id = p.product_id
+            FROM [DHUB].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
             WHERE LTRIM(RTRIM(p.acronym)) = LTRIM(RTRIM(@acronym)) AND r.is_active = 1
-            ORDER BY bp.basic_plan_name, r.rider_name
+            ORDER BY r.rider_name
         `);
     return result.recordset;
 };
@@ -104,11 +94,9 @@ export const getRiderById = async (id) => {
         .query(`
             SELECT 
                 r.*,
-                bp.basic_plan_name,
                 p.product_name
-            FROM [DHUB].[sg].[financial_insurance_rider] r
-            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON bp.product_id = p.product_id
+            FROM [DHUB].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
             WHERE r.rider_id = @id
         `);
     return result.recordset[0];
@@ -120,7 +108,7 @@ export const getRiderByName = async (name) => {
     const result = await pool.request()
         .input("name", sql.VarChar, name)
         .query(`
-            SELECT * FROM [DHUB].[sg].[financial_insurance_rider]
+            SELECT * FROM [DHUB].[sg].[financial_insurance_riders]
             WHERE rider_name = @name AND is_active = 1
         `);
     return result.recordset[0];
