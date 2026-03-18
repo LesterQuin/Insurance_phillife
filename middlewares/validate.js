@@ -41,8 +41,8 @@ export const validateRegister = [
     body('email')
         .notEmpty().withMessage('Email is required')
         .isEmail().withMessage('Invalid email format')
-        .matches(/^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com)$/i)
-        .withMessage('Email must be from allowed domain (gmail.com, yahoo.com, phillifeassurance.onmicrosoft.com)'),
+        .matches(/^[\w.-]+@(gmail\.com|yahoo\.com|phillifeassurance\.onmicrosoft\.com|phillife\.com\.ph)$/i)
+        .withMessage('Email must be from allowed domain (gmail.com, yahoo.com, phillifeassurance.onmicrosoft.com, phillife.com.ph)'),
     body('phoneNumber')
         .optional()
         .matches(/^[0-9]{10,15}$/).withMessage('Phone number must be 10-15 digits'),
