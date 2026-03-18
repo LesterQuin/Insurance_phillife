@@ -4,21 +4,52 @@ import { tempPasswordTemplate } from '../../templates/tempPasswordTemplate.js';
 import { otpTemplate } from '../../templates/otpTemplate.js';
 import * as bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import * as nodemailer from "nodemailer";
+import { ClientSecretCredential } from "@azure/identity";
+import { Client } from "@microsoft/microsoft-graph-client";
+import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials/index.js";
+import "isomorphic-fetch";
 import dotenv from 'dotenv';
 dotenv.config();
 
-export const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT),
-    secure: false,   
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD
-    },
-    logger: true,    
-    debug: true      
+const credential = new ClientSecretCredential(
+    process.env.AZURE_TENANT_ID,
+    process.env.AZURE_CLIENT_ID,
+    process.env.AZURE_CLIENT_SECRET
+);
+
+const authProvider = new TokenCredentialAuthenticationProvider(credential, {
+    scopes: ["https://graph.microsoft.com/.default"],
 });
+
+const graphClient = Client.initWithMiddleware({
+    debugLogging: true,
+    authProvider,
+});
+
+export const transporter = {
+    sendMail: async (mailOptions) => {
+        const sendMail = {
+            message: {
+                subject: mailOptions.subject,
+                body: {
+                    contentType: "HTML",
+                    content: mailOptions.html,
+                },
+                toRecipients: [
+                    {
+                        emailAddress: {
+                            address: mailOptions.to,
+                        },
+                    },
+                ],
+            },
+            saveToSentItems: "false",
+        };
+
+        await graphClient.api(`/users/${process.env.SMTP_USER}/sendMail`)
+            .post(sendMail);
+    }
+};
 
 // Cookie options
 const cookieOptions = {
