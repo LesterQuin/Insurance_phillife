@@ -11,6 +11,8 @@ export const getAllRiders = async () => {
                 r.acronym,
                 r.product_id,
                 p.product_name,
+                bp.basic_plan_id,
+                bp.basic_plan_name,
                 r.input_type,
                 r.min_amount,
                 r.max_amount,
@@ -20,8 +22,9 @@ export const getAllRiders = async () => {
                 r.updated_at
             FROM [DHUB].[sg].[financial_insurance_riders] r
             LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.product_id = bp.product_id
             WHERE r.is_active = 1
-            ORDER BY p.product_name, r.rider_name
+            ORDER BY p.product_name, bp.basic_plan_name, r.rider_name
         `);
     return result.recordset;
 };
@@ -38,6 +41,8 @@ export const getRidersByProductName = async (productName) => {
                 r.acronym,
                 r.product_id,
                 p.product_name,
+                bp.basic_plan_id,
+                bp.basic_plan_name,
                 r.input_type,
                 r.min_amount,
                 r.max_amount,
@@ -48,12 +53,14 @@ export const getRidersByProductName = async (productName) => {
             FROM [DHUB].[sg].[financial_insurance_riders] r
             LEFT JOIN [DHUB].[sg].[financial_insurance_product] p 
                 ON r.product_id = p.product_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp 
+                ON r.product_id = bp.product_id
             WHERE (
                 p.acronym LIKE '%' + @productName + '%'
                 OR p.product_name LIKE '%' + @productName + '%'
             )
             AND r.is_active = 1
-            ORDER BY r.rider_name
+            ORDER BY bp.basic_plan_name, r.rider_name
         `);
     return result.recordset;
 };
@@ -71,6 +78,8 @@ export const getRidersByProductAcronym = async (acronym) => {
                 r.product_id,
                 p.product_name,
                 p.acronym as product_acronym,
+                bp.basic_plan_id,
+                bp.basic_plan_name,
                 r.input_type,
                 r.min_amount,
                 r.max_amount,
@@ -80,8 +89,9 @@ export const getRidersByProductAcronym = async (acronym) => {
                 r.updated_at
             FROM [DHUB].[sg].[financial_insurance_riders] r
             LEFT JOIN [DHUB].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
+            LEFT JOIN [DHUB].[sg].[financial_insurance_basic_plan] bp ON r.product_id = bp.product_id
             WHERE LTRIM(RTRIM(p.acronym)) = LTRIM(RTRIM(@acronym)) AND r.is_active = 1
-            ORDER BY r.rider_name
+            ORDER BY bp.basic_plan_name, r.rider_name
         `);
     return result.recordset;
 };
