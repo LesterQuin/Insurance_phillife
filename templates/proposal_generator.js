@@ -5,11 +5,13 @@ const formatNumber = (num) => {
 };
 
 const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    // Adding timeZone: 'UTC' prevents the date from shifting to the next day
+    // due to local timezone conversion of a UTC-like date string from the database.
+    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 };
 
 // Helper to generate table rows dynamically for rates
-const generateRateRows = (rates, suffix = '') => {
+const generateRateRows = (rates, suffix = '') => { 
     const keys = Object.keys(rates).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
     if (keys.length === 0) return '<tr><td colspan="2">N/A</td></tr>';
     return keys.map(key => `
@@ -27,9 +29,9 @@ const generateRateRows = (rates, suffix = '') => {
  * @returns {string} - The complete HTML content for the proposal.
  */
 export const generateGCLIPDFContent = (application, user, details) => {
-    const proposalDate = new Date();
-    const expiryDate = new Date();
-    expiryDate.setDate(proposalDate.getDate() + 30);
+    const proposalDate = new Date(application.updated_at);
+    const expiryDate = new Date(proposalDate);
+    expiryDate.setDate(expiryDate.getDate() + 30);
 
     const addresseeLastName = application.proposal_addressee.split(' ').pop();
 
