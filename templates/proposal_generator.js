@@ -8,6 +8,17 @@ const formatDate = (date) => {
     return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
+// Helper to generate table rows dynamically for rates
+const generateRateRows = (rates, suffix = '') => {
+    const keys = Object.keys(rates).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
+    if (keys.length === 0) return '<tr><td colspan="2">N/A</td></tr>';
+    return keys.map(key => `
+<tr>
+<td>${key}${suffix}</td>
+<td>${rates[key]}</td>
+</tr>`).join('');
+};
+
 /**
  * Generates the HTML content for a Group Credit Life Insurance Plan (GCLIP) proposal.
  * @param {object} application - The full application data object from the database.
@@ -203,20 +214,23 @@ maximum amount.
 <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_64)}</td>
 </tr>
 
+${application.borrower_age_65_67 ? `
 <tr>
 <td>65-67</td>
 <td>Initial amount balance maximum of Php ${formatNumber(maxAmount65_67)}</td>
-</tr>
+</tr>` : ''}
 
+${application.borrower_age_68_70 ? `
 <tr>
 <td>68-70</td>
 <td>Initial amount balance maximum of Php ${formatNumber(maxAmount68_70)}</td>
-</tr>
+</tr>` : ''}
 
+${application.borrower_age_71_74 ? `
 <tr>
 <td>71-74</td>
 <td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_74)}</td>
-</tr>
+</tr>` : ''}
 </table>
 
 <p>
@@ -234,35 +248,7 @@ throughout the term of the loan.
 <th>Rate</th>
 </tr>
 
-<tr>
-<td>6 months</td>
-<td>${rates18_64[6] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>12 months</td>
-<td>${rates18_64[12] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>18 months</td>
-<td>${rates18_64[18] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>24 months</td>
-<td>${rates18_64[24] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>30 months</td>
-<td>${rates18_64[30] || 'N/A'}</td>
-</tr>
-
-<tr>
-<td>36 months</td>
-<td>${rates18_64[36] || 'N/A'}</td>
-</tr>
+${generateRateRows(rates18_64, ' months')}
 </table>
 
 ${application.borrower_age_65_67 ? `
@@ -272,30 +258,7 @@ ${application.borrower_age_65_67 ? `
             <th>Term of Loan</th>
             <th>Rate</th>
         </tr>
-        <tr>
-            <td>6 months</td>
-            <td>${rates65_67[6] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>12 months</td>
-            <td>${rates65_67[12] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>18 months</td>
-            <td>${rates65_67[18] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>24 months</td>
-            <td>${rates65_67[24] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>30 months</td>
-            <td>${rates65_67[30] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>36 months</td>
-            <td>${rates65_67[36] || 'N/A'}</td>
-        </tr>
+        ${generateRateRows(rates65_67, ' months')}
     </table>
 ` : ''}
 
@@ -306,30 +269,7 @@ ${application.borrower_age_68_70 ? `
             <th>Term of Loan</th>
             <th>Rate</th>
         </tr>
-        <tr>
-            <td>6 months</td>
-            <td>${rates68_70[6] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>12 months</td>
-            <td>${rates68_70[12] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>18 months</td>
-            <td>${rates68_70[18] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>24 months</td>
-            <td>${rates68_70[24] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>30 months</td>
-            <td>${rates68_70[30] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>36 months</td>
-            <td>${rates68_70[36] || 'N/A'}</td>
-        </tr>
+        ${generateRateRows(rates68_70, ' months')}
     </table>
 ` : ''}
 
@@ -340,22 +280,7 @@ ${application.borrower_age_71_74 ? `
             <th>Age</th>
             <th>Rate</th>
         </tr>
-        <tr>
-            <td>71</td>
-            <td>${rates71_74[71] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>72</td>
-            <td>${rates71_74[72] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>73</td>
-            <td>${rates71_74[73] || 'N/A'}</td>
-        </tr>
-        <tr>
-            <td>74</td>
-            <td>${rates71_74[74] || 'N/A'}</td>
-        </tr>
+        ${generateRateRows(rates71_74, '')}
     </table>
 ` : ''}
 

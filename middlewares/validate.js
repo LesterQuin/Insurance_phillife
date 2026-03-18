@@ -674,15 +674,15 @@ body('basic_plan_id')
     // Single Rate for Borrowers
     body('borrower_age_65_67')
         .if(body('type_of_proposal_id').equals('31'))
-        .exists({ checkNull: true }).withMessage('Selection for Borrower age 65-67 is required.')
+        .optional()
         .isBoolean().withMessage('Borrower age 65-67 selection must be a boolean (true/false)'),
     body('borrower_age_68_70')
         .if(body('type_of_proposal_id').equals('31'))
-        .exists({ checkNull: true }).withMessage('Selection for Borrower age 68-70 is required.')
+        .optional()
         .isBoolean().withMessage('Borrower age 68-70 selection must be a boolean (true/false)'),
     body('borrower_age_71_74')
         .if(body('type_of_proposal_id').equals('31'))
-        .exists({ checkNull: true }).withMessage('Selection for Borrower age 71-74 is required.')
+        .optional()
         .isBoolean().withMessage('Borrower age 71-74 selection must be a boolean (true/false)'),
 
     // Optional validation for new product-specific fields
@@ -847,6 +847,50 @@ body('basic_plan_id')
     body('status_id').optional().isInt({ min: 0 }),
 
     // Validation result
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
+// Rates validation
+// -----------------------------
+export const validateRates = [
+    body('application_id')
+        .notEmpty().withMessage('Application ID is required')
+        .isInt({ min: 1 }).withMessage('Application ID must be a valid integer'),
+    // Check the root body for the rate keys
+    body()
+        .custom((value, { req }) => {
+            const keys = ['18-64', '65-67', '68-70', '71-74'];
+            let hasData = false;
+            
+            keys.forEach(key => {
+                if (req.body[key]) {
+                    hasData = true;
+                    if (!Array.isArray(req.body[key])) {
+                        throw new Error(`Data for ${key} must be an array.`);
+                    }
+                    
+                    req.body[key].forEach((item, index) => {
+                        const termKey = key === '71-74' ? 'term_or_age' : 'term_or_months';
+                        if (!item[termKey]) {
+                            throw new Error(`Item ${index + 1} in ${key} is missing '${termKey}'.`);
+                        }
+                        if (item.rate === undefined || item.rate === null) {
+                            throw new Error(`Item ${index + 1} in ${key} is missing 'rate'.`);
+                        }
+                    });
+                }
+            });
+
+            if (!hasData) {
+                throw new Error('At least one rate group (18-64, 65-67, 68-70, 71-74) is required.');
+            }
+            return true;
+        }),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });

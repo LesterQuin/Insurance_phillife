@@ -471,19 +471,6 @@ export const getRidersByProductId = async (productId) => {
     return res.recordset ?? [];
 };
 
-// Get attachable riders for a specific basic plan
-export const getRidersByBasicPlanId = async (basicPlanId) => {
-    const pool = await poolPromise;
-    const res = await pool.request()
-        .input('basicPlanId', sql.Int, basicPlanId)
-        .query(`
-            SELECT rider_id, rider_name, is_active
-            FROM sg.financial_insurance_rider
-            WHERE basic_plan_id = @basicPlanId AND is_active = 1
-        `);
-    return res.recordset ?? [];
-};
-
 // Get lookup names by a list of IDs
 export const getLookupNamesByIds = async (ids) => {
     if (!ids || ids.length === 0) return new Map();
@@ -540,7 +527,7 @@ export const getApplicationRiders = async (applicationId) => {
                 ar.rider_amount as amount,
                 ar.rider_unit as unit
             FROM sg.financial_insurance_application_rider ar
-            JOIN sg.financial_insurance_rider r ON ar.rider_id = r.rider_id
+            JOIN sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
             WHERE ar.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -652,8 +639,88 @@ export const getBulkApplicationRiders = async (applicationIds) => {
     const result = await request.query(`
         SELECT ar.application_id, r.rider_id, r.rider_name, r.input_type, r.unit_value, ar.rider_amount as amount, ar.rider_unit as unit
         FROM sg.financial_insurance_application_rider ar
-        JOIN sg.financial_insurance_rider r ON ar.rider_id = r.rider_id
+        JOIN sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
         WHERE ar.application_id IN (${idParams})
     `);
+    return result.recordset ?? [];
+};
+
+// Save application rates to the normalized table
+export const saveApplicationRates = async (applicationId, ratesData) => {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+        // 1. Fetch Plan ID associated with the application (needed for the rates table schema)
+        const appRes = await new sql.Request(transaction)
+            .input('appId', sql.Int, applicationId)
+            .query('SELECT plan_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @appId');
+        
+        const planId = appRes.recordset[0]?.plan_id || 1; // Default to 1 if not found
+
+        // 2. Delete existing rates for this application
+        await new sql.Request(transaction)
+            .input('appId', sql.Int, applicationId)
+            .query('DELETE FROM DHUB.sg.financial_insurance_application_rates WHERE application_id = @appId');
+
+        // 3. Insert new rates
+        const categories = {
+            '18-64': '18_64',
+            '65-67': '65_67',
+            '68-70': '68_70',
+            '71-74': '71_74'
+        };
+
+        for (const [jsonKey, dbCategory] of Object.entries(categories)) {
+            const items = ratesData[jsonKey];
+            if (Array.isArray(items)) {
+                for (const item of items) {
+                    let term = null;
+                    let age = null;
+
+                    if (item.term_or_months) {
+                        const match = item.term_or_months.toString().match(/\d+/);
+                        if (match) term = parseInt(match[0], 10);
+                    }
+                    if (item.term_or_age) {
+                        const match = item.term_or_age.toString().match(/\d+/);
+                        if (match) age = parseInt(match[0], 10);
+                    }
+
+                    const rateValue = parseFloat(item.rate);
+
+                    await new sql.Request(transaction)
+                        .input('plan_id', sql.Int, planId)
+                        .input('application_id', sql.Int, applicationId)
+                        .input('borrower_category', sql.VarChar(20), dbCategory)
+                        .input('term_months', sql.Int, term)
+                        .input('attained_age', sql.Int, age)
+                        .input('premium_amount', sql.Decimal(18, 2), rateValue)
+                        .query(`
+                            INSERT INTO DHUB.sg.financial_insurance_application_rates 
+                            (plan_id, application_id, borrower_category, term_months, attained_age, premium_amount, updated_at)
+                            VALUES (@plan_id, @application_id, @borrower_category, @term_months, @attained_age, @premium_amount, GETDATE())
+                        `);
+                }
+            }
+        }
+
+        await transaction.commit();
+        return true;
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+// Get application rates from normalized table
+export const getApplicationRates = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT * FROM DHUB.sg.financial_insurance_application_rates WHERE application_id = @application_id
+        `);
     return result.recordset ?? [];
 };

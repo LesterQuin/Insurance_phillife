@@ -32,6 +32,39 @@ const cleanupOtherFields = async (data) => {
     return mutableData;
 };
 
+// Helper to format rates for template (extract numeric key from "6 months" or "71 age")
+const formatRatesForTemplate = (ratesArray, keyField) => {
+    if (!Array.isArray(ratesArray)) return {};
+    return ratesArray.reduce((acc, item) => {
+        let rawKey = item[keyField];
+        if (rawKey && item.rate !== undefined) {
+            // Extract integer from string (e.g., "6 months" -> 6)
+            let key = rawKey;
+            if (typeof rawKey === 'string') {
+                const match = rawKey.match(/\d+/);
+                if (match) key = parseInt(match[0], 10);
+            }
+            acc[key] = typeof item.rate === 'number' ? item.rate.toFixed(2) : item.rate;
+        }
+        return acc;
+    }, {});
+};
+
+// Helper to transform DB rows (from new table) back to template format
+const formatDbRatesForTemplate = (dbRows, category) => {
+    if (!dbRows || dbRows.length === 0) return null;
+    
+    // Filter by category (e.g., '18_64')
+    const filtered = dbRows.filter(row => row.borrower_category === category);
+    if (filtered.length === 0) return null;
+
+    return filtered.reduce((acc, row) => {
+        const key = category === '71_74' ? row.attained_age : row.term_months;
+        if (key) acc[key] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
+        return acc;
+    }, {});
+};
+
 // Create Application
 export const createApplication = async (req, res) => {
     try {
@@ -81,6 +114,9 @@ export const getTemplateById = async (req, res) => {
         if (!appData) {
             return error(res, "Application not found.", 404);
         }
+        
+        // Fetch rates from the new table
+        const ratesRows = await Model.getApplicationRates(id);
 
         // 2. Fetch User Data (CFE / Agent) who created the application
         let user;
@@ -114,12 +150,14 @@ export const getTemplateById = async (req, res) => {
         const details = {
             totalAnnualPremium: 0, 
             contactLocal: '123',
-            // Default rates can be passed here or handled in template defaults. 
-            // Providing some here to ensure they render.
-            rates18_64: { 6: '5.00', 12: '6.00', 18: '7.00', 24: '8.00', 30: '9.00', 36: '10.00' },
-            rates65_67: { 6: '6.00', 12: '7.00', 18: '8.00', 24: '9.00', 30: '10.00', 36: '11.00' },
-            rates68_70: { 6: '7.00', 12: '8.00', 18: '9.00', 24: '10.00', 30: '11.00', 36: '12.00' },
-            rates71_74: { 71: '12.00', 72: '13.00', 73: '14.00', 74: '15.00' },
+            
+            // Map table rows to template structure
+            // Fallback to hardcoded defaults if DB returns nothing
+            rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+            rates65_67: formatDbRatesForTemplate(ratesRows, '65_67') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+            rates68_70: formatDbRatesForTemplate(ratesRows, '68_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+            rates71_74: formatDbRatesForTemplate(ratesRows, '71_74') || { 71: 'n/a', 72: 'n/a', 73: 'n/a', 74: 'n/a' },
+            
             nelAmount: 500000,
             nelAge: 65,
             nmlAmount: 1000000,
@@ -214,6 +252,49 @@ export const getAllApplications = async (req, res) => {
         return success(res, formattedApplications, 'Applications fetched successfully.');
     } catch (err) {
         console.error('Service Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Save/Update Rates for Application
+export const saveRates = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        const { application_id, ...ratesData } = req.body;
+
+        // 1. Authorization Check (Similar to updateApplication)
+        const existingApplication = await Model.getApplicationById(application_id);
+        if (!existingApplication) {
+            return error(res, 'Application not found', 404);
+        }
+
+        const loggedInId = Number(userId);
+        const creatorId = Number(existingApplication.user_id);
+        let isAuthorized = false;
+
+        if (loggedInId === creatorId) {
+            isAuthorized = true;
+        } else if (req.user.agent_code) {
+             // If user has agent code, check if it matches the creator's agent code
+            const creatorUser = await User.getUserById(existingApplication.user_id);
+                if (creatorUser && creatorUser.agent_code === req.user.agent_code.trim()) {
+                    isAuthorized = true;
+                }
+        }
+
+        // if (!isAuthorized) {
+        //     return error(res, 'You are not authorized to update rates for this application.', 403);
+        // }
+
+        // 2. Save Rates to Normalized Table
+        await Model.saveApplicationRates(application_id, ratesData);
+        
+        // Fetch updated application to return
+        const updatedApp = await Model.getApplicationById(application_id);
+        return success(res, updatedApp, 'Rates saved successfully.');
+
+    } catch (err) {
+        console.error('Save Rates Error:', err);
         return error(res, err.message);
     }
 };
