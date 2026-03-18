@@ -13,10 +13,16 @@ export const activationTemplate = (lastname, activationLink) => {
         
         <!-- Header -->
         <tr>
-            <td style="background: linear-gradient(135deg, #4caf50 0%, #45a049 100%); text-align:center; padding:20px; color:white;">
-            <h1 style="margin:0; font-size:24px; font-weight:300;">Welcome to the Insurance Proposal System</h1>
+        <td 
+            bgcolor="#4caf50" 
+            style="background-color:#4caf50; 
+                background: linear-gradient(135deg, #4caf50 0%, #45a049 100%);
+                text-align:center; 
+                padding:20px; 
+                color:white;">
+            <h1 style="margin:0; font-size:24px; font-weight:300;">Welcome to Insurance Proposal System</h1>
             <p style="margin:5px 0 0; font-size:14px; opacity:0.9;">One more step to get started</p>
-            </td>
+        </td>
         </tr>
 
         <!-- Content -->
