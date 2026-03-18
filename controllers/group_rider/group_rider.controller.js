@@ -32,12 +32,12 @@ const groupRidersByProduct = (riders) => {
     const productsMap = new Map();
 
     riders.forEach(rider => {
-        const { product_id, product_name, basic_plan_id, basic_plan_name, ...riderInfo } = rider;
+        const { product_id, product_name, product_acronym, basic_plan_id, basic_plan_name, ...riderInfo } = rider;
 
         if (!productsMap.has(product_id)) {
             productsMap.set(product_id, {
                 product_id,
-                product_name,
+                product_name: product_acronym ? `${product_name} (${product_acronym})` : product_name,
                 basic_plans: new Map()
             });
         }
