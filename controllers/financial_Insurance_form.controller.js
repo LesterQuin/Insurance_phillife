@@ -1,7 +1,13 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as Model from '../models/financial_Insurance_form.model.js';
 import * as User from '../models/user/user_model.js';
 import { success, error } from '../utils/response.js';
 import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Helper to clean "other" fields based on selected IDs
 const cleanupOtherFields = async (data) => {
@@ -177,6 +183,131 @@ export const getTemplateById = async (req, res) => {
         return error(res, err.message, 500);
     }
 };
+
+// Get Prototype Plan View (HTML)
+export const getPrototypePlanView = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        let filename = '';
+
+        // Map IDs to static HTML files (IDs based on seed order)
+        switch (id) {
+            case 1: filename = 'prototype_StudentsGroupTermLifeInsurancePlan.html'; break;
+            case 2: filename = 'prototype_StudentsGroupPersonalAccidentPlan.html'; break;
+            case 3: filename = 'prototype_GroupAssociationsPlan.html'; break;
+            case 4: filename = 'prototype_SecurityGuardsProtectionPlan.html'; break;
+            case 5: filename = 'prototype_GroupCreditLifePrototypePlan–InitialLoan.html'; break;
+            case 6: filename = 'prototype_GroupCreditLifeInsuranceOutstandingLoanBalance.html'; break;
+            case 7: filename = 'prototype_HotelEmployeesGroupTermLifeInsurancePlan.html'; break;
+            case 8: filename = 'prototype_PlanforSmallGroups.html'; break;
+            case 9: filename = 'prototype_BarangayProtectPlan.html'; break;
+            default: return error(res, 'Prototype plan view not found.', 404);
+        }
+
+        const filePath = path.join(__dirname, '../templates', filename);
+        if (!fs.existsSync(filePath)) {
+            return error(res, 'Template file not found on server.', 404);
+        }
+
+        const html = fs.readFileSync(filePath, 'utf8');
+        res.setHeader('Content-Type', 'text/html');
+        res.send(html);
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
+
+// // Get List of Prototype Plan Definitions (Dropdown List)
+// export const getPrototypePlans = async (req, res) => {
+//     try {
+//         const list = await Model.getPrototypePlans();
+//         return success(res, list, 'Prototype plans fetched successfully.');
+//     } catch (err) {
+//         return error(res, err.message);
+//     }
+// };
+
+// // Get List of Prototypes
+// export const getPrototypes = async (req, res) => {
+//     try {
+//         const rawApplications = await Model.getAllApplications();
+        
+//         // Filter for Prototypes (ID 30)
+//         const prototypes = rawApplications.filter(app => Number(app.type_of_proposal_id) === 30);
+
+//         if (prototypes.length === 0) {
+//             return success(res, [], 'No prototypes found.');
+//         }
+
+//         // --- Bulk fetch related data ---
+//         const appIds = prototypes.map(app => app.application_id);
+
+//         const allRiders = await Model.getBulkApplicationRiders(appIds);
+//         const ridersByAppId = allRiders.reduce((acc, rider) => {
+//             (acc[rider.application_id] = acc[rider.application_id] || []).push(rider);
+//             return acc;
+//         }, {});
+        
+//         const allSubGroups = await Model.getBulkApplicationSubGroups(appIds);
+//         const subGroupsByAppId = allSubGroups.reduce((acc, sg) => {
+//             (acc[sg.application_id] = acc[sg.application_id] || []).push({ id: sg.id, name: sg.name });
+//             return acc;
+//         }, {});
+
+//         const allPayments = await Model.getBulkApplicationPaymentTerms(appIds);
+//         const paymentsByAppId = allPayments.reduce((acc, p) => {
+//             (acc[p.application_id] = acc[p.application_id] || []).push({
+//                 payment_term: { id: p.payment_term_id, name: p.payment_term_name },
+//                 sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+//             });
+//             return acc;
+//         }, {});
+
+//         // --- Map the bulk-fetched data back to each application ---
+//         const formattedPrototypes = prototypes.map(app => {
+
+//             return {
+//                 application_id: app.application_id,
+//                 user_id: app.user_id,
+//                 group_name: app.group_name,
+//                 number_of_lives: app.number_of_lives,
+//                 contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+//                 status: { id: app.status_id, name: app.status_name },
+//                 group_classification: { 
+//                     id: app.group_classification_id, 
+//                     name: app.group_classification_name,
+//                     other_value: app.other_group_classification
+//                 },
+//                 business_type: {
+//                     id: app.business_type_id,
+//                     name: app.business_type_name,
+//                     other_value: app.other_business_type
+//                 },
+//                 group_type: { 
+//                     id: app.group_type_id, 
+//                     name: app.group_type_name,
+//                     other_value: app.other_group_type
+//                 },
+//                 sub_group_types: subGroupsByAppId[app.application_id] || [],
+//                 payment: paymentsByAppId[app.application_id] || [],
+//                 type_of_proposal: {
+//                     id: app.type_of_proposal_id,
+//                     name: app.type_of_proposal_name
+//                 },
+//                 plan: { id: app.plan_id, name: app.plan_name },
+//                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+//                 riders: ridersByAppId[app.application_id] || [],
+//                 created_at: app.created_at,
+//                 updated_at: app.updated_at,
+//             };
+//         });
+
+//         return success(res, formattedPrototypes, 'Prototypes fetched successfully.');
+//     } catch (err) {
+//         console.error('Service Error:', err);
+//         return error(res, err.message);
+//     }
+// };
 
 // Get All Applications
 export const getAllApplications = async (req, res) => {

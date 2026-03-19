@@ -445,6 +445,16 @@ export const getAllPlans = async () => {
     return res.recordset ?? [];
 };
 
+// Get list of prototype plans (definitions)
+export const getPrototypePlans = async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT id, name, acronym FROM sg.financial_insurance_prototype_plans WHERE is_active = 1
+        `);
+    return res.recordset ?? [];
+};
+
 // Get basic plans for a specific top-level plan
 export const getBasicPlansByPlanId = async (planId) => {
     const pool = await poolPromise;
