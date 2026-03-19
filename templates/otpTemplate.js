@@ -49,9 +49,17 @@ export const otpTemplate = (lastname, otp) => {
 
         <!-- Footer -->
         <tr>
-        <td style="background:#f8f9fa; text-align:center; padding:20px; border-top:1px solid #e9ecef;">
-            <p style="margin:0; font-size:12px; color:#6c757d;">© 2026 Insurance Proposal. All rights reserved.</p>
-        </td>
+            <td style="background:#f8f9fa; text-align:center; padding:20px; border-top:1px solid #e9ecef;">
+                <p style="margin:0; font-size:12px; color:#6c757d;">© 2026 Insurance Proposal. All rights reserved.</p>
+
+                <p style="font-size: 9pt; color:#c62828; margin-top:10px; font-style:italic;">
+                <strong>Notice:</strong> This is a system-generated proposal. Please do not reply directly to this email.
+                For inquiries or concerns, kindly contact us at 
+                <a href="mailto:helpdesk@phillife.com.ph" style="color:#c62828;">
+                helpdesk@phillife.com.ph
+                </a> or call (02) 7798 – 5433.
+                </p>
+            </td>
         </tr>
 
     </table>
