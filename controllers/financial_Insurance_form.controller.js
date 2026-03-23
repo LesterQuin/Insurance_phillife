@@ -5,6 +5,15 @@ import * as Model from '../models/financial_Insurance_form.model.js';
 import * as User from '../models/user/user_model.js';
 import { success, error } from '../utils/response.js';
 import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
+import { generateBarangayPDFContent } from '../templates/prototype_BarangayProtectPlan.js';
+import { generateStudentsGTLIPPDFContent } from '../templates/prototype_StudentsGroupTermLifeInsurancePlan.js';
+import { generateStudentsGPAPDFContent } from '../templates/prototype_StudentsGroupPersonalAccidentPlan.js';
+import { generateGroupAssociationsPDFContent } from '../templates/prototype_GroupAssociationsPlan.js';
+import { generateSecurityGuardsPDFContent } from '../templates/prototype_SecurityGuardsProtectionPlan.js';
+import { generateGCLIInitialLoanPDFContent } from '../templates/prototype_GroupCreditLifePrototypePlanInitialLoan.js';
+import { generateGCLIOutstandingLoanBalancePDFContent } from '../templates/prototype_GroupCreditLifeInsuranceOutstandingLoanBalance.js';
+import { generateHotelEmployeesPDFContent } from '../templates/prototype_HotelEmployeesGroupTermLifeInsurancePlan.js';
+import { generateSmallGroupsPDFContent } from '../templates/prototype_PlanforSmallGroups.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -257,7 +266,44 @@ export const getTemplateById = async (req, res) => {
         };
 
         // 5. Generate HTML
-        const htmlContent = generateGCLIPDFContent(application, user, details);
+        let htmlContent;
+
+        if (application.type_of_proposal_id === 30) {
+            switch (application.prototype_id) {
+                case 1:
+                    htmlContent = generateStudentsGTLIPPDFContent(application, user, details);
+                    break;
+                case 2:
+                    htmlContent = generateStudentsGPAPDFContent(application, user, details);
+                    break;
+                case 3:
+                    htmlContent = generateGroupAssociationsPDFContent(application, user, details);
+                    break;
+                case 4:
+                    htmlContent = generateSecurityGuardsPDFContent(application, user, details);
+                    break;
+                case 5:
+                    htmlContent = generateGCLIInitialLoanPDFContent(application, user, details);
+                    break;
+                case 6:
+                    htmlContent = generateGCLIOutstandingLoanBalancePDFContent(application, user, details);
+                    break;
+                case 7:
+                    htmlContent = generateHotelEmployeesPDFContent(application, user, details);
+                    break;
+                case 8:
+                    htmlContent = generateSmallGroupsPDFContent(application, user, details);
+                    break;
+                case 9:
+                    htmlContent = generateBarangayPDFContent(application, user, details);
+                    break;
+                default:
+                    htmlContent = generateGCLIPDFContent(application, user, details);
+                    break;
+            }
+        } else {
+            htmlContent = generateGCLIPDFContent(application, user, details);
+        }
 
         // 6. Return HTML response
         res.setHeader('Content-Type', 'text/html');
