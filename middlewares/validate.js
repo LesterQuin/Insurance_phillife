@@ -664,21 +664,48 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             if (!planId) return true; 
 
+            // GYRT (Plan ID 2) Specific Validations
+            if (planId === 2) {
+                // Mutual Exclusivity for Accidental Death/Disability Riders (Select 1 out of 4)
+                const accidentRiderIds = [2, 3, 4, 5];
+                const selectedAccidentRiders = riders.filter(r => accidentRiderIds.includes(Number(r.rider_id)));
+                if (selectedAccidentRiders.length > 1) {
+                    throw new Error('Select only 1 out of the 4 Group Accidental Death Benefit/Disability Riders.');
+                }
+            }
+
             const validRiders = await Financial.getRidersByProductId(planId);
             
             for (const rider of riders) {
                 const riderId = Number(rider.rider_id);
-                const amount = Number(rider.amount);
+                const amount = rider.amount !== undefined && rider.amount !== null ? Number(rider.amount) : 0;
+                const unit = rider.unit !== undefined && rider.unit !== null ? Number(rider.unit) : 0;
                 const riderDef = validRiders.find(r => r.rider_id === riderId);
                 
                 if (riderDef) {
-                    const name = riderDef.rider_name.trim();
-                    if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
-                        throw new Error(`${name} amount must be least 500 minimum.`);
-                    } else if (name === 'Group Hospital Income Rider' && (amount < 100 || amount > 300)) {
-                        throw new Error(`${name} amount must be between 100 and 300.`);
-                    } else if (name === 'Burial (Memorial/Service)' && amount !== 50000) {
-                        throw new Error(`${name} amount must be fixed at 50,000.`);
+                    // GYRT (Plan 2) Specific Validations based on IDs
+                    if (planId === 2) {
+                        if (riderId === 8) { // Group Hospital Income Rider
+                            if (amount < 100 || amount > 300) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+                        } else if (riderId === 9) { // Group Accidental Medical Expense Reimbursement Rider
+                            if (amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+                        } else if (riderId === 11) { // Burial (Memorial/Service)
+                            if (amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
+                        } else if (riderId === 13) { // Group Dengue Rider
+                            if (![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
+                        } else if ([6, 7, 10, 12].includes(riderId)) { // Valid Amount Required for these riders
+                            if (amount <= 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
+                        }
+                    } else {
+                        // General Validation for other plans (fallback to name checks if ID not specific)
+                        const name = riderDef.rider_name.trim();
+                        if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
+                            throw new Error(`${name} amount must be least 500 minimum.`);
+                        } else if (name === 'Group Hospital Income Rider' && (amount < 100 || amount > 300)) {
+                            throw new Error(`${name} amount must be between 100 and 300.`);
+                        } else if (name === 'Burial (Memorial/Service)' && amount !== 50000) {
+                            throw new Error(`${name} amount must be fixed at 50,000.`);
+                        }
                     }
                 }
             }
@@ -1146,21 +1173,41 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 
         if (!planId) throw new Error('plan_id is required to validate rider_ids');
 
+        // GYRT (Plan ID 2) Specific Validations
+        if (planId === 2) {
+            // Mutual Exclusivity for Accidental Death/Disability Riders (Select 1 out of 4)
+            const accidentRiderIds = [2, 3, 4, 5];
+            const selectedAccidentRiders = riders.filter(r => accidentRiderIds.includes(Number(r.rider_id)));
+            if (selectedAccidentRiders.length > 1) {
+                throw new Error('Select only 1 out of the 4 Group Accidental Death Benefit/Disability Riders.');
+            }
+        }
+
         const validRiders = await Financial.getRidersByProductId(planId);
 
         // Since this is a custom validator on the array, we check each item.
         for (const rider of riders) {
-            if (rider.rider_id === undefined || isNaN(parseInt(rider.rider_id, 10)) || parseInt(rider.rider_id, 10) < 0) {
+            const riderId = parseInt(rider.rider_id, 10);
+            if (rider.rider_id === undefined || isNaN(riderId) || riderId < 0) {
                 throw new Error('Each rider in the array must have a valid non-negative integer rider_id.');
             }
 
-            if (rider.amount !== undefined) {
-                if (isNaN(parseFloat(rider.amount)) || parseFloat(rider.amount) < 0) {
-                    throw new Error(`Rider amount for rider_id ${rider.rider_id} must be a non-negative number.`);
-                }
-                const amount = parseFloat(rider.amount);
-                const riderDef = validRiders.find(r => r.rider_id === parseInt(rider.rider_id, 10));
-                if (riderDef) {
+            const amount = rider.amount !== undefined && rider.amount !== null ? parseFloat(rider.amount) : 0;
+            const unit = rider.unit !== undefined && rider.unit !== null ? parseInt(rider.unit, 10) : 0;
+
+            if (rider.amount !== undefined && (isNaN(amount) || amount < 0)) {
+                throw new Error(`Rider amount for rider_id ${riderId} must be a non-negative number.`);
+            }
+            
+            const riderDef = validRiders.find(r => r.rider_id === riderId);
+            if (riderDef) {
+                if (planId === 2) {
+                    if (riderId === 8 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+                    if (riderId === 9 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+                    if (riderId === 11 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
+                    if (riderId === 13 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
+                    if ([6, 7, 10, 12].includes(riderId) && amount <= 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
+                } else {
                     const name = riderDef.rider_name.trim();
                     if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
                         throw new Error(`${name} amount must be least 500 minimum.`);
