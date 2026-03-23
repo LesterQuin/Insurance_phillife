@@ -71,10 +71,89 @@ const formatDbRatesForTemplate = (dbRows, category) => {
     }, {});
 };
 
+// Helper to build structured response for a single application
+const buildApplicationResponse = async (app) => {
+    const subGroupTypes = await Model.getApplicationSubGroups(app.application_id);
+    const paymentTermsRaw = await Model.getApplicationPaymentTerms(app.application_id);
+    const paymentTerms = paymentTermsRaw.map(p => ({
+        payment_term: { id: p.payment_term_id, name: p.payment_term_name },
+        sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+    }));
+    const riders = await Model.getApplicationRiders(app.application_id);
+    const rankings = await Model.getCoverageRankingsByAppId(app.application_id);
+
+    let levelRanking = null;
+    let salaryRanking = null;
+    if (app.coverage_type_id === 32) { // Level Ranking
+        levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, ...rest }) => rest);
+    } else if (app.coverage_type_id === 34) { // By Salary Rank
+        salaryRanking = rankings.map(({ uniform_coverage_amount, ...rest }) => rest);
+    }
+
+    let coverage_totals = [];
+    if (app.coverage_type_id !== 34) {
+        coverage_totals = rankings.map(r => ({
+            designation: r.designation,
+            total_coverage_amount: r.total_coverage_amount
+        }));
+    }
+
+    return {
+        application_id: app.application_id,
+        user_id: app.user_id,
+        group_name: app.group_name,
+        business_nature: app.business_nature,
+        number_of_lives: app.number_of_lives,
+        business_address: app.business_address,
+        contact_number: app.contact_number,
+        fax_number: app.fax_number,
+        email: app.email,
+        contact_person_salutation: app.contact_person_salutation,
+        contact_person_firstname: app.contact_person_firstname,
+        contact_person_mi: app.contact_person_mi,
+        contact_person_lastname: app.contact_person_lastname,
+        designation: app.designation,
+        proposal_addressee: app.proposal_addressee,
+        addressee_designation: app.addressee_designation,
+        minimum_age: app.minimum_age,
+        maximum_age: app.maximum_age,
+        status: { id: app.status_id, name: app.status_name },
+        group_classification: {
+            id: app.group_classification_id,
+            name: app.group_classification_name,
+            other_value: app.other_group_classification || null
+        },
+        business_type: {
+            id: app.business_type_id,
+            name: app.business_type_name,
+            other_value: app.other_business_type || null
+        },
+        group_type: {
+            id: app.group_type_id,
+            name: app.group_type_name,
+            other_value: app.other_group_type || null
+        },
+        sub_group_types: subGroupTypes,
+        payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
+        payment: paymentTerms,
+        type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
+        prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
+        plan: { id: app.plan_id, name: app.plan_name },
+        basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+        riders: riders,
+        level_ranking: levelRanking,
+        salary_ranking: salaryRanking,
+        uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
+        coverage_totals: coverage_totals,
+        created_at: app.created_at,
+        updated_at: app.updated_at
+    };
+};
+
 // Create Application
 export const createApplication = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
         // If it's a Prototype, nullify product-specific fields.
@@ -89,6 +168,8 @@ export const createApplication = async (req, res) => {
             dataToSave.level_ranking = null;
             dataToSave.uniform_coverage_amount = null;
             dataToSave.salary_ranking = null;
+        } else { // It's a Customize or other type
+            dataToSave.prototype_id = null;
         }
         
         const cleanedData = await cleanupOtherFields(dataToSave);
@@ -98,9 +179,13 @@ export const createApplication = async (req, res) => {
             return error(res, 'Failed to create the application.', 500);
         }
 
-        const fullApplication = await Model.getApplicationById(newRecord.application_id);
+        // Fetch the raw application data
+        const app = await Model.getApplicationById(newRecord.application_id);
+        
+        // Format it to match the standard response structure
+        const response = await buildApplicationResponse(app);
 
-        return success(res, fullApplication, 'Application submitted successfully', 201);
+        return success(res, response, 'Application submitted successfully', 201);
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);
@@ -139,7 +224,7 @@ export const getTemplateById = async (req, res) => {
         const application = {
             ...appData,
             status: { name: appData.status_name || 'Pending' },
-            basic_plan: { name: appData.basic_plan_name || 'N/A' },
+            basic_plan: { name: appData.basic_plan_name || appData.prototype_plan_name || 'N/A' },
             payment_mode: { name: appData.payment_mode_name || 'N/A' },
             // Ensure fields used in the template are explicit
             group_name: appData.group_name,
@@ -217,97 +302,95 @@ export const getPrototypePlanView = async (req, res) => {
     }
 };
 
-// // Get List of Prototype Plan Definitions (Dropdown List)
-// export const getPrototypePlans = async (req, res) => {
-//     try {
-//         const list = await Model.getPrototypePlans();
-//         return success(res, list, 'Prototype plans fetched successfully.');
-//     } catch (err) {
-//         return error(res, err.message);
-//     }
-// };
+// Get List of Prototype Plan Definitions (Dropdown List)
+export const getPrototypePlans = async (req, res) => {
+    try {
+        const list = await Model.getPrototypePlans();
+        return success(res, list, 'Prototype plans fetched successfully.');
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
 
-// // Get List of Prototypes
-// export const getPrototypes = async (req, res) => {
-//     try {
-//         const rawApplications = await Model.getAllApplications();
+// Get List of Prototypes
+export const getPrototypes = async (req, res) => {
+    try {
+        const prototypes = await Model.getPrototypes();
+
+        if (prototypes.length === 0) {
+            return success(res, [], 'No prototypes found.');
+        }
+
+        // --- Bulk fetch related data ---
+        const appIds = prototypes.map(app => app.application_id);
+
+        const allRiders = await Model.getBulkApplicationRiders(appIds);
+        const ridersByAppId = allRiders.reduce((acc, rider) => {
+            (acc[rider.application_id] = acc[rider.application_id] || []).push(rider);
+            return acc;
+        }, {});
         
-//         // Filter for Prototypes (ID 30)
-//         const prototypes = rawApplications.filter(app => Number(app.type_of_proposal_id) === 30);
+        const allSubGroups = await Model.getBulkApplicationSubGroups(appIds);
+        const subGroupsByAppId = allSubGroups.reduce((acc, sg) => {
+            (acc[sg.application_id] = acc[sg.application_id] || []).push({ id: sg.id, name: sg.name });
+            return acc;
+        }, {});
 
-//         if (prototypes.length === 0) {
-//             return success(res, [], 'No prototypes found.');
-//         }
+        const allPayments = await Model.getBulkApplicationPaymentTerms(appIds);
+        const paymentsByAppId = allPayments.reduce((acc, p) => {
+            (acc[p.application_id] = acc[p.application_id] || []).push({
+                payment_term: { id: p.payment_term_id, name: p.payment_term_name },
+                sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+            });
+            return acc;
+        }, {});
 
-//         // --- Bulk fetch related data ---
-//         const appIds = prototypes.map(app => app.application_id);
+        // --- Map the bulk-fetched data back to each application ---
+        const formattedPrototypes = prototypes.map(app => {
 
-//         const allRiders = await Model.getBulkApplicationRiders(appIds);
-//         const ridersByAppId = allRiders.reduce((acc, rider) => {
-//             (acc[rider.application_id] = acc[rider.application_id] || []).push(rider);
-//             return acc;
-//         }, {});
-        
-//         const allSubGroups = await Model.getBulkApplicationSubGroups(appIds);
-//         const subGroupsByAppId = allSubGroups.reduce((acc, sg) => {
-//             (acc[sg.application_id] = acc[sg.application_id] || []).push({ id: sg.id, name: sg.name });
-//             return acc;
-//         }, {});
+            return {
+                application_id: app.application_id,
+                user_id: app.user_id,
+                group_name: app.group_name,
+                number_of_lives: app.number_of_lives,
+                contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+                status: { id: app.status_id, name: app.status_name },
+                group_classification: { 
+                    id: app.group_classification_id, 
+                    name: app.group_classification_name,
+                    other_value: app.other_group_classification
+                },
+                business_type: {
+                    id: app.business_type_id,
+                    name: app.business_type_name,
+                    other_value: app.other_business_type
+                },
+                group_type: { 
+                    id: app.group_type_id, 
+                    name: app.group_type_name,
+                    other_value: app.other_group_type
+                },
+                sub_group_types: subGroupsByAppId[app.application_id] || [],
+                payment: paymentsByAppId[app.application_id] || [],
+                type_of_proposal: {
+                    id: app.type_of_proposal_id,
+                    name: app.type_of_proposal_name
+                },
+                prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
+                plan: { id: app.plan_id, name: app.plan_name },
+                basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+                riders: ridersByAppId[app.application_id] || [],
+                created_at: app.created_at,
+                updated_at: app.updated_at,
+            };
+        });
 
-//         const allPayments = await Model.getBulkApplicationPaymentTerms(appIds);
-//         const paymentsByAppId = allPayments.reduce((acc, p) => {
-//             (acc[p.application_id] = acc[p.application_id] || []).push({
-//                 payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-//                 sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
-//             });
-//             return acc;
-//         }, {});
-
-//         // --- Map the bulk-fetched data back to each application ---
-//         const formattedPrototypes = prototypes.map(app => {
-
-//             return {
-//                 application_id: app.application_id,
-//                 user_id: app.user_id,
-//                 group_name: app.group_name,
-//                 number_of_lives: app.number_of_lives,
-//                 contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
-//                 status: { id: app.status_id, name: app.status_name },
-//                 group_classification: { 
-//                     id: app.group_classification_id, 
-//                     name: app.group_classification_name,
-//                     other_value: app.other_group_classification
-//                 },
-//                 business_type: {
-//                     id: app.business_type_id,
-//                     name: app.business_type_name,
-//                     other_value: app.other_business_type
-//                 },
-//                 group_type: { 
-//                     id: app.group_type_id, 
-//                     name: app.group_type_name,
-//                     other_value: app.other_group_type
-//                 },
-//                 sub_group_types: subGroupsByAppId[app.application_id] || [],
-//                 payment: paymentsByAppId[app.application_id] || [],
-//                 type_of_proposal: {
-//                     id: app.type_of_proposal_id,
-//                     name: app.type_of_proposal_name
-//                 },
-//                 plan: { id: app.plan_id, name: app.plan_name },
-//                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
-//                 riders: ridersByAppId[app.application_id] || [],
-//                 created_at: app.created_at,
-//                 updated_at: app.updated_at,
-//             };
-//         });
-
-//         return success(res, formattedPrototypes, 'Prototypes fetched successfully.');
-//     } catch (err) {
-//         console.error('Service Error:', err);
-//         return error(res, err.message);
-//     }
-// };
+        return success(res, formattedPrototypes, 'Prototypes fetched successfully.');
+    } catch (err) {
+        console.error('Service Error:', err);
+        return error(res, err.message);
+    }
+};
 
 // Get All Applications
 export const getAllApplications = async (req, res) => {
@@ -372,6 +455,7 @@ export const getAllApplications = async (req, res) => {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
                 },
+                prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
                 plan: { id: app.plan_id, name: app.plan_name },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 riders: ridersByAppId[app.application_id] || [],
@@ -390,7 +474,7 @@ export const getAllApplications = async (req, res) => {
 // Save/Update Rates for Application
 export const saveRates = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
         const { application_id, ...ratesData } = req.body;
 
         // 1. Authorization Check (Similar to updateApplication)
@@ -436,66 +520,7 @@ export const getApplicationById = async (req, res) => {
         const app = await Model.getApplicationById(req.params.id);
         if (!app) return error(res, 'Application not found', 404);
 
-        // --- Build structured response ---
-        const subGroupTypes = await Model.getApplicationSubGroups(req.params.id);
-
-        const paymentTermsRaw = await Model.getApplicationPaymentTerms(req.params.id);
-        const paymentTerms = paymentTermsRaw.map(p => ({
-            payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-            sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
-        }));
-
-        // Fetch riders from the new table
-        const riders = await Model.getApplicationRiders(req.params.id);
-
-        // Fetch coverage rankings
-        const rankings = await Model.getCoverageRankingsByAppId(req.params.id);
-
-        let levelRanking = null;
-        let salaryRanking = null;
-        if (app.coverage_type_id === 32) { // Level Ranking
-            levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, ...rest }) => rest);
-        } else if (app.coverage_type_id === 34) { // By Salary Rank
-            // Return the raw ranking entries without aggregation
-            salaryRanking = rankings.map(({ uniform_coverage_amount, ...rest }) => rest);
-        }
-
-        let coverage_totals = [];
-        // Only populate coverage_totals if it's not "By Salary Rank" to avoid redundancy
-        if (app.coverage_type_id !== 34) {
-            coverage_totals = rankings.map(r => ({
-                designation: r.designation,
-                total_coverage_amount: r.total_coverage_amount
-            }));
-        }
-
-        const response = {
-            application_id: app.application_id, user_id: app.user_id, group_name: app.group_name,
-            business_nature: app.business_nature, number_of_lives: app.number_of_lives, business_address: app.business_address,
-            contact_number: app.contact_number, fax_number: app.fax_number, email: app.email,
-            contact_person_salutation: app.contact_person_salutation,
-            contact_person_firstname: app.contact_person_firstname,
-            contact_person_mi: app.contact_person_mi,
-            contact_person_lastname: app.contact_person_lastname,
-            designation: app.designation, proposal_addressee: app.proposal_addressee,
-            addressee_designation: app.addressee_designation, minimum_age: app.minimum_age, maximum_age: app.maximum_age,
-            status: { id: app.status_id, name: app.status_name },
-            group_classification: { id: app.group_classification_id, name: app.group_classification_name, other_value: app.other_group_classification || null },
-            business_type: { id: app.business_type_id, name: app.business_type_name, other_value: app.other_business_type || null },
-            group_type: { id: app.group_type_id, name: app.group_type_name, other_value: app.other_group_type || null },
-            sub_group_types: subGroupTypes,
-            payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
-            payment: paymentTerms,
-            type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
-            plan: { id: app.plan_id, name: app.plan_name },
-            basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
-            riders: riders,
-            level_ranking: levelRanking,
-            salary_ranking: salaryRanking,
-            uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
-            coverage_totals: coverage_totals,
-            created_at: app.created_at, updated_at: app.updated_at
-        };
+        const response = await buildApplicationResponse(app);
 
         return success(res, response);
     } catch (err) {
@@ -507,7 +532,7 @@ export const getApplicationById = async (req, res) => {
 // Update Application
 export const updateApplication = async (req, res) => {
     try {
-        const userId = req.user.userId;
+        const userId = req.user.user_id;
         
         console.log('=== UPDATE DEBUG ===');
         console.log('Logged in userId:', userId, 'Type:', typeof userId);

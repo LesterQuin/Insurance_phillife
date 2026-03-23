@@ -6,7 +6,6 @@ export const createApplication = async (data, userId) => {
     try {
         await transaction.begin();
 
-        // Extract payment info if present (taking the first one since logic implies 1:1 relation on main table)
         const paymentTerm = (data.payment && Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;
 
 
@@ -39,6 +38,7 @@ export const createApplication = async (data, userId) => {
             .input('plan_id', sql.Int, data.plan_id || null)
             .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
             .input('type_of_proposal_id', sql.Int, data.type_of_proposal_id)
+            .input('prototype_id', sql.Int, data.prototype_id || null)
             .input('status_id', sql.Int, data.status_id || 1)
             .input('amount_loans_id', sql.Int, data.amount_loans_id || null)
             .input('loans_amount', sql.Decimal(18, 2), data.loans_amount || null)
@@ -53,14 +53,14 @@ export const createApplication = async (data, userId) => {
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
-                    minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, status_id,
+                    minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id,
                     borrower_age_65_67, borrower_age_68_70, borrower_age_71_74
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
-                    @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @status_id,
+                    @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id,
                     @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74
                 );
@@ -120,9 +120,11 @@ export const createApplication = async (data, userId) => {
             const rankRequest = new sql.Request(transaction);
             await rankRequest
                 .input('application_id', sql.Int, applicationId)
+                .input('designation', sql.NVarChar, 'All Rank')
+                .input('amount', sql.Decimal(18, 2), uniformAmount)
                 .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                 .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
-                .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @uniform_coverage_amount, @total_coverage_amount);`);
+                .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
         }
 
         if (data.riders && Array.isArray(data.riders) && data.riders.length > 0) {
@@ -145,7 +147,7 @@ export const createApplication = async (data, userId) => {
         return { application_id: applicationId };
     } catch (err) {
         await transaction.rollback();
-        throw err; // Re-throw the error to be caught by the controller
+        throw err; 
     }
 };
 
@@ -160,7 +162,7 @@ export const getAllApplications = async () => {
                 fia.contact_person_salutation, fia.contact_person_firstname, fia.contact_person_mi, fia.contact_person_lastname,
                 fia.status_id, fia.group_classification_id, fia.other_group_classification,
                 fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
-                fia.plan_id, fia.basic_plan_id,
+                fia.plan_id, fia.basic_plan_id, fia.prototype_id,
                 fia.type_of_proposal_id,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
@@ -169,7 +171,8 @@ export const getAllApplications = async () => {
                 gt.name AS group_type_name,
                 topl.name AS type_of_proposal_name,
                 p.product_name AS plan_name,
-                bp.basic_plan_name
+                bp.basic_plan_name,
+                pp.name as prototype_plan_name
             FROM sg.financial_insurance_application fia
             LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
@@ -178,6 +181,44 @@ export const getAllApplications = async () => {
             LEFT JOIN sg.financial_insurance_group_lookups topl ON fia.type_of_proposal_id = topl.id
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            ORDER BY fia.created_at DESC
+        `);
+
+    return res.recordset ?? [];
+};
+
+// Get prototypes (type 30)
+export const getPrototypes = async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT
+                fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives,
+                fia.contact_person_salutation, fia.contact_person_firstname, fia.contact_person_mi, fia.contact_person_lastname,
+                fia.status_id, fia.group_classification_id, fia.other_group_classification,
+                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
+                fia.plan_id, fia.basic_plan_id, fia.prototype_id,
+                fia.type_of_proposal_id,
+                fia.created_at, fia.updated_at,
+                fis.status_name,
+                gc.name AS group_classification_name,
+                bt.name AS business_type_name,
+                gt.name AS group_type_name,
+                topl.name AS type_of_proposal_name,
+                p.product_name AS plan_name,
+                bp.basic_plan_name,
+                pp.name as prototype_plan_name
+            FROM sg.financial_insurance_application fia
+            LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
+            LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
+            LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
+            LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
+            LEFT JOIN sg.financial_insurance_group_lookups topl ON fia.type_of_proposal_id = topl.id
+            LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            WHERE fia.type_of_proposal_id = 30
             ORDER BY fia.created_at DESC
         `);
 
@@ -194,42 +235,33 @@ export const getApplicationById = async (id) => {
             SELECT 
                 fia.*,
                 fis.status_name,
-
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
                 pm.name AS payment_mode_name,
                 topl.name AS type_of_proposal_name,
-
                 p.product_name AS plan_name,
-                bp.basic_plan_name
-
+                bp.basic_plan_name,
+                pp.name as prototype_plan_name
             FROM DHUB.sg.financial_insurance_application fia
-
             LEFT JOIN DHUB.sg.financial_insurance_status fis
                 ON fia.status_id = fis.status_id
-
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
-
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
-
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
-
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
-
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-
             LEFT JOIN DHUB.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-
             LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-
+            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+                ON fia.prototype_id = pp.id
             WHERE fia.application_id = @id
         `);
 
@@ -305,9 +337,11 @@ export const updateApplication = async (id, data) => {
                 const rankRequest = new sql.Request(transaction);
                 await rankRequest
                     .input('application_id', sql.Int, id)
+                    .input('designation', sql.NVarChar, 'All Rank')
+                    .input('amount', sql.Decimal(18, 2), uniformAmount)
                     .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                     .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
-                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @uniform_coverage_amount, @total_coverage_amount);`);
+                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
             }
         }
 
@@ -369,6 +403,7 @@ export const updateApplication = async (id, data) => {
         addClause('maximum_age', data.maximum_age, sql.Int);
         addClause('payment_mode_id', data.payment_mode_id, sql.Int);
         addClause('type_of_proposal_id', data.type_of_proposal_id, sql.Int);
+        addClause('prototype_id', data.prototype_id, sql.Int);
         addClause('plan_id', data.plan_id, sql.Int);
         addClause('basic_plan_id', data.basic_plan_id, sql.Int);
         addClause('status_id', data.status_id, sql.Int);
@@ -511,7 +546,6 @@ export const getLookupNamesByIds = async (ids) => {
     return namesMap;
 };
 
-// Get riders by a list of IDs
 // Get lookups by a list of IDs
 export const getLookupsByIds = async (ids) => {
     if (!ids || ids.length === 0) return new Map();
