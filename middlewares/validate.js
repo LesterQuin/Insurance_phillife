@@ -889,12 +889,23 @@ body('basic_plan_id')
 // Rates validation
 // -----------------------------
 export const validateRates = [
+    // Merge URL param :id into body for validation
+    (req, res, next) => {
+        if (req.params.id) req.body.application_id = parseInt(req.params.id, 10);
+        next();
+    },
     body('application_id')
         .notEmpty().withMessage('Application ID is required')
         .isInt({ min: 1 }).withMessage('Application ID must be a valid integer'),
     // Check the root body for the rate keys
     body()
-        .custom((value, { req }) => {
+        .custom(async (value, { req }) => {
+            const applicationId = req.body.application_id;
+            if (!applicationId) return true; // Let the other validator handle missing ID
+
+            const app = await Financial.getApplicationById(applicationId);
+            if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
+
             const keys = ['18-64', '65-67', '68-70', '71-74'];
             let hasData = false;
             
@@ -905,6 +916,17 @@ export const validateRates = [
                         throw new Error(`Data for ${key} must be an array.`);
                     }
                     
+                    // Validate against application boolean flags
+                    if (key === '65-67' && !app.borrower_age_65_67) {
+                        throw new Error(`Rates for '65-67' cannot be added because the age bracket is not selected for this application.`);
+                    }
+                    if (key === '68-70' && !app.borrower_age_68_70) {
+                        throw new Error(`Rates for '68-70' cannot be added because the age bracket is not selected for this application.`);
+                    }
+                    if (key === '71-74' && !app.borrower_age_71_74) {
+                        throw new Error(`Rates for '71-74' cannot be added because the age bracket is not selected for this application.`);
+                    }
+
                     req.body[key].forEach((item, index) => {
                         const termKey = key === '71-74' ? 'term_or_age' : 'term_or_months';
                         if (!item[termKey]) {

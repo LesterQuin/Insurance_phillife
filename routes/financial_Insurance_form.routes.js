@@ -9,8 +9,9 @@ const router = express.Router();
 router.post('/create', authenticate, validateFinancialApplication, Controller.createApplication);
 router.put('/:id', authenticate, validateUpdateFinancialApplication, Controller.updateApplication);
 
-// New API to input rates on the borrower
-router.post('/rates', authenticate, validateRates, Controller.saveRates);
+// API to input or update rates on the borrower(boolean)
+router.post('/rates/:id', authenticate, validateRates, Controller.saveRates);
+router.put('/rates/:id', authenticate, validateRates, Controller.saveRates);
 
 // Routes without validation
 router.get('/list', Controller.getAllApplications);
