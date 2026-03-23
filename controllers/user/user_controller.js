@@ -28,21 +28,38 @@ const graphClient = Client.initWithMiddleware({
 
 export const transporter = {
     sendMail: async (mailOptions) => {
-        const sendMail = {
-            message: {
-                subject: mailOptions.subject,
-                body: {
-                    contentType: "HTML",
-                    content: mailOptions.html,
-                },
-                toRecipients: [
-                    {
-                        emailAddress: {
-                            address: mailOptions.to,
-                        },
-                    },
-                ],
+        const message = {
+            subject: mailOptions.subject,
+            body: {
+                contentType: "HTML",
+                content: mailOptions.html,
             },
+            toRecipients: [
+                {
+                    emailAddress: {
+                        address: mailOptions.to,
+                    },
+                },
+            ],
+        };
+
+        if (mailOptions.from) {
+            const fromMatch = mailOptions.from.match(/(.*)<(.*)>/);
+            if (fromMatch && fromMatch[2]) {
+                const name = fromMatch[1] ? fromMatch[1].replace(/"/g, '').trim() : undefined;
+                const address = fromMatch[2].trim();
+
+                message.from = {
+                    emailAddress: {
+                        name: name,
+                        address: address
+                    }
+                };
+            }
+        }
+
+        const sendMail = {
+            message: message,
             saveToSentItems: "false",
         };
 
@@ -524,3 +541,28 @@ export const activateAccount = async (req, res) => {
         res.status(500).json({ status: false, message: 'Server error', error: err.message });
     }
 };
+
+export const getUserById = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const user = await User.getUserById(userId);
+
+        if (!user) {
+            return res.status(404).json({ status: false, message: 'User not found.' });
+        }
+
+        // Exclude sensitive information from the response
+        const { password_hash, otp, otp_expires_at, temp_password, ...userForResponse } = user;
+
+        res.status(200).json({
+            status: true,
+            user: userForResponse
+        });
+
+    } catch (err) {
+        console.error('GET USER BY ID ERROR:', err);
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
+    }
+};
+    

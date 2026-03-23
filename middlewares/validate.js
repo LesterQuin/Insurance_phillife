@@ -588,12 +588,43 @@ export const validateFinancialApplication = [
             return true;
         }),
 
-    // -----------------------------
-    // Product/Plan
-    // -----------------------------
+    // ------------------------------------------
+    // Prototype / Product Plan (Conditional)
+    // ------------------------------------------
+    body('prototype_id')
+        .if(body('type_of_proposal_id').equals('30')) // If it's a Prototype
+        .notEmpty().withMessage('Prototype Plan selection is required for a Prototype proposal.')
+        .isInt({ min: 1 }).withMessage('prototype_id must be a valid ID.')
+        .custom(async (value) => {
+            const prototypes = await Financial.getPrototypePlans();
+            if (!prototypes.some(p => p.id === Number(value))) {
+                const validOptions = prototypes.map(p => `${p.id} - ${p.name}`).join(', ');
+                throw new Error(`Invalid prototype_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+
+    body('plan_id')
+        .if(body('type_of_proposal_id').equals('30')) // If it's a Prototype
+        .custom((value) => {
+            if (value != null) {
+                throw new Error('plan_id must not be provided for Prototype proposals.');
+            }
+            return true;
+        }),
+
+    body('prototype_id')
+        .if(body('type_of_proposal_id').equals('31')) // If it's Customize
+        .custom((value) => {
+            if (value != null) {
+                throw new Error('prototype_id must not be provided for Customize proposals.');
+            }
+            return true;
+        }),
+
     body('plan_id')
         .if(body('type_of_proposal_id').equals('31'))
-        .notEmpty().withMessage('Plan is required')
+        .notEmpty().withMessage('Plan is required for a Customize proposal.')
         .isInt({ min: 0 }).withMessage('plan_id must be a non-negative integer')
         .custom(async (value) => {
             const plans = await Financial.getAllPlans();
@@ -605,7 +636,7 @@ export const validateFinancialApplication = [
         }),
 body('basic_plan_id')
         .if(body('type_of_proposal_id').equals('31'))
-        .notEmpty().withMessage('Basic Plan is required')
+        .notEmpty().withMessage('Basic Plan is required for a Customize proposal.')
         .isInt({ min: 0 }).withMessage('basic_plan_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             // Check if basic_plan_id is an array - only one allowed
