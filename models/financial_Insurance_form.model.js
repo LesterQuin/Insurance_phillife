@@ -346,14 +346,25 @@ export const updateApplication = async (id, data) => {
             }
         }
 
-        // Handle coverage ranking update
-        if (data.level_ranking !== undefined || data.salary_ranking !== undefined || data.coverage_type_id !== undefined || data.uniform_coverage_amount !== undefined) {
+        // --- Handle Coverage, Ranking, and Rider Updates ---
+        const isRankingStructureUpdate = (data.level_ranking !== undefined || data.salary_ranking !== undefined || data.coverage_type_id !== undefined || data.uniform_coverage_amount !== undefined);
+        const areRidersUpdated = data.riders !== undefined;
+
+        if (isRankingStructureUpdate) {
             const deleteRankingsRequest = new sql.Request(transaction);
             await deleteRankingsRequest
                 .input('application_id', sql.Int, id)
                 .query('DELETE FROM DHUB.sg.financial_insurance_coverage_ranking WHERE application_id = @application_id');
 
-            const coverageTypeId = data.coverage_type_id;
+            let coverageTypeId = data.coverage_type_id;
+            
+            if (coverageTypeId === undefined) {
+                const currentApp = await new sql.Request(transaction)
+                    .input('id', sql.Int, id)
+                    .query('SELECT coverage_type_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @id');
+                coverageTypeId = currentApp.recordset[0]?.coverage_type_id;
+            }
+
             const levelRanking = data.level_ranking;
             const salaryRanking = data.salary_ranking;
             const uniformAmount = data.uniform_coverage_amount;
@@ -368,7 +379,8 @@ export const updateApplication = async (id, data) => {
                         .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount)
                         .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                     const rankingId = rankResult.recordset[0].id;
-                    await insertRankingRiders(rankingId, rank.designation, data.riders);
+                    // Use new riders if provided, otherwise this will use undefined which is handled by insertRankingRiders
+                    await insertRankingRiders(rankingId, rank.designation, data.riders); 
                 }
             } else if (coverageTypeId === 34 && salaryRanking && salaryRanking.length > 0) { 
                 for (const rank of salaryRanking) {
@@ -386,7 +398,7 @@ export const updateApplication = async (id, data) => {
                     const rankingId = rankResult.recordset[0].id;
                     await insertRankingRiders(rankingId, rank.designation, data.riders);
                 }
-            } else if (coverageTypeId === 33 && uniformAmount != null) { // Uniform Coverage
+            } else if (coverageTypeId === 33 && uniformAmount != null) {
                 const rankRequest = new sql.Request(transaction);
                 await rankRequest
                     .input('application_id', sql.Int, id)
@@ -396,10 +408,35 @@ export const updateApplication = async (id, data) => {
                     .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                     .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
             }
+        } else if (areRidersUpdated) {
+            // This block handles the case where ONLY riders are updated, but the ranking structure is not.
+            // We need to update the nested riders for the existing ranks.
+            let currentCoverageTypeId;
+            const typeRes = await new sql.Request(transaction)
+                .input('appId', sql.Int, id)
+                .query('SELECT coverage_type_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @appId');
+            currentCoverageTypeId = typeRes.recordset[0]?.coverage_type_id;
+
+            if (currentCoverageTypeId === 32 || currentCoverageTypeId === 34) {
+                const existingRankingsRes = await new sql.Request(transaction)
+                    .input('appId', sql.Int, id)
+                    .query('SELECT ranking_id, designation FROM DHUB.sg.financial_insurance_coverage_ranking WHERE application_id = @appId');
+                
+                const existingRankings = existingRankingsRes.recordset || [];
+
+                if (existingRankings.length > 0) {
+                    // Delete existing ranking riders and re-insert new ones based on the updated rider list
+                    await new sql.Request(transaction).input('appId', sql.Int, id).query(`DELETE crr FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr JOIN DHUB.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id WHERE cr.application_id = @appId`);
+
+                    for (const rank of existingRankings) {
+                        await insertRankingRiders(rank.ranking_id, rank.designation, data.riders);
+                    }
+                }
+            }
         }
 
-        // Handle riders update first (delete and re-insert)
-        if (data.riders !== undefined) {
+        // Always update the main rider table if riders are provided
+        if (areRidersUpdated) {
             const deleteRidersRequest = new sql.Request(transaction);
             await deleteRidersRequest
                 .input('application_id', sql.Int, id)
