@@ -7,8 +7,6 @@ import * as Financial from '../models/financial_Insurance_form.model.js'
 // -----------------------------
 // User validation
 // -----------------------------
-
-// Validation for financial insurance application
 export const validateApplication = [
     body('group_name').notEmpty().withMessage('Group Name is required'),
     body('business_nature').notEmpty().withMessage('Business Nature is required'),
@@ -91,7 +89,6 @@ export const validateRegister = [
         }
         return true;
     }),
-    // Custom middleware to check for duplicate agent_code
     async (req, res, next) => {
         try {
             const { agent_code } = req.body;
@@ -290,9 +287,6 @@ export const validateAdminUpdateUser = [
 // Form validation
 // -----------------------------
 export const validateFinancialApplication = [
-    // -----------------------------
-    // KYC
-    // ----------------------------- q
     body('group_name')
         .notEmpty().withMessage('Group Name is required')
         .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
@@ -454,7 +448,7 @@ export const validateFinancialApplication = [
             const subGroupTypeId = value;
     
             if (!groupTypeId) {
-                return true; // Let group_type_id validator handle missing group_type_id
+                return true; 
             }
     
             // Fetch lookups if not already cached on the request
@@ -482,12 +476,9 @@ export const validateFinancialApplication = [
                     const validOptions = validSubgroups.map(sg => `${sg.id} (${sg.name})`).join(', ');
                     throw new Error(`sub_group_type_id is required for Group Type '${groupTypeItem.name}'. Valid options: ${validOptions}`);
                 }
-    
-                // --- Handle single vs. multiple selections ---
-                // 'Employer-Employee' (ID 11) allows multiple sub-group selections.
-                // Other types like 'OFW' (ID 16) allow only one.
+
                 if (Array.isArray(subGroupTypeId)) {
-                    if (groupTypeId !== 11) { // ID 11 is 'Employer-Employee'
+                    if (groupTypeId !== 11) { 
                         throw new Error(`Group Type '${groupTypeItem.name}' only allows a single sub-group selection.`);
                     }
                 }
@@ -501,7 +492,6 @@ export const validateFinancialApplication = [
                     throw new Error(`Invalid sub_group_type_id(s): ${invalidIds.join(', ')}. Valid options for '${groupTypeItem.name}': ${validOptions}`);
                 }
             } else if (subGroupTypeId != null) {
-                // If no subgroups exist, sub_group_type_id must be null
                 throw new Error(`sub_group_type_id must be null as Group Type '${groupTypeItem.name}' has no sub-groups.`);
             }
     
@@ -639,7 +629,6 @@ body('basic_plan_id')
         .notEmpty().withMessage('Basic Plan is required for a Customize proposal.')
         .isInt({ min: 0 }).withMessage('basic_plan_id must be a non-negative integer')
         .custom(async (value, { req }) => {
-            // Check if basic_plan_id is an array - only one allowed
             if (Array.isArray(value)) {
                 throw new Error('Only select one');
             }
@@ -662,7 +651,9 @@ body('basic_plan_id')
             if (!riders || riders.length === 0) return true;
             
             const planId = Number(req.body.plan_id);
-            if (!planId) return true; 
+            if (!planId) return true; // Let other validators handle missing plan_id
+
+            const coverageTypeId = Number(req.body.coverage_type_id);
 
             // GYRT (Plan ID 2) Specific Validations
             if (planId === 2) {
@@ -674,6 +665,45 @@ body('basic_plan_id')
                 }
             }
 
+            // --- Validation for Level/Salary Ranking Riders (Mapped by Designation) ---
+            if ((planId === 2 || planId === 3) && (coverageTypeId === 32 || coverageTypeId === 34)) {
+                let designations = [];
+                if (coverageTypeId === 32 && req.body.level_ranking) {
+                    designations = req.body.level_ranking.map(r => r.designation);
+                } else if (coverageTypeId === 34 && req.body.salary_ranking) {
+                    designations = req.body.salary_ranking.map(r => r.designation);
+                }
+
+                for (const rider of riders) {
+                    if (!rider.values || !Array.isArray(rider.values)) {
+                        throw new Error(`Rider ${rider.rider_id} must have a 'values' array for ranking-based coverage.`);
+                    }
+                    
+                    const riderDesignations = rider.values.map(v => v.designation);
+                    const missingDesignations = designations.filter(d => !riderDesignations.includes(d));
+                    if (missingDesignations.length > 0) {
+                        throw new Error(`Rider ${rider.rider_id} is missing values for designations: ${missingDesignations.join(', ')}`);
+                    }
+
+                    // Validate amounts inside the mapped values
+                    for (const val of rider.values) {
+                        if (planId === 2) { // GYRT specific checks
+                            const rId = Number(rider.rider_id);
+                            const amount = val.amount != null ? Number(val.amount) : 0;
+                            const unit = val.unit != null ? Number(val.unit) : 0;
+
+                            if (rId === 8 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300 for all ranks.');
+                            if (rId === 9 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500 for all ranks.');
+                            if (rId === 11 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000 for all ranks.');
+                            if (rId === 13 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 or 2 Units for all ranks.');
+                            if ([6, 7, 10, 12].includes(rId) && amount <= 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
+                        }
+                    }
+                }
+                return true;
+            }
+
+            // --- General Validation for Non-Ranking Riders ---
             const validRiders = await Financial.getRidersByProductId(planId);
             
             for (const rider of riders) {
@@ -717,7 +747,7 @@ body('basic_plan_id')
         .isInt({ min: 0 }).withMessage('rider_id must be a non-negative integer')
         .custom(async (value, { req }) => {
             const planId = Number(req.body.plan_id);
-            if (!planId) return true; // Let other validator catch missing plan_id
+            if (!planId) return true; 
 
             const validRiders = await Financial.getRidersByProductId(planId);
             if (!validRiders.some(v => v.rider_id === Number(value))) {
@@ -819,14 +849,14 @@ body('basic_plan_id')
             const coverageTypeId = Number(req.body.coverage_type_id);
 
             if (planId === 2 || planId === 3) {
-                if (coverageTypeId === 33) { // Uniform Coverage
+                if (coverageTypeId === 33) { 
                     if (value == null) {
                         throw new Error('Uniform Coverage Amount is required and cannot be null for this coverage type.');
                     }
                     if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
                         throw new Error('Uniform Coverage Amount must be a non-negative decimal.');
                     }
-                } else if (coverageTypeId === 32 && value != null) { // Should be null for Level Ranking
+                } else if (coverageTypeId === 32 && value != null) { 
                     throw new Error('Uniform Coverage Amount must be null when Level Ranking is selected.');
                 }
             }
@@ -842,14 +872,14 @@ body('basic_plan_id')
             const coverageTypeId = Number(req.body.coverage_type_id);
 
             if (planId === 2 || planId === 3) {
-                if (coverageTypeId === 32) { // Level Ranking
+                if (coverageTypeId === 32) { 
                     if (value == null || value.length < 2) {
                         throw new Error('Level Ranking is required for this coverage type and must have at least 2 entries.');
                     }
                     if (value.length > 10) {
                         throw new Error('Level Ranking cannot have more than 10 entries.');
                     }
-                } else if (value != null && value.length > 0) { // For any other coverage type under plan 2 or 3
+                } else if (value != null && value.length > 0) { 
                     throw new Error('Level Ranking must be null and only be provided for the "Level Ranking" coverage type.');
                 }
             }
@@ -880,7 +910,7 @@ body('basic_plan_id')
                     if (uniqueMultipliers.size !== multipliers.length) {
                         throw new Error('Salary multipliers within Salary Ranking must be unique.');
                     }
-                } else if (value != null) { // For any other coverage type under plan 2 or 3
+                } else if (value != null) { 
                     throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
                 }
             }
@@ -916,7 +946,6 @@ body('basic_plan_id')
 // Rates validation
 // -----------------------------
 export const validateRates = [
-    // Merge URL param :id into body for validation
     (req, res, next) => {
         if (req.params.id) req.body.application_id = parseInt(req.params.id, 10);
         next();
@@ -924,11 +953,10 @@ export const validateRates = [
     body('application_id')
         .notEmpty().withMessage('Application ID is required')
         .isInt({ min: 1 }).withMessage('Application ID must be a valid integer'),
-    // Check the root body for the rate keys
     body()
         .custom(async (value, { req }) => {
             const applicationId = req.body.application_id;
-            if (!applicationId) return true; // Let the other validator handle missing ID
+            if (!applicationId) return true; 
 
             const app = await Financial.getApplicationById(applicationId);
             if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
@@ -985,7 +1013,6 @@ export const validateUpdateFinancialApplication = [
     async (req, res, next) => {
         if (req.params.id) {
             try {
-                // Fetch once and cache on the request object
                 req.existingApplication = await Financial.getApplicationById(req.params.id);
                 if (!req.existingApplication) {
                     return res.status(404).json({ status: false, errors: [{ msg: `Application with ID ${req.params.id} not found.` }] });
@@ -1071,14 +1098,12 @@ export const validateUpdateFinancialApplication = [
     // Dependent field validations - sub_group_type_id can be array or string
     body('sub_group_type_id').optional().custom(async (value, { req }) => {
         const subGroupTypeId = value;
-        // Determine the groupTypeId from the request body or the existing application
         const groupTypeId = req.body.group_type_id !== undefined
             ? Number(req.body.group_type_id)
             : req.existingApplication?.group_type_id;
 
         if (!groupTypeId) {
             if (subGroupTypeId != null) {
-                // If group_type_id is being removed, sub_group_type_id should also be removed.
                 throw new Error('Cannot have sub_group_type_id without a group_type_id.');
             }
             return true;
@@ -1093,7 +1118,6 @@ export const validateUpdateFinancialApplication = [
         const groupTypeItem = lookups.find(l => l.id === groupTypeId);
 
         if (!groupTypeItem) {
-            // This should be caught by group_type_id validator, but as a safeguard:
             return true;
         }
 
@@ -1115,14 +1139,12 @@ export const validateUpdateFinancialApplication = [
             }
 
             if (subGroupTypeId != null) {
-                // --- Handle single vs. multiple selections ---
                 if (Array.isArray(subGroupTypeId)) {
-                    if (groupTypeId !== 11) { // ID 11 is 'Employer-Employee'
+                    if (groupTypeId !== 11) {
                         throw new Error(`Group Type '${groupTypeItem.name}' only allows a single sub-group selection.`);
                     }
                 }
 
-                // Validate the provided ID(s)
                 const idsToCheck = Array.isArray(subGroupTypeId) ? subGroupTypeId : [subGroupTypeId];
                 const invalidIds = idsToCheck.filter(id => !validSubgroups.some(sg => sg.id === Number(id)));
 
@@ -1132,7 +1154,6 @@ export const validateUpdateFinancialApplication = [
                 }
             }
         } else if (subGroupTypeId != null) {
-            // If no subgroups exist, sub_group_type_id must be null
             throw new Error(`sub_group_type_id must be null as Group Type '${groupTypeItem.name}' has no sub-groups.`);
         }
         return true;
@@ -1146,14 +1167,13 @@ export const validateUpdateFinancialApplication = [
         return true;
     }),
 body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id must be a non-negative integer').custom(async (value, { req }) => {
-        // Check if basic_plan_id is an array - only one allowed
         if (Array.isArray(value)) {
             throw new Error('Only select one');
         }
         
         const planId = req.body.plan_id !== undefined
             ? Number(req.body.plan_id)
-            : req.existingApplication?.plan?.id;
+            : req.existingApplication?.plan_id;
 
         if (!planId) throw new Error('plan_id is required to validate basic_plan_id');
 
@@ -1169,7 +1189,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 
         const planId = req.body.plan_id !== undefined
             ? Number(req.body.plan_id)
-            : req.existingApplication?.plan?.id;
+            : req.existingApplication?.plan_id;
 
         if (!planId) throw new Error('plan_id is required to validate rider_ids');
 
@@ -1296,7 +1316,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     body('other_group_classification').optional({ nullable: true }).isLength({ max: 255 }).withMessage('other_group_classification must not exceed 255 characters').custom(async (value, { req }) => {
         const id = req.body.group_classification_id !== undefined
             ? req.body.group_classification_id
-            : req.existingApplication?.group_classification?.id;
+            : req.existingApplication?.group_classification_id;
 
         if (!id) return true;
 
@@ -1320,7 +1340,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     body('other_business_type').optional({ nullable: true }).isLength({ max: 255 }).withMessage('other_business_type must not exceed 255 characters').custom(async (value, { req }) => {
         const id = req.body.business_type_id !== undefined
             ? req.body.business_type_id
-            : req.existingApplication?.business_type?.id;
+            : req.existingApplication?.business_type_id;
 
         if (!id) return true;
 
@@ -1344,7 +1364,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     body('other_group_type').optional({ nullable: true }).isLength({ max: 255 }).withMessage('other_group_type must not exceed 255 characters').custom(async (value, { req }) => {
         const id = req.body.group_type_id !== undefined
             ? req.body.group_type_id
-            : req.existingApplication?.group_type?.id;
+            : req.existingApplication?.group_type_id;
 
         if (!id) return true;
 

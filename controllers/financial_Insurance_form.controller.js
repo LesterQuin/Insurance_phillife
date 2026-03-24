@@ -53,7 +53,6 @@ const formatRatesForTemplate = (ratesArray, keyField) => {
     return ratesArray.reduce((acc, item) => {
         let rawKey = item[keyField];
         if (rawKey && item.rate !== undefined) {
-            // Extract integer from string (e.g., "6 months" -> 6)
             let key = rawKey;
             if (typeof rawKey === 'string') {
                 const match = rawKey.match(/\d+/);
@@ -90,12 +89,31 @@ const buildApplicationResponse = async (app) => {
     }));
     const riders = await Model.getApplicationRiders(app.application_id);
     const rankings = await Model.getCoverageRankingsByAppId(app.application_id);
+    
+    // Fetch nested ranking riders
+    const rankingRiders = await Model.getCoverageRankingRiders(app.application_id);
+
+    if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && rankingRiders.length > 0) {
+        riders.forEach(mainRider => {
+            const riderValues = rankingRiders
+                .filter(rr => rr.rider_id === mainRider.rider_id)
+                .map(rr => ({
+                    designation: rr.designation,
+                    amount: rr.rider_amount,
+                    unit: rr.rider_unit
+                }));
+            
+            if (riderValues.length > 0) {
+                mainRider.values = riderValues;
+            }
+        });
+    }
 
     let levelRanking = null;
     let salaryRanking = null;
-    if (app.coverage_type_id === 32) { // Level Ranking
+    if (app.coverage_type_id === 32) { 
         levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, ...rest }) => rest);
-    } else if (app.coverage_type_id === 34) { // By Salary Rank
+    } else if (app.coverage_type_id === 34) { 
         salaryRanking = rankings.map(({ uniform_coverage_amount, ...rest }) => rest);
     }
 
@@ -149,6 +167,14 @@ const buildApplicationResponse = async (app) => {
         prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
         plan: { id: app.plan_id, name: app.plan_name },
         basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
+        amount_loans: app.amount_loans_id ? {
+            id: app.amount_loans_id,
+            name: app.amount_loans_name
+        } : null,
+        loans_amount: app.loans_amount,
+        borrower_age_65_67: app.borrower_age_65_67,
+        borrower_age_68_70: app.borrower_age_68_70,
+        borrower_age_71_74: app.borrower_age_71_74,
         riders: riders,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
@@ -177,7 +203,7 @@ export const createApplication = async (req, res) => {
             dataToSave.level_ranking = null;
             dataToSave.uniform_coverage_amount = null;
             dataToSave.salary_ranking = null;
-        } else { // It's a Customize or other type
+        } else { 
             dataToSave.prototype_id = null;
         }
         
@@ -225,7 +251,6 @@ export const getTemplateById = async (req, res) => {
         }
 
         if (!user) {
-            // Fallback if user is missing or ID is null so the template can still generate
             user = { firstname: 'Phillife', lastname: 'Representative', departmentName: 'Head Office', locationName: 'Main Office' };
         }
 
@@ -235,7 +260,6 @@ export const getTemplateById = async (req, res) => {
             status: { name: appData.status_name || 'Pending' },
             basic_plan: { name: appData.basic_plan_name || appData.prototype_plan_name || 'N/A' },
             payment_mode: { name: appData.payment_mode_name || 'N/A' },
-            // Ensure fields used in the template are explicit
             group_name: appData.group_name,
             proposal_addressee: appData.proposal_addressee,
             addressee_designation: appData.addressee_designation,
@@ -245,8 +269,6 @@ export const getTemplateById = async (req, res) => {
         };
 
         // 4. Prepare Details (Rates, Limits, etc.)
-        // In a real app, these should probably come from a database lookup or calculation service.
-        // For now, hardcoding as per previous examples/requests.
         const details = {
             totalAnnualPremium: 0, 
             contactLocal: '123',
@@ -618,7 +640,8 @@ export const updateApplication = async (req, res) => {
         
         const cleanedData = await cleanupOtherFields(updateData);
         const updated = await Model.updateApplication(req.params.id, cleanedData);
-        return success(res, updated, 'Application updated successfully.');
+        const response = await buildApplicationResponse(updated);
+        return success(res, response, 'Application updated successfully.');
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);
