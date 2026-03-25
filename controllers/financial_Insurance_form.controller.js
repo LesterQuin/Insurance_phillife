@@ -47,6 +47,74 @@ const cleanupOtherFields = async (data) => {
     return mutableData;
 };
 
+// Helper to expand simplified rider inputs and enforce rules
+const preprocessRiders = (data) => {
+    // 1. Get Designations from rankings if available
+    let designations = [];
+    if (data.salary_ranking && Array.isArray(data.salary_ranking)) {
+        designations = data.salary_ranking.map(r => r.designation).filter(Boolean);
+    } else if (data.level_ranking && Array.isArray(data.level_ranking)) {
+        designations = data.level_ranking.map(r => r.designation).filter(Boolean);
+    }
+
+    if (!data.riders || !Array.isArray(data.riders)) return data;
+
+    data.riders = data.riders.map(rider => {
+        const riderId = Number(rider.rider_id);
+        let baseAmount = rider.amount !== undefined ? Number(rider.amount) : undefined;
+        let baseUnit = rider.unit !== undefined ? Number(rider.unit) : undefined;
+
+        // If values array has exactly one item, treat it as the base for expansion
+        if (rider.values && rider.values.length === 1) {
+            if (rider.values[0].amount !== undefined) baseAmount = Number(rider.values[0].amount);
+            if (rider.values[0].unit !== undefined) baseUnit = Number(rider.values[0].unit);
+        }
+
+        // Business Rules / Validation
+        if (riderId === 8) { // Group Hospital Income Rider
+            if (baseAmount !== undefined && (baseAmount < 100 || baseAmount > 300)) {
+                throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+            }
+        } else if (riderId === 9) { // Group Accidental Medical Expense Reimbursement Rider
+            if (baseAmount !== undefined && baseAmount < 500) {
+                throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+            }
+        } else if (riderId === 11) { // Burial (Memorial/Service)
+            baseAmount = 50000; // Fixed amount
+        } else if (riderId === 13) { // Group Dengue Rider
+             // Ensure amount corresponds to unit if not explicitly provided
+             if (baseUnit === 1) baseAmount = 30000;
+             if (baseUnit === 2) baseAmount = 60000;
+        }
+
+        // Expand to all designations if applicable
+        const isSingular = (rider.values && rider.values.length === 1) || (!rider.values && (baseAmount !== undefined || baseUnit !== undefined));
+        
+        if (designations.length > 0 && isSingular) {
+            const newValues = designations.map(d => ({
+                designation: d,
+                amount: baseAmount,
+                unit: baseUnit
+            }));
+            return { ...rider, values: newValues };
+        }
+
+        // Special case: If Rider 11 has multiple values (manual input), ensure they are all 50000
+        if (riderId === 11 && rider.values && rider.values.length > 0) {
+            rider.values = rider.values.map(v => ({ ...v, amount: 50000 }));
+        }
+
+        // Special case: If Rider 13 has multiple values, ensure amounts match units
+        if (riderId === 13 && rider.values && rider.values.length > 0) {
+            rider.values = rider.values.map(v => ({ ...v, amount: v.unit === 1 ? 30000 : (v.unit === 2 ? 60000 : v.amount) }));
+        }
+
+        return rider;
+    });
+
+    return data;
+};
+
 // Helper to format rates for template (extract numeric key from "6 months" or "71 age")
 const formatRatesForTemplate = (ratesArray, keyField) => {
     if (!Array.isArray(ratesArray)) return {};
@@ -208,7 +276,8 @@ export const createApplication = async (req, res) => {
         }
         
         const cleanedData = await cleanupOtherFields(dataToSave);
-        const newRecord = await Model.createApplication(cleanedData, userId);
+        const processedData = preprocessRiders(cleanedData);
+        const newRecord = await Model.createApplication(processedData, userId);
 
         if (!newRecord || !newRecord.application_id) {
             return error(res, 'Failed to create the application.', 500);
@@ -640,7 +709,8 @@ export const updateApplication = async (req, res) => {
         const { agent_code, ...updateData } = req.body;
         
         const cleanedData = await cleanupOtherFields(updateData);
-        const updated = await Model.updateApplication(req.params.id, cleanedData);
+        const processedData = preprocessRiders(cleanedData);
+        const updated = await Model.updateApplication(req.params.id, processedData);
         const response = await buildApplicationResponse(updated);
         return success(res, response, 'Application updated successfully.');
     } catch (err) {

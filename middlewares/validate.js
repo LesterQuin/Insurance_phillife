@@ -679,10 +679,14 @@ body('basic_plan_id')
                         throw new Error(`Rider ${rider.rider_id} must have a 'values' array for ranking-based coverage.`);
                     }
                     
-                    const riderDesignations = rider.values.map(v => v.designation);
-                    const missingDesignations = designations.filter(d => !riderDesignations.includes(d));
-                    if (missingDesignations.length > 0) {
-                        throw new Error(`Rider ${rider.rider_id} is missing values for designations: ${missingDesignations.join(', ')}`);
+                    // If exactly one value is provided, we assume it applies to all designations (broadcast).
+                    // Only check for missing designations if multiple values are provided.
+                    if (rider.values.length !== 1) {
+                        const riderDesignations = rider.values.map(v => v.designation);
+                        const missingDesignations = designations.filter(d => !riderDesignations.includes(d));
+                        if (missingDesignations.length > 0) {
+                            throw new Error(`Rider ${rider.rider_id} is missing values for designations: ${missingDesignations.join(', ')}`);
+                        }
                     }
 
                     // Validate amounts inside the mapped values
@@ -935,6 +939,21 @@ body('basic_plan_id')
     body('status_id').optional().isInt({ min: 0 }),
 
     // Validation result
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
+// System Lookup Validation
+// -----------------------------
+export const validateSystemLookup = [
+    body('category').notEmpty().withMessage('Category is required').isLength({ max: 50 }).withMessage('Category must not exceed 50 characters'),
+    body('name').notEmpty().withMessage('Name is required').isLength({ max: 100 }).withMessage('Name must not exceed 100 characters'),
+    body('code').optional().isLength({ max: 50 }).withMessage('Code must not exceed 50 characters'),
+    body('is_active').optional().isBoolean().withMessage('is_active must be a boolean'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
