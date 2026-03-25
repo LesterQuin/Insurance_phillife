@@ -16,11 +16,11 @@ router.get('/list', Controller.getAllApplications);
 router.post('/rates/:id', authenticate, validateRates, Controller.saveRates);
 router.put('/rates/:id', authenticate, validateRates, Controller.saveRates);
 
-// Routes without validation
-
+// API to get prototype plan view
 router.get('/prototype-plans/:id', Controller.getPrototypePlanView);
 //router.get('/prototype-plans/', Controller.getAllPrototypePlan);
 
+// API to get template of plans
 router.get('/template/:id', Controller.getTemplateById);
 
 export default router;
