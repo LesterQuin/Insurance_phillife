@@ -345,20 +345,21 @@ export const getPrototypePlanView = async (req, res) => {
 
         // Map IDs to static HTML files (IDs based on seed order)
         switch (id) {
-            case 1: filename = 'prototype_StudentsGroupTermLifeInsurancePlan.html'; break;
-            case 2: filename = 'prototype_StudentsGroupPersonalAccidentPlan.html'; break;
-            case 3: filename = 'prototype_GroupAssociationsPlan.html'; break;
-            case 4: filename = 'prototype_SecurityGuardsProtectionPlan.html'; break;
-            case 5: filename = 'prototype_GroupCreditLifePrototypePlan–InitialLoan.html'; break;
-            case 6: filename = 'prototype_GroupCreditLifeInsuranceOutstandingLoanBalance.html'; break;
-            case 7: filename = 'prototype_HotelEmployeesGroupTermLifeInsurancePlan.html'; break;
-            case 8: filename = 'prototype_PlanforSmallGroups.html'; break;
-            case 9: filename = 'prototype_BarangayProtectPlan.html'; break;
+            case 1: filename = 'prototype_StudentsGroupTermLifeInsurancePlan.js'; break;
+            case 2: filename = 'prototype_StudentsGroupPersonalAccidentPlan.js'; break;
+            case 3: filename = 'prototype_GroupAssociationsPlan.js'; break;
+            case 4: filename = 'prototype_SecurityGuardsProtectionPlan.js'; break;
+            case 5: filename = 'prototype_GroupCreditLifePrototypePlanInitialLoan.js'; break;
+            case 6: filename = 'prototype_GroupCreditLifeInsuranceOutstandingLoanBalance.js'; break;
+            case 7: filename = 'prototype_HotelEmployeesGroupTermLifeInsurancePlan.js'; break;
+            case 8: filename = 'prototype_PlanforSmallGroups.js'; break;
+            case 9: filename = 'prototype_BarangayProtectPlan.js'; break;
             default: return error(res, 'Prototype plan view not found.', 404);
         }
 
         const filePath = path.join(__dirname, '../templates', filename);
         if (!fs.existsSync(filePath)) {
+            console.error(`[getPrototypePlanView] File not found at: ${filePath}`);
             return error(res, 'Template file not found on server.', 404);
         }
 
