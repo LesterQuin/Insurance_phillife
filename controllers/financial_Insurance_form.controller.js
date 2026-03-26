@@ -205,10 +205,7 @@ const buildApplicationResponse = async (app) => {
         contact_number: app.contact_number,
         fax_number: app.fax_number,
         email: app.email,
-        contact_person_salutation: app.contact_person_salutation,
-        contact_person_firstname: app.contact_person_firstname,
-        contact_person_mi: app.contact_person_mi,
-        contact_person_lastname: app.contact_person_lastname,
+        contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
         designation: app.designation,
         proposal_addressee: app.proposal_addressee,
         addressee_designation: app.addressee_designation,
@@ -234,8 +231,14 @@ const buildApplicationResponse = async (app) => {
         payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
         payment: paymentTerms,
         type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
-        prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
-        plan: { id: app.plan_id, name: app.plan_name },
+        prototype_plan: { 
+            id: app.prototype_id, 
+            name: app.prototype_plan_name && app.prototype_plan_acronym ? `${app.prototype_plan_name} (${app.prototype_plan_acronym})` : app.prototype_plan_name 
+        },
+        plan: { 
+            id: app.plan_id, 
+            name: app.plan_name && app.plan_acronym ? `${app.plan_name} (${app.plan_acronym})` : app.plan_name 
+        },
         basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
         amount_loans: app.amount_loans_id ? {
             id: app.amount_loans_id,
@@ -517,8 +520,14 @@ export const getPrototypes = async (req, res) => {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
                 },
-                prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
-                plan: { id: app.plan_id, name: app.plan_name },
+                prototype_plan: { 
+                    id: app.prototype_id, 
+                    name: app.prototype_plan_name && app.prototype_plan_acronym ? `${app.prototype_plan_name} (${app.prototype_plan_acronym})` : app.prototype_plan_name 
+                },
+                plan: { 
+                    id: app.plan_id, 
+                    name: app.plan_name && app.plan_acronym ? `${app.plan_name} (${app.plan_acronym})` : app.plan_name 
+                },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 riders: ridersByAppId[app.application_id] || [],
                 created_at: app.created_at,
@@ -608,8 +617,14 @@ export const getAllApplications = async (req, res) => {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
                 },
-                prototype_plan: { id: app.prototype_id, name: app.prototype_plan_name },
-                plan: { id: app.plan_id, name: app.plan_name },
+                prototype_plan: { 
+                    id: app.prototype_id, 
+                    name: app.prototype_plan_name && app.prototype_plan_acronym ? `${app.prototype_plan_name} (${app.prototype_plan_acronym})` : app.prototype_plan_name 
+                },
+                plan: { 
+                    id: app.plan_id, 
+                    name: app.plan_name && app.plan_acronym ? `${app.plan_name} (${app.plan_acronym})` : app.plan_name 
+                },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
                 loans_amount: app.loans_amount,
