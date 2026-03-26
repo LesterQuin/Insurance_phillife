@@ -180,7 +180,6 @@ export const createApplication = async (data, userId) => {
     }
 };
 
-
 // Get all applications
 export const getAllApplications = async () => {
     const pool = await poolPromise;
@@ -229,7 +228,11 @@ export const getAllApplications = async () => {
                 p.product_name AS plan_name,
                 bp.basic_plan_name,
                 pp.name AS prototype_plan_name,
-                al.name AS amount_loans_name
+                al.name AS amount_loans_name,
+                u.firstname AS creator_firstname,
+                u.middlename AS creator_middlename,
+                u.lastname AS creator_lastname,
+                u.suffix AS creator_suffix
             FROM DHUB.sg.financial_insurance_application fia
             LEFT JOIN DHUB.sg.financial_insurance_status fis
                 ON fia.status_id = fis.status_id
@@ -251,6 +254,8 @@ export const getAllApplications = async () => {
                 ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB.sg.financial_insurance_users u
+                ON fia.user_id = u.user_id
             ORDER BY fia.created_at DESC;
         `);
 
@@ -277,8 +282,12 @@ export const getPrototypes = async () => {
                 topl.name AS type_of_proposal_name,
                 p.product_name AS plan_name,
                 bp.basic_plan_name,
-                pp.name as prototype_plan_name
-            FROM sg.financial_insurance_application fia
+                pp.name as prototype_plan_name,
+                u.firstname AS creator_firstname,
+                u.middlename AS creator_middlename,
+                u.lastname AS creator_lastname,
+                u.suffix AS creator_suffix
+            FROM DHUB.sg.financial_insurance_application fia
             LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
             LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
@@ -287,6 +296,7 @@ export const getPrototypes = async () => {
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
             WHERE fia.type_of_proposal_id = 30
             ORDER BY fia.created_at DESC
         `);
@@ -312,7 +322,11 @@ export const getApplicationById = async (id) => {
                 p.product_name AS plan_name,
                 bp.basic_plan_name,
                 pp.name as prototype_plan_name,
-                al.name as amount_loans_name
+                al.name as amount_loans_name,
+                u.firstname AS creator_firstname,
+                u.middlename AS creator_middlename,
+                u.lastname AS creator_lastname,
+                u.suffix AS creator_suffix
             FROM DHUB.sg.financial_insurance_application fia
             LEFT JOIN DHUB.sg.financial_insurance_status fis
                 ON fia.status_id = fis.status_id
@@ -334,6 +348,8 @@ export const getApplicationById = async (id) => {
                 ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB.sg.financial_insurance_users u
+                ON fia.user_id = u.user_id
             WHERE fia.application_id = @id
         `);
 

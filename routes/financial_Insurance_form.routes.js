@@ -16,6 +16,8 @@ router.put('/rates/:id', authenticate, validateRates, Controller.saveRates);
 // Routes without validation
 router.get('/list', Controller.getAllApplications);
 router.get('/prototype-plans/:id/view', Controller.getPrototypePlanView);
+router.get('/prototype-plans', Controller.getPrototypePlans);
+router.get('/prototypes', Controller.getPrototypes);
 router.get('/:id', Controller.getApplicationById);
 router.delete('/:id', Controller.deleteApplication);
 

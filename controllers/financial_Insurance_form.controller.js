@@ -197,6 +197,7 @@ const buildApplicationResponse = async (app) => {
     return {
         application_id: app.application_id,
         user_id: app.user_id,
+        user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
         group_name: app.group_name,
         business_nature: app.business_nature,
         number_of_lives: app.number_of_lives,
@@ -490,6 +491,7 @@ export const getPrototypes = async (req, res) => {
             return {
                 application_id: app.application_id,
                 user_id: app.user_id,
+                user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
                 group_name: app.group_name,
                 number_of_lives: app.number_of_lives,
                 contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
@@ -569,6 +571,7 @@ export const getAllApplications = async (req, res) => {
             return {
                 application_id: app.application_id,
                 user_id: app.user_id,
+                user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
                 group_name: app.group_name,
                 business_nature: app.business_nature,
                 number_of_lives: app.number_of_lives,
