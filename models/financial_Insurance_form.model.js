@@ -187,31 +187,71 @@ export const getAllApplications = async () => {
     const res = await pool.request()
         .query(`
             SELECT
-                fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives,
-                fia.contact_person_salutation, fia.contact_person_firstname, fia.contact_person_mi, fia.contact_person_lastname,
-                fia.status_id, fia.group_classification_id, fia.other_group_classification,
-                fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
-                fia.plan_id, fia.basic_plan_id, fia.prototype_id,
+                fia.application_id,
+                fia.user_id,
+                fia.group_name,
+                fia.business_nature,
+                fia.number_of_lives,
+                fia.business_address,
+                fia.contact_number,
+                fia.fax_number,
+                fia.email,
+                fia.contact_person_salutation,
+                fia.contact_person_firstname,
+                fia.contact_person_mi,
+                fia.contact_person_lastname,
+                fia.designation,
+                fia.proposal_addressee,
+                fia.addressee_designation,
+                fia.minimum_age,
+                fia.maximum_age,
+                fia.payment_mode_id,
+                fia.status_id,
+                fia.group_classification_id,
+                fia.other_group_classification,
+                fia.business_type_id,
+                fia.other_business_type,
+                fia.group_type_id,
+                fia.other_group_type,
+                fia.plan_id,
+                fia.basic_plan_id,
+                fia.prototype_id,
                 fia.type_of_proposal_id,
-                fia.created_at, fia.updated_at,
+                fia.amount_loans_id,
+                fia.created_at,
+                fia.updated_at,
                 fis.status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
+                pm.name AS payment_mode_name,
                 topl.name AS type_of_proposal_name,
                 p.product_name AS plan_name,
                 bp.basic_plan_name,
-                pp.name as prototype_plan_name
-            FROM sg.financial_insurance_application fia
-            LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
-            LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
-            LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
-            LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
-            LEFT JOIN sg.financial_insurance_group_lookups topl ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
-            LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            ORDER BY fia.created_at DESC
+                pp.name AS prototype_plan_name,
+                al.name AS amount_loans_name
+            FROM DHUB.sg.financial_insurance_application fia
+            LEFT JOIN DHUB.sg.financial_insurance_status fis
+                ON fia.status_id = fis.status_id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gc
+                ON fia.group_classification_id = gc.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups bt
+                ON fia.business_type_id = bt.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gt
+                ON fia.group_type_id = gt.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
+                ON fia.payment_mode_id = pm.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups topl
+                ON fia.type_of_proposal_id = topl.id
+            LEFT JOIN DHUB.sg.financial_insurance_product p
+                ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp
+                ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+                ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
+                ON fia.amount_loans_id = al.id
+            ORDER BY fia.created_at DESC;
         `);
 
     return res.recordset ?? [];
