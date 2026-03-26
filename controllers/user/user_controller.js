@@ -7,14 +7,36 @@ import jwt from 'jsonwebtoken';
 import { ClientSecretCredential } from "@azure/identity";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials/index.js";
-import "isomorphic-fetch";
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dns from 'node:dns';
+
+// Fix for Node.js 18+ where IPv6 is prioritized over IPv4.
+// This often causes "network_error" on servers that have IPv6 enabled but unconfigured.
+dns.setDefaultResultOrder('ipv4first');
+
+// If you do not have SSL configured yet or are behind an SSL-inspecting firewall, 
+// this line allows Node.js to connect to Azure despite certificate validation issues.
+// WARNING: Use this for testing only. Enable SSL for production.
+// Remove this line and ensure your server can validate Azure's SSL certificate before going live.
+if (process.env.NODE_ENV !== 'production') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure .env is loaded from an absolute path relative to the root
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+
+// More aggressive trimming to remove hidden characters/quotes from .env
+const tenantId = process.env.AZURE_TENANT_ID?.replace(/['"]+/g, '').trim();
+const clientId = process.env.AZURE_CLIENT_ID?.replace(/['"]+/g, '').trim();
+const clientSecret = process.env.AZURE_CLIENT_SECRET?.replace(/['"]+/g, '').trim();
 
 const credential = new ClientSecretCredential(
-    process.env.AZURE_TENANT_ID,
-    process.env.AZURE_CLIENT_ID,
-    process.env.AZURE_CLIENT_SECRET
+    tenantId,
+    clientId,
+    clientSecret
 );
 
 const authProvider = new TokenCredentialAuthenticationProvider(credential, {
@@ -62,6 +84,11 @@ export const transporter = {
             message: message,
             saveToSentItems: "false",
         };
+
+        // If on RDS/IIS, check if variables are actually present
+        if (!tenantId || !clientId || !clientSecret) {
+            throw new Error("Azure Configuration missing. Check .env variables.");
+        }
 
         await graphClient.api(`/users/${process.env.SMTP_USER}/sendMail`)
             .post(sendMail);
@@ -140,11 +167,17 @@ export const register = async (req, res) => {
         });
 
     } catch (err) {
-        //console.error('REGISTRATION ERROR:', err);
+        console.error('REGISTRATION ERROR:', err);
+        // Deep extract the real error. MSAL Node often puts the actual socket error in 'errors[0]'
+        const underlyingError = err.innerError || err.cause || (err.errors && err.errors[0]) || err;
+
         res.status(500).json({
             status: false,
             message: 'Server error',
-            error: err.message
+            error: err.message,
+            details: err.code || 'Check outbound connectivity',
+            innerError: underlyingError ? { message: underlyingError.message, code: underlyingError.code, name: underlyingError.name } : null,
+            debug: !tenantId ? "Tenant ID is empty" : "Credentials present"
         });
     }
 };
@@ -192,10 +225,14 @@ export const login = async (req, res) => {
 
     } catch (err) {
         console.error('LOGIN ERROR:', err);
+        const underlyingError = err.innerError || err.cause || (err.errors && err.errors[0]) || err;
+
         res.status(500).json({
             status: false,
             message: 'Server error',
-            error: err.message
+            error: err.message,
+            innerError: underlyingError ? { message: underlyingError.message, code: underlyingError.code, name: underlyingError.name } : null,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
     }
 };
@@ -347,7 +384,8 @@ export const logout = async (req, res) => {
         res.status(500).json({
             status: false,
             message: 'Server error',
-            error: err.message
+            error: err.message,
+            innerError: err.innerError || null
         });
     }
 };
