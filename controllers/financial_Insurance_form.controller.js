@@ -21,11 +21,12 @@ const __dirname = path.dirname(__filename);
 // Helper to clean "other" fields based on selected IDs
 const cleanupOtherFields = async (data) => {
     const mutableData = { ...data };
-    const idsToCheck = [
-        mutableData.group_classification_id,
-        mutableData.business_type_id,
-        mutableData.group_type_id,
-    ];
+    const idsToCheck = [];
+    if (mutableData.group_classification_id !== undefined) idsToCheck.push(mutableData.group_classification_id);
+    if (mutableData.business_type_id !== undefined) idsToCheck.push(mutableData.business_type_id);
+    if (mutableData.group_type_id !== undefined) idsToCheck.push(mutableData.group_type_id);
+
+    if (idsToCheck.length === 0) return mutableData;
 
     const namesMap = await Model.getLookupNamesByIds(idsToCheck);
     const isOther = (id) => {
@@ -34,13 +35,13 @@ const cleanupOtherFields = async (data) => {
         return name === 'Other' || name === 'Others';
     };
 
-    if (!isOther(mutableData.group_classification_id)) {
+    if (mutableData.group_classification_id !== undefined && !isOther(mutableData.group_classification_id)) {
         mutableData.other_group_classification = null;
     }
-    if (!isOther(mutableData.business_type_id)) {
+    if (mutableData.business_type_id !== undefined && !isOther(mutableData.business_type_id)) {
         mutableData.other_business_type = null;
     }
-    if (!isOther(mutableData.group_type_id)) {
+    if (mutableData.group_type_id !== undefined && !isOther(mutableData.group_type_id)) {
         mutableData.other_group_type = null;
     }
 

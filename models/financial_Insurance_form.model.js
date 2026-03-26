@@ -100,12 +100,15 @@ export const createApplication = async (data, userId) => {
                         ? rider.values.find(v => v.designation === designation) 
                         : null;
 
-                    if (riderValue) {
+                    // Fallback: If no specific value found (e.g. during partial update), use the base values
+                    const finalValue = riderValue || (rider.amount !== undefined || rider.unit !== undefined ? { amount: rider.amount, unit: rider.unit } : null);
+
+                    if (finalValue) {
                         await new sql.Request(transaction)
                             .input('coverage_ranking_id', sql.Int, rankingId)
                             .input('rider_id', sql.Int, rider.rider_id)
-                            .input('rider_amount', sql.Decimal(18, 2), riderValue.amount || null)
-                            .input('rider_unit', sql.Int, riderValue.unit || null)
+                            .input('rider_amount', sql.Decimal(18, 2), finalValue.amount || null)
+                            .input('rider_unit', sql.Int, finalValue.unit || null)
                             .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
@@ -309,16 +312,21 @@ export const updateApplication = async (id, data) => {
         const insertRankingRiders = async (rankingId, designation, riders) => {
             if (riders && Array.isArray(riders) && riders.length > 0) {
                 for (const rider of riders) {
-                    const riderValue = rider.values && Array.isArray(rider.values) 
+                    let riderValue = rider.values && Array.isArray(rider.values) 
                         ? rider.values.find(v => v.designation === designation) 
                         : null;
 
-                    if (riderValue) {
+                    // Fallback: Check for generic value in values[0] (if single item & no designation) or root-level amount
+                    const finalValue = riderValue 
+                        || (rider.values && rider.values.length === 1 && !rider.values[0].designation ? rider.values[0] : null)
+                        || (rider.amount !== undefined || rider.unit !== undefined ? { amount: rider.amount, unit: rider.unit } : null);
+
+                    if (finalValue) {
                         await new sql.Request(transaction)
                             .input('coverage_ranking_id', sql.Int, rankingId)
                             .input('rider_id', sql.Int, rider.rider_id)
-                            .input('rider_amount', sql.Decimal(18, 2), riderValue.amount || null)
-                            .input('rider_unit', sql.Int, riderValue.unit || null)
+                            .input('rider_amount', sql.Decimal(18, 2), finalValue.amount || null)
+                            .input('rider_unit', sql.Int, finalValue.unit || null)
                             .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
@@ -474,7 +482,7 @@ export const updateApplication = async (id, data) => {
         addClause('number_of_lives', data.number_of_lives, sql.Int);
         addClause('business_address', data.business_address);
         addClause('contact_number', data.contact_number);
-        addClause('fax_number', data.fax_number || null);
+        addClause('fax_number', data.fax_number);
         addClause('email', data.email);
         addClause('contact_person_salutation', data.contact_person_salutation);
         addClause('contact_person_firstname', data.contact_person_firstname);
@@ -484,11 +492,11 @@ export const updateApplication = async (id, data) => {
         addClause('proposal_addressee', data.proposal_addressee);
         addClause('addressee_designation', data.addressee_designation);
         addClause('group_classification_id', data.group_classification_id, sql.Int);
-        addClause('other_group_classification', data.other_group_classification || null);
+        addClause('other_group_classification', data.other_group_classification);
         addClause('business_type_id', data.business_type_id, sql.Int);
-        addClause('other_business_type', data.other_business_type || null);
+        addClause('other_business_type', data.other_business_type);
         addClause('group_type_id', data.group_type_id, sql.Int);
-        addClause('other_group_type', data.other_group_type || null);
+        addClause('other_group_type', data.other_group_type);
         addClause('minimum_age', data.minimum_age, sql.Int);
         addClause('maximum_age', data.maximum_age, sql.Int);
         addClause('payment_mode_id', data.payment_mode_id, sql.Int);
