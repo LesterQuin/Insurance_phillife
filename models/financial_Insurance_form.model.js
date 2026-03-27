@@ -48,6 +48,7 @@ export const createApplication = async (data, userId) => {
             .input('borrower_age_65_67', sql.Bit, data.borrower_age_65_67 || false)
             .input('borrower_age_68_70', sql.Bit, data.borrower_age_68_70 || false)
             .input('borrower_age_71_74', sql.Bit, data.borrower_age_71_74 || false)
+            .input('notes', sql.NVarChar(sql.MAX), data.notes || null)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
                     user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
@@ -55,14 +56,14 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id,
-                    borrower_age_65_67, borrower_age_68_70, borrower_age_71_74
+                    borrower_age_65_67, borrower_age_68_70, borrower_age_71_74, notes
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id,
-                    @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74
+                    @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74, @notes
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -267,6 +268,7 @@ export const getAllApplications = async () => {
                 fia.borrower_age_65_67,
                 fia.borrower_age_68_70,
                 fia.borrower_age_71_74,
+                fia.notes,
                 fia.created_at,
                 fia.updated_at,
                 fis.status_name,
@@ -335,6 +337,7 @@ export const getPrototypes = async () => {
                 fia.borrower_age_65_67,
                 fia.borrower_age_68_70,
                 fia.borrower_age_71_74,
+                fia.notes,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
                 gc.name AS group_classification_name,
@@ -643,6 +646,7 @@ export const updateApplication = async (id, data) => {
         addClause('borrower_age_65_67', data.borrower_age_65_67, sql.Bit);
         addClause('borrower_age_68_70', data.borrower_age_68_70, sql.Bit);
         addClause('borrower_age_71_74', data.borrower_age_71_74, sql.Bit);
+        addClause('notes', data.notes, sql.NVarChar(sql.MAX));
 
         if (data.payment !== undefined) {
             const paymentTerm = (Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;

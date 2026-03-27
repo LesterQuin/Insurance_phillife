@@ -260,6 +260,7 @@ const buildApplicationResponse = async (app) => {
         salary_ranking: salaryRanking,
         uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
         coverage_totals: coverage_totals,
+        notes: app.notes,
         created_at: app.created_at,
         updated_at: app.updated_at
     };
@@ -594,6 +595,7 @@ export const getPrototypes = async (req, res) => {
                 },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 riders: appRiders,
+                notes: app.notes,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
             };
@@ -748,6 +750,7 @@ export const getAllApplications = async (req, res) => {
                 borrower_age_71_74: app.borrower_age_71_74,
                 coverage_totals: coverage_totals,
                 riders: appRiders,
+                notes: app.notes,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
             };
