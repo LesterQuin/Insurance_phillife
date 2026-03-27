@@ -229,6 +229,13 @@ const buildApplicationResponse = async (app) => {
         },
         sub_group_types: subGroupTypes,
         payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
+        coverage_type: {
+            id: app.coverage_type_id,
+            name: app.coverage_type_name,
+            details: app.coverage_type_id === 32 ? levelRanking : 
+                    app.coverage_type_id === 34 ? salaryRanking :
+                    app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
+        },
         payment: paymentTerms,
         type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
         prototype_plan: { 
@@ -488,8 +495,49 @@ export const getPrototypes = async (req, res) => {
             return acc;
         }, {});
 
+        const allRankings = await Model.getBulkCoverageRankings(appIds);
+        const rankingsByAppId = allRankings.reduce((acc, r) => {
+            (acc[r.application_id] = acc[r.application_id] || []).push(r);
+            return acc;
+        }, {});
+
+        const allRankingRiders = await Model.getBulkCoverageRankingRiders(appIds);
+        const rankingRidersByAppId = allRankingRiders.reduce((acc, rr) => {
+            (acc[rr.application_id] = acc[rr.application_id] || []).push(rr);
+            return acc;
+        }, {});
+
         // --- Map the bulk-fetched data back to each application ---
         const formattedPrototypes = prototypes.map(app => {
+            const rankings = rankingsByAppId[app.application_id] || [];
+            const appRiders = ridersByAppId[app.application_id] || [];
+            const appRankingRiders = rankingRidersByAppId[app.application_id] || [];
+
+            // Map ranking-specific riders back to the riders array
+            if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && appRankingRiders.length > 0) {
+                appRiders.forEach(mainRider => {
+                    const riderValues = appRankingRiders
+                        .filter(rr => rr.rider_id === mainRider.rider_id)
+                        .map(rr => ({ designation: rr.designation, amount: rr.rider_amount, unit: rr.rider_unit }));
+                    if (riderValues.length > 0) mainRider.values = riderValues;
+                });
+            }
+
+            let levelRanking = null;
+            let salaryRanking = null;
+            if (app.coverage_type_id === 32) { 
+                levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, application_id, ...rest }) => rest);
+            } else if (app.coverage_type_id === 34) { 
+                salaryRanking = rankings.map(({ uniform_coverage_amount, application_id, ...rest }) => rest);
+            }
+
+            let coverage_totals = [];
+            if (app.coverage_type_id !== 34) {
+                coverage_totals = rankings.map(r => ({
+                    designation: r.designation,
+                    total_coverage_amount: r.total_coverage_amount
+                }));
+            }
 
             return {
                 application_id: app.application_id,
@@ -516,6 +564,22 @@ export const getPrototypes = async (req, res) => {
                 },
                 sub_group_types: subGroupsByAppId[app.application_id] || [],
                 payment: paymentsByAppId[app.application_id] || [],
+                coverage_type: {
+                    id: app.coverage_type_id,
+                    name: app.coverage_type_name,
+                    details: app.coverage_type_id === 32 ? levelRanking : 
+                            app.coverage_type_id === 34 ? salaryRanking :
+                            app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
+                },
+                level_ranking: levelRanking,
+                salary_ranking: salaryRanking,
+                uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
+                coverage_totals: coverage_totals,
+                amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
+                loans_amount: app.loans_amount,
+                borrower_age_65_67: app.borrower_age_65_67,
+                borrower_age_68_70: app.borrower_age_68_70,
+                borrower_age_71_74: app.borrower_age_71_74,
                 type_of_proposal: {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
@@ -529,7 +593,7 @@ export const getPrototypes = async (req, res) => {
                     name: app.plan_name && app.plan_acronym ? `${app.plan_name} (${app.plan_acronym})` : app.plan_name 
                 },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
-                riders: ridersByAppId[app.application_id] || [],
+                riders: appRiders,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
             };
@@ -574,8 +638,49 @@ export const getAllApplications = async (req, res) => {
             return acc;
         }, {});
 
+        const allRankings = await Model.getBulkCoverageRankings(appIds);
+        const rankingsByAppId = allRankings.reduce((acc, r) => {
+            (acc[r.application_id] = acc[r.application_id] || []).push(r);
+            return acc;
+        }, {});
+
+        const allRankingRiders = await Model.getBulkCoverageRankingRiders(appIds);
+        const rankingRidersByAppId = allRankingRiders.reduce((acc, rr) => {
+            (acc[rr.application_id] = acc[rr.application_id] || []).push(rr);
+            return acc;
+        }, {});
+
         // --- Map the bulk-fetched data back to each application ---
         const formattedApplications = rawApplications.map(app => {
+            const rankings = rankingsByAppId[app.application_id] || [];
+            const appRiders = ridersByAppId[app.application_id] || [];
+            const appRankingRiders = rankingRidersByAppId[app.application_id] || [];
+
+            // Map ranking-specific riders back to the riders array
+            if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && appRankingRiders.length > 0) {
+                appRiders.forEach(mainRider => {
+                    const riderValues = appRankingRiders
+                        .filter(rr => rr.rider_id === mainRider.rider_id)
+                        .map(rr => ({ designation: rr.designation, amount: rr.rider_amount, unit: rr.rider_unit }));
+                    if (riderValues.length > 0) mainRider.values = riderValues;
+                });
+            }
+
+            let levelRanking = null;
+            let salaryRanking = null;
+            if (app.coverage_type_id === 32) { 
+                levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, application_id, ...rest }) => rest);
+            } else if (app.coverage_type_id === 34) { 
+                salaryRanking = rankings.map(({ uniform_coverage_amount, application_id, ...rest }) => rest);
+            }
+
+            let coverage_totals = [];
+            if (app.coverage_type_id !== 34) {
+                coverage_totals = rankings.map(r => ({
+                    designation: r.designation,
+                    total_coverage_amount: r.total_coverage_amount
+                }));
+            }
 
             return {
                 application_id: app.application_id,
@@ -612,6 +717,13 @@ export const getAllApplications = async (req, res) => {
                 },
                 sub_group_types: subGroupsByAppId[app.application_id] || [],
                 payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
+                coverage_type: {
+                    id: app.coverage_type_id,
+                    name: app.coverage_type_name,
+                    details: app.coverage_type_id === 32 ? levelRanking : 
+                            app.coverage_type_id === 34 ? salaryRanking :
+                            app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
+                },
                 payment: paymentsByAppId[app.application_id] || [],
                 type_of_proposal: {
                     id: app.type_of_proposal_id,
@@ -628,10 +740,14 @@ export const getAllApplications = async (req, res) => {
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
                 loans_amount: app.loans_amount,
+                level_ranking: levelRanking,
+                salary_ranking: salaryRanking,
+                uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
                 borrower_age_65_67: app.borrower_age_65_67,
                 borrower_age_68_70: app.borrower_age_68_70,
                 borrower_age_71_74: app.borrower_age_71_74,
-                riders: ridersByAppId[app.application_id] || [],
+                coverage_totals: coverage_totals,
+                riders: appRiders,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
             };

@@ -180,6 +180,51 @@ export const createApplication = async (data, userId) => {
     }
 };
 
+// Get coverage rankings for multiple applications in bulk
+export const getBulkCoverageRankings = async (applicationIds) => {
+    if (!applicationIds || applicationIds.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    const idParams = applicationIds.map((id, i) => {
+        const paramName = `appId${i}`;
+        request.input(paramName, sql.Int, id);
+        return `@${paramName}`;
+    }).join(',');
+
+    const result = await request.query(`
+        SELECT application_id, designation, amount, salary_multiplier, uniform_coverage_amount, total_coverage_amount
+        FROM DHUB.sg.financial_insurance_coverage_ranking
+        WHERE application_id IN (${idParams})`);
+    return result.recordset ?? [];
+};
+
+// Get nested riders for coverage rankings in bulk
+export const getBulkCoverageRankingRiders = async (applicationIds) => {
+    if (!applicationIds || applicationIds.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    const idParams = applicationIds.map((id, i) => {
+        const paramName = `appId${i}`;
+        request.input(paramName, sql.Int, id);
+        return `@${paramName}`;
+    }).join(',');
+
+    const result = await request.query(`
+        SELECT 
+            cr.application_id,
+            crr.rider_id,
+            cr.designation,
+            crr.rider_amount,
+            crr.rider_unit
+        FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr
+        JOIN DHUB.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
+        WHERE cr.application_id IN (${idParams})
+    `);
+    return result.recordset ?? [];
+};
+
 // Get all applications
 export const getAllApplications = async () => {
     const pool = await poolPromise;
@@ -217,6 +262,11 @@ export const getAllApplications = async () => {
                 fia.prototype_id,
                 fia.type_of_proposal_id,
                 fia.amount_loans_id,
+                fia.loans_amount,
+                fia.coverage_type_id,
+                fia.borrower_age_65_67,
+                fia.borrower_age_68_70,
+                fia.borrower_age_71_74,
                 fia.created_at,
                 fia.updated_at,
                 fis.status_name,
@@ -231,6 +281,7 @@ export const getAllApplications = async () => {
                 pp.name AS prototype_plan_name,
                 pp.acronym AS prototype_plan_acronym,
                 al.name AS amount_loans_name,
+                ct.name AS coverage_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
@@ -256,6 +307,8 @@ export const getAllApplications = async () => {
                 ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct
+                ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             ORDER BY fia.created_at DESC;
@@ -276,6 +329,12 @@ export const getPrototypes = async () => {
                 fia.business_type_id, fia.other_business_type, fia.group_type_id, fia.other_group_type,
                 fia.plan_id, fia.basic_plan_id, fia.prototype_id,
                 fia.type_of_proposal_id,
+                fia.amount_loans_id,
+                fia.loans_amount,
+                fia.coverage_type_id,
+                fia.borrower_age_65_67,
+                fia.borrower_age_68_70,
+                fia.borrower_age_71_74,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
                 gc.name AS group_classification_name,
@@ -287,6 +346,8 @@ export const getPrototypes = async () => {
                 bp.basic_plan_name,
                 pp.name as prototype_plan_name,
                 pp.acronym AS prototype_plan_acronym,
+                al.name AS amount_loans_name,
+                ct.name AS coverage_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
@@ -300,6 +361,8 @@ export const getPrototypes = async () => {
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
             WHERE fia.type_of_proposal_id = 30
             ORDER BY fia.created_at DESC
@@ -329,6 +392,7 @@ export const getApplicationById = async (id) => {
                 pp.name as prototype_plan_name,
                 pp.acronym AS prototype_plan_acronym,
                 al.name as amount_loans_name,
+                ct.name AS coverage_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
@@ -354,6 +418,8 @@ export const getApplicationById = async (id) => {
                 ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct
+                ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             WHERE fia.application_id = @id
