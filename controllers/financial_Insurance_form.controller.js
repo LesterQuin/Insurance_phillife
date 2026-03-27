@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import * as Model from '../models/financial_Insurance_form.model.js';
 import * as User from '../models/user/user_model.js';
 import { success, error } from '../utils/response.js';
+import sanitizeHtml from 'sanitize-html';
 import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
 import { generateBarangayPDFContent } from '../templates/prototype_BarangayProtectPlan.js';
 import { generateStudentsGTLIPPDFContent } from '../templates/prototype_StudentsGroupTermLifeInsurancePlan.js';
@@ -17,6 +18,14 @@ import { generateSmallGroupsPDFContent } from '../templates/prototype_PlanforSma
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Configuration for rich-text sanitization
+const sanitizeOptions = {
+    allowedTags: ['h1', 'h2', 'h3', 'p', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'br', 'span', 'div'],
+    allowedAttributes: {
+        'span': ['style'],
+    }
+};
 
 // Helper to clean "other" fields based on selected IDs
 const cleanupOtherFields = async (data) => {
@@ -84,8 +93,8 @@ const preprocessRiders = (data) => {
             baseAmount = 50000; // Fixed amount
         } else if (riderId === 13) { // Group Dengue Rider
              // Ensure amount corresponds to unit if not explicitly provided
-             if (baseUnit === 1) baseAmount = 30000;
-             if (baseUnit === 2) baseAmount = 60000;
+            if (baseUnit === 1) baseAmount = 30000;
+            if (baseUnit === 2) baseAmount = 60000;
         }
 
         // Expand to all designations if applicable
@@ -290,6 +299,12 @@ export const createApplication = async (req, res) => {
         
         const cleanedData = await cleanupOtherFields(dataToSave);
         const processedData = preprocessRiders(cleanedData);
+
+        // Sanitize notes if they exist
+        if (processedData.notes) {
+            processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
+        }
+
         const newRecord = await Model.createApplication(processedData, userId);
 
         if (!newRecord || !newRecord.application_id) {
@@ -864,6 +879,12 @@ export const updateApplication = async (req, res) => {
         
         const cleanedData = await cleanupOtherFields(updateData);
         const processedData = preprocessRiders(cleanedData);
+
+        // Sanitize notes if they exist
+        if (processedData.notes) {
+            processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
+        }
+
         const updated = await Model.updateApplication(req.params.id, processedData);
         const response = await buildApplicationResponse(updated);
         return success(res, response, 'Application updated successfully.');
