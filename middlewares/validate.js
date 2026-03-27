@@ -938,6 +938,10 @@ body('basic_plan_id')
     // Optional status
     body('status_id').optional().isInt({ min: 0 }),
 
+    body('notes')
+        .optional({ nullable: true })
+        .isString().withMessage('Notes must be a string'),
+
     // Validation result
     (req, res, next) => {
         const errors = validationResult(req);
@@ -1415,6 +1419,10 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 
     // Optional status
     body('status_id').optional().isInt({ min: 0 }),
+
+    body('notes')
+        .optional({ nullable: true })
+        .isString().withMessage('Notes must be a string'),
 
     // Validation result
     (req, res, next) => {
