@@ -30,7 +30,8 @@ router.put('/admin/update-user/:userId', authenticate, isSuperAdmin, validateAdm
 router.put('/deactivate/:userId', authenticate, isSuperAdmin, Controller.deactivateAccount);
 router.put('/activate/:userId', authenticate, isSuperAdmin, Controller.activateAccount);
 
-// New API for super admin to view user details
+// Super admin routes to view users
+router.get('/', authenticate, isSuperAdmin, Controller.getAllUsers);
 router.get('/:userId', authenticate, isSuperAdmin, Controller.getUserById);
 
 export default router;

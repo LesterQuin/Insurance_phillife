@@ -580,6 +580,38 @@ export const activateAccount = async (req, res) => {
     }
 };
 
+export const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.getAllUsers();
+
+        // Exclude sensitive information from the response for all users
+        const safeUsers = users.map(user => {
+            const { 
+                password_hash, otp, otp_expires_at, temp_password, otpCode, otpExpiresAt,
+                role_id, role_name, 
+                department_id, department_name, 
+                location_id, location_name,
+                ...rest 
+            } = user;
+            return {
+                ...rest,
+                role: { id: role_id, name: role_name },
+                department: { id: department_id, name: department_name },
+                location: { id: location_id, name: location_name }
+            };
+        });
+
+        res.status(200).json({
+            status: true,
+            message: 'Users fetched successfully.',
+            data: safeUsers
+        });
+    } catch (err) {
+        console.error('GET ALL USERS ERROR:', err);
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
+    }
+};
+
 export const getUserById = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -591,11 +623,22 @@ export const getUserById = async (req, res) => {
         }
 
         // Exclude sensitive information from the response
-        const { password_hash, otp, otp_expires_at, temp_password, ...userForResponse } = user;
+        const { 
+            password_hash, otp, otp_expires_at, temp_password, otpCode, otpExpiresAt,
+            role_id, roleName,
+            department_id, departmentName, departmentCode,
+            location_id, locationName,
+            ...rest 
+        } = user;
 
         res.status(200).json({
             status: true,
-            user: userForResponse
+            user: {
+                ...rest,
+                role: { id: role_id, name: roleName },
+                department: { id: department_id, name: departmentName, code: departmentCode },
+                location: { id: location_id, name: locationName }
+            }
         });
 
     } catch (err) {

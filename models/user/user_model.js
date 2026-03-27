@@ -51,6 +51,25 @@ export const getUserByEmail = async (email) => {
     return result.recordset[0];
 }
 
+export const getAllUsers = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT 
+                u.*,
+                r.name AS role_name,
+                d.name AS department_name,
+                l.name AS location_name
+            FROM DHUB.sg.financial_insurance_users u
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups l ON u.location_id = l.id AND l.category = 'LOCATION'
+            ORDER BY u.created_at DESC
+        `);
+    return result.recordset;
+};
+
+
 export const getUserById = async (userId) => {
     const pool = await poolPromise;
     const result = await pool.request()
