@@ -646,4 +646,37 @@ export const getUserById = async (req, res) => {
         res.status(500).json({ status: false, message: 'Server error', error: err.message });
     }
 };
-    
+
+export const adminResetPassword = async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        const targetUser = await User.getUserById(userId);
+        if (!targetUser) {
+            return res.status(404).json({ status: false, message: "User not found." });
+        }
+
+        // Generate a random 8-character temporary password
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        // Update the user's password using the admin reset method
+        await User.adminResetPassword(targetUser.email, hashedPassword);
+
+        // Send the plain-text temporary password via email
+        await transporter.sendMail({
+            from: `"Insurance System" <${process.env.SMTP_USER}>`,
+            to: targetUser.email,
+            subject: 'Administrative Password Reset',
+            html: tempPasswordTemplate(targetUser.lastname, tempPassword, process.env.APP_BASE_URL)
+        });
+
+        res.json({
+            status: true,
+            message: `Password reset successful. A temporary password has been sent to ${targetUser.email}.`
+        });
+    } catch (err) {
+        console.error('ADMIN RESET PASSWORD ERROR:', err);
+        res.status(500).json({ status: false, message: 'Server error', error: err.message });
+    }
+};

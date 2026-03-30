@@ -116,6 +116,19 @@ export const updatePassword = async (email, newPassword) => {
         `);
 }
 
+export const adminResetPassword = async (email, hashedPassword) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('email', sql.VarChar, email)
+        .input('password_hash', sql.VarChar, hashedPassword)
+        .input('mustChangePassword', sql.Bit, 1)
+        .query(`
+            UPDATE DHUB.sg.financial_insurance_users
+            SET password_hash = @password_hash, mustChangePassword = @mustChangePassword
+            WHERE email = @email
+        `);
+};
+
 // Helper function to check if value is provided and not empty
 const hasValue = (value) => value !== undefined && value !== null && value !== '';
 

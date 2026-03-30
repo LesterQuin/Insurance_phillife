@@ -1,6 +1,7 @@
 import express from 'express';
 import * as Controller from '../../controllers/user/user_controller.js';
 import { authenticate, isSuperAdmin } from '../../middlewares/authenticate.js';
+import rateLimit from 'express-rate-limit';
 import { 
     validateRegister, 
     validateLogin, 
@@ -9,26 +10,34 @@ import {
     validateResetPassword, 
     validateLogout,
     validateAdminUpdateUser, 
-    validateRefreshToken,
+    validateAdminIT,
     validateUpdateProfile 
 } from '../../middlewares/validate.js';
 
 const router = express.Router();
 
+// Rate limiters
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Limit each IP to 10 requests per window
+    message: { status: false, message: "Too many attempts, please try again after 15 minutes" }
+});
+
 // Public routes
-router.post('/register', validateRegister, Controller.register);
-router.post('/login', validateLogin, Controller.login);
-router.post('/verify-otp', validateVerifyOTP, Controller.verifyOTP);
-router.post('/resend-otp', validateResendOTP, Controller.resendOTP);
+router.post('/register', authLimiter, validateRegister, Controller.register);
+router.post('/login', authLimiter, validateLogin, Controller.login);
+router.post('/verify-otp', authLimiter, validateVerifyOTP, Controller.verifyOTP);
+router.post('/resend-otp', authLimiter, validateResendOTP, Controller.resendOTP);
 router.post('/reset-password', validateResetPassword, Controller.resetPassword);
 router.post('/logout', validateLogout, Controller.logout);
 router.post('/refresh-token', Controller.refreshToken);
 router.put('/update-profile', authenticate, validateUpdateProfile, Controller.updateProfile);
 
 // super admin routes for user management
-router.put('/admin/update-user/:userId', authenticate, isSuperAdmin, validateAdminUpdateUser, Controller.adminUpdateUser);
-router.put('/deactivate/:userId', authenticate, isSuperAdmin, Controller.deactivateAccount);
-router.put('/activate/:userId', authenticate, isSuperAdmin, Controller.activateAccount);
+router.put('/admin/update-user/:userId', authenticate, validateAdminIT, validateAdminUpdateUser, Controller.adminUpdateUser);
+router.post('/admin/reset-password/:userId', authenticate, validateAdminIT, Controller.adminResetPassword);
+router.put('/deactivate/:userId', authenticate, validateAdminIT, Controller.deactivateAccount);
+router.put('/activate/:userId', authenticate, validateAdminIT, Controller.activateAccount);
 
 // Super admin routes to view users
 router.get('/', authenticate, isSuperAdmin, Controller.getAllUsers);

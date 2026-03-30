@@ -1,6 +1,6 @@
 // validate.js
 import validator from 'express-validator';
-const { body, validationResult } = validator;
+const { body, param, validationResult } = validator;
 import * as User from '../models/user/user_model.js';
 import * as Financial from '../models/financial_Insurance_form.model.js'
 
@@ -26,16 +26,20 @@ export const validateApplication = [
 export const validateRegister = [
     body('firstname')
         .notEmpty().withMessage('First name is required')
-        .isLength({ max: 100 }).withMessage('First name must not exceed 100 characters'),
+        .isLength({ max: 100 }).withMessage('First name must not exceed 100 characters')
+        .trim().escape(),
     body('middlename')
         .optional()
-        .isLength({ max: 100 }).withMessage('Middle name must not exceed 100 characters'),
+        .isLength({ max: 100 }).withMessage('Middle name must not exceed 100 characters')
+        .trim().escape(),
     body('lastname')
         .notEmpty().withMessage('Last name is required')
-        .isLength({ max: 100 }).withMessage('Last name must not exceed 100 characters'),
+        .isLength({ max: 100 }).withMessage('Last name must not exceed 100 characters')
+        .trim().escape(),
     body('suffix')
         .optional()
-        .isLength({ max: 20 }).withMessage('Suffix must not exceed 20 characters'),
+        .isLength({ max: 20 }).withMessage('Suffix must not exceed 20 characters')
+        .trim().escape(),
     body('email')
         .notEmpty().withMessage('Email is required')
         .isEmail().withMessage('Invalid email format')
@@ -43,7 +47,7 @@ export const validateRegister = [
         .withMessage('Email must be from allowed domain (gmail.com, yahoo.com, phillifeassurance.onmicrosoft.com, phillife.com.ph)'),
     body('phoneNumber')
         .optional()
-        .matches(/^[0-9]{10,15}$/).withMessage('Phone number must be 10-15 digits'),
+        .matches(/^(\+63|0)[0-9]{10}$/).withMessage('Phone number must be 10-15 digits'),
     body('agent_code')
         .optional()
         .isLength({ max: 50 }).withMessage('Agent code must not exceed 50 characters'),
@@ -172,7 +176,10 @@ export const validateResetPassword = [
         .isEmail().withMessage('Invalid email format'),
     body('newPassword')
         .notEmpty().withMessage('New password is required')
-        .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+        .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+        .matches(/[a-z]/).withMessage('Password must contain a lowercase letter')
+        .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter')
+        .matches(/[0-9]/).withMessage('Password must contain a number'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -207,27 +214,64 @@ export const validateRefreshToken = [
 export const validateUpdateProfile = [
     body('firstname')
         .optional()
-        .isLength({ max: 100 }).withMessage('First name must not exceed 100 characters'),
+        .isLength({ max: 100 }).withMessage('First name must not exceed 100 characters')
+        .trim().escape(),
     body('middlename')
         .optional()
-        .isLength({ max: 100 }).withMessage('Middle name must not exceed 100 characters'),
+        .isLength({ max: 100 }).withMessage('Middle name must not exceed 100 characters')
+        .trim().escape(),
     body('lastname')
         .optional()
-        .isLength({ max: 100 }).withMessage('Last name must not exceed 100 characters'),
+        .isLength({ max: 100 }).withMessage('Last name must not exceed 100 characters')
+        .trim().escape(),
     body('suffix')
         .optional()
-        .isLength({ max: 20 }).withMessage('Suffix must not exceed 20 characters'),
+        .isLength({ max: 20 }).withMessage('Suffix must not exceed 20 characters')
+        .trim().escape(),
     body('phoneNumber')
         .optional()
-        .matches(/^[0-9]{10,15}$/).withMessage('Phone number must be 10-15 digits'),
+        .matches(/^(\+63|0)[0-9]{10}$/).withMessage('Phone number must be 10-15 digits'),
     body('newPassword')
         .optional()
-        .isLength({ min: 6 }).withMessage('New password must be at least 6 characters'),
+        .isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+        .matches(/[a-z]/).withMessage('Password must contain a lowercase letter')
+        .matches(/[A-Z]/).withMessage('Password must contain an uppercase letter')
+        .matches(/[0-9]/).withMessage('Password must contain a number'),
 
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty())
             return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// Validation for administrative actions (Super Admin or IT)
+export const validateAdminIT = [
+    param('userId').isInt({ min: 1 }).withMessage('Valid User ID is required'),
+    async (req, res, next) => {
+        try {
+            const requester = req.user;
+            
+            // Check if user is Super Admin (Role ID 1) or in the IT Department
+            const isSuperAdmin = requester && (requester.role_id === 1 || requester.roleName === 'Super Admin');
+            const isITDepartment = requester && (requester.departmentName === 'IT' || requester.departmentCode === 'IT');
+
+            if (!isSuperAdmin && !isITDepartment) {
+                return res.status(403).json({
+                    status: false,
+                    message: "Unauthorized. Only SuperAdmins or IT department personnel can perform this action."
+                });
+            }
+            next();
+        } catch (error) {
+            console.error('Admin reset validation error:', error);
+            res.status(500).json({ status: false, message: 'Error checking permissions' });
+        }
+    },
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
         next();
     }
 ];
