@@ -22,6 +22,27 @@ export const validateApplication = [
     }
 ];
 
+// Validation for fetching application history (Restricted to Super Admin or IT)
+export const validateGetHistory = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+
+        const requester = req.user;
+        const isSuperAdmin = requester && (requester.role_id === 1 || requester.roleName === 'Super Admin');
+        const isITDepartment = requester && (requester.departmentName === 'IT' || requester.departmentCode === 'IT');
+
+        if (!isSuperAdmin && !isITDepartment) {
+            return res.status(403).json({
+                status: false,
+                message: "Unauthorized. Only SuperAdmins or IT department personnel can view application history logs."
+            });
+        }
+        next();
+    }
+];
+
 // Validation for user registration
 export const validateRegister = [
     body('firstname')

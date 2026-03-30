@@ -1,6 +1,6 @@
 import express from 'express';
 import * as Controller from '../controllers/financial_Insurance_form.controller.js';
-import { validateFinancialApplication, validateUpdateFinancialApplication, validateRates } from '../middlewares/validate.js';
+import { validateFinancialApplication, validateUpdateFinancialApplication, validateRates, validateGetHistory } from '../middlewares/validate.js';
 import { authenticate } from '../middlewares/authenticate.js';
 
 const router = express.Router();
@@ -20,6 +20,7 @@ router.get('/prototype-plans', Controller.getPrototypePlans);
 router.get('/prototypes', Controller.getPrototypes);
 router.get('/:id', Controller.getApplicationById);
 router.delete('/:id', Controller.deleteApplication);
+router.get('/:id/history',  Controller.getApplicationHistory);
 
 router.get('/template/:id', Controller.getTemplateById);
 

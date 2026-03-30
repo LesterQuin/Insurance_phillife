@@ -1,5 +1,20 @@
 import { poolPromise, sql } from '../config/db.js';
 
+// Helper to log application actions
+const logApplicationAction = async (transaction, { applicationId, userId, actionType, changes, ipAddress }) => {
+    const request = new sql.Request(transaction);
+    await request
+        .input('application_id', sql.Int, applicationId)
+        .input('user_id', sql.Int, userId)
+        .input('action_type', sql.NVarChar, actionType)
+        .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(changes))
+        .input('ip_address', sql.NVarChar, ipAddress || null)
+        .query(`
+            INSERT INTO DHUB.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+            VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
+        `);
+};
+
 export const createApplication = async (data, userId) => {
     const pool = await poolPromise;
     const transaction = new sql.Transaction(pool);
@@ -69,6 +84,15 @@ export const createApplication = async (data, userId) => {
             `);
 
         const applicationId = appResult.recordset[0].application_id;
+
+        // Log the creation action
+        await logApplicationAction(transaction, {
+            applicationId,
+            userId,
+            actionType: 'CREATE',
+            changes: data,
+            ipAddress: data.ip_address
+        });
 
         // Insert sub_group_type_ids into the new table
         if (data.sub_group_type_id) {
@@ -432,7 +456,7 @@ export const getApplicationById = async (id) => {
 };
 
 // Update application - handles partial updates
-export const updateApplication = async (id, data) => {
+export const updateApplication = async (id, data, userId) => {
     const pool = await poolPromise;
     const transaction = new sql.Transaction(pool);
 
@@ -665,6 +689,15 @@ export const updateApplication = async (id, data) => {
             await request.query(query);
         }
 
+        // Log the update action
+        await logApplicationAction(transaction, {
+            applicationId: id,
+            userId,
+            actionType: 'UPDATE',
+            changes: data,
+            ipAddress: data.ip_address
+        });
+
         await transaction.commit();
         return getApplicationById(id);
     } catch (err) {
@@ -803,6 +836,23 @@ export const getApplicationRiders = async (applicationId) => {
             FROM sg.financial_insurance_application_rider ar
             JOIN sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
             WHERE ar.application_id = @application_id
+        `);
+    return result.recordset ?? [];
+};
+
+// Get application history logs
+export const getApplicationHistory = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT 
+                l.log_id, l.application_id, l.user_id, l.action_type, l.changes, l.ip_address, l.created_at,
+                u.firstname, u.lastname, u.email
+            FROM DHUB.sg.financial_insurance_application_history_logs l
+            LEFT JOIN DHUB.sg.financial_insurance_users u ON l.user_id = u.user_id
+            WHERE l.application_id = @application_id
+            ORDER BY l.created_at DESC
         `);
     return result.recordset ?? [];
 };

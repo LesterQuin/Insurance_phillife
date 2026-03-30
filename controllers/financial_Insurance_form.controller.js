@@ -27,6 +27,15 @@ const sanitizeOptions = {
     }
 };
 
+// Helper to normalize IP addresses for readable logging
+const normalizeIp = (ip) => {
+    if (!ip) return null;
+    // Convert IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) to standard IPv4
+    if (ip.startsWith('::ffff:')) return ip.replace('::ffff:', '');
+    // Convert IPv6 loopback to IPv4 loopback for consistency
+    return ip === '::1' ? '127.0.0.1' : ip;
+};
+
 // Helper to clean "other" fields based on selected IDs
 const cleanupOtherFields = async (data) => {
     const mutableData = { ...data };
@@ -215,6 +224,10 @@ const buildApplicationResponse = async (app) => {
         fax_number: app.fax_number,
         email: app.email,
         contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+        contact_person_salutation: app.contact_person_salutation,
+        contact_person_firstname: app.contact_person_firstname,
+        contact_person_mi: app.contact_person_mi,
+        contact_person_lastname: app.contact_person_lastname,
         designation: app.designation,
         proposal_addressee: app.proposal_addressee,
         addressee_designation: app.addressee_designation,
@@ -299,6 +312,7 @@ export const createApplication = async (req, res) => {
         
         const cleanedData = await cleanupOtherFields(dataToSave);
         const processedData = preprocessRiders(cleanedData);
+        processedData.ip_address = normalizeIp(req.ip);
 
         // Sanitize notes if they exist
         if (processedData.notes) {
@@ -562,6 +576,10 @@ export const getPrototypes = async (req, res) => {
                 group_name: app.group_name,
                 number_of_lives: app.number_of_lives,
                 contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+                contact_person_salutation: app.contact_person_salutation,
+                contact_person_firstname: app.contact_person_firstname,
+                contact_person_mi: app.contact_person_mi,
+                contact_person_lastname: app.contact_person_lastname,
                 status: { id: app.status_id, name: app.status_name },
                 group_classification: { 
                     id: app.group_classification_id, 
@@ -711,6 +729,10 @@ export const getAllApplications = async (req, res) => {
                 fax_number: app.fax_number,
                 email: app.email,
                 contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+                contact_person_salutation: app.contact_person_salutation,
+                contact_person_firstname: app.contact_person_firstname,
+                contact_person_mi: app.contact_person_mi,
+                contact_person_lastname: app.contact_person_lastname,
                 designation: app.designation,
                 proposal_addressee: app.proposal_addressee,
                 addressee_designation: app.addressee_designation,
@@ -821,6 +843,17 @@ export const saveRates = async (req, res) => {
     }
 };
 
+// Get Application History Logs
+export const getApplicationHistory = async (req, res) => {
+    try {
+        const history = await Model.getApplicationHistory(req.params.id);
+        return success(res, history, 'Application history fetched successfully.');
+    } catch (err) {
+        console.error('Service Error:', err);
+        return error(res, err.message);
+    }
+};
+
 // Get Application by ID
 export const getApplicationById = async (req, res) => {
     try {
@@ -879,13 +912,14 @@ export const updateApplication = async (req, res) => {
         
         const cleanedData = await cleanupOtherFields(updateData);
         const processedData = preprocessRiders(cleanedData);
+        processedData.ip_address = normalizeIp(req.ip);
 
         // Sanitize notes if they exist
         if (processedData.notes) {
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
         }
 
-        const updated = await Model.updateApplication(req.params.id, processedData);
+        const updated = await Model.updateApplication(req.params.id, processedData, userId);
         const response = await buildApplicationResponse(updated);
         return success(res, response, 'Application updated successfully.');
     } catch (err) {

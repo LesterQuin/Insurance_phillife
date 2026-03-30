@@ -15,6 +15,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(cookieParser());
+app.set('trust proxy', true);
 
 // Test endpoint
 app.get("/api/hello", (req, res) => {
