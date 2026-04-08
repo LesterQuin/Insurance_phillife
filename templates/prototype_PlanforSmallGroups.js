@@ -13,6 +13,7 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     const totalAnnualPremium = details?.totalAnnualPremium || 0;
     const contactLocal = details?.contactLocal || 'N/A';
     const cfeFullName = `${user.firstname} ${user.lastname}`;
+    const logoDataUri = details?.logoDataUri || null;
 
     return `
 <!DOCTYPE html>
@@ -21,37 +22,49 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     <meta charset="UTF-8">
     <title>Prototype Plan for Small Groups</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; color: #333; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; line-height: 1.6; color: #333; }
         h2, h3 { margin-top: 30px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         table, th, td { border: 1px solid #000; }
         th, td { padding: 8px; text-align: center; }
         .note { font-size: 14px; margin-top: 10px; }
-        .footer-contact { text-align: left; font-size: 9pt; color: #555; margin-top: 8px; font-style: italic; }
-        .footer-link { color: #555; text-decoration: none; }
+        .footer-contact { text-align: center; font-size: 9pt; color: #555; font-style: italic; }
+        .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
         .page-break { page-break-before: always; }
+        .logo { display: block; margin: 0 auto; width: 250px; }
+        .header-table td { text-align: left; }
+        .cover-page { display: flex; flex-direction: column; justify-content: space-between; height: 230mm; box-sizing: border-box; padding: 20px 0; }
+        .cover-middle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
-    <table class="header-table">
-        <tr>
-            <td><strong>Presented To:</strong> ${application.group_name}</td>
-            <td><strong>Proposal Status:</strong> ${application.status?.name || ''}</td>
-            <td><strong>Date of Proposal:</strong> ${formatDate(proposalDate)}</td>
-        </tr>
-        <tr>
-            <td><strong>Base Plan:</strong> ${application.basic_plan?.name || ''}</td>
-            <td><strong>Total Annual Premium:</strong> Php ${formatNumber(totalAnnualPremium)}</td>
-            <td><strong>Payment Terms:</strong> ${application.payment_mode?.name || ''}</td>
-        </tr>
-    </table>
-    <br>
-    <div class="footer-contact">
-        <a href="https://www.phillife.com.ph" class="footer-link" target="_blank">www.phillife.com.ph</a><br>
-        <a href="tel:+63277985433" class="footer-link">(02) 7798 5433</a><br>
-        <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a>
+    <div class="cover-page">
+        <div class="cover-top">
+            ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ''}
+        </div>
+        <div class="cover-middle">
+            <table class="header-table">
+                <tr>
+                    <td><strong>Presented To:</strong> ${application.group_name}</td>
+                    <td><strong>Proposal Status:</strong> ${application.status?.name || ''}</td>
+                    <td><strong>Date of Proposal:</strong> ${formatDate(proposalDate)}</td>
+                </tr>
+                <tr>
+                    <td><strong>Base Plan:</strong> ${application.basic_plan?.name || ''}</td>
+                    <td><strong>Total Annual Premium:</strong> Php ${formatNumber(totalAnnualPremium)}</td>
+                    <td><strong>Payment Terms:</strong> ${application.payment_mode?.name || ''}</td>
+                </tr>
+            </table>
+        </div>
+        <div class="cover-bottom">
+            <div class="footer-contact">
+                <a href="https://www.phillife.com.ph" class="footer-link" target="_blank">www.phillife.com.ph</a><br>
+                <a href="tel:+63277985433" class="footer-link">(02) 7798 5433</a><br>
+                <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a>
+            </div>
+        </div>
     </div>
-    <br>
+    <div class="page-break"></div>
     <p>
         ${formatDate(proposalDate)} <br>
         ${application.contact_person_salutation || ''} ${application.proposal_addressee || ''} <br>
@@ -60,9 +73,9 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         ${application.business_address || ''}
     </p>
     <p>Dear ${application.addressee_designation || ''} ${addresseeLastName},</p>
-    <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ''}</strong> for the benefit of <strong>${application.group_name || ''} - employees</strong>.</p>
+    <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ''}</strong> for the benefit of <strong>${application.group_name || ''} - students</strong>.</p>
     <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
-    <p>Should you have concerns with our program, please feel free to contact us at Tel. Nos. (02) 7798 – 5433 loc. ${contactLocal} or email us at <a href="mailto:helpdesk@phillife.com.ph">helpdesk@phillife.com.ph</a>.</p>
+    <p>Should you have concerns with our program, please feel free to contact us at telephone number (02) 7798 – 5433, local number +63 917 123 4567 or email us at <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a>.</p>
     <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
     <p>
         Sincerely,<br><br>
