@@ -394,8 +394,8 @@ export const refreshToken = async (req, res) => {
     try {
         // Get refresh token from cookie or body
         const refreshTokenFromCookie = req.cookies.refreshToken;
-        const refreshTokenFromBody = req.body.refreshToken;
-        const refreshToken = refreshTokenFromCookie || refreshTokenFromBody;
+        // const refreshTokenFromBody = req.body.refreshToken;
+        const refreshToken = refreshTokenFromCookie;
 
         if (!refreshToken) {
             return res.status(401).json({
