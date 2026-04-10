@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as Model from '../models/financial_Insurance_form.model.js';
 import * as User from '../models/user/user_model.js';
+import puppeteer from 'puppeteer';
 import { success, error } from '../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
 import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
@@ -338,113 +339,216 @@ export const createApplication = async (req, res) => {
     }
 };
 
-// Get Template By ID
+// Helper to generate HTML for a proposal (Internal use only)
+const generateProposalHtml = async (id) => {
+    const appData = await Model.getApplicationById(id);
+    if (!appData) throw new Error("Application not found.");
+
+    const ratesRows = await Model.getApplicationRates(id);
+    let user = appData.user_id ? await User.getUserById(appData.user_id) : null;
+    if (!user) {
+        user = { firstname: 'Phillife', lastname: 'Representative', departmentName: 'Head Office', locationName: 'Main Office' };
+    }
+
+    // Load logo and convert to base64 for PDF embedding
+    let logoDataUri = null;
+    try {
+        const logoPath = path.resolve('img/phillife-logo-hd.jpg');
+        if (fs.existsSync(logoPath)) {
+            const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
+            logoDataUri = `data:image/jpeg;base64,${logoBase64}`;
+        }
+    } catch (logoErr) {
+        console.error("Logo loading error:", logoErr);
+    }
+
+    const application = {
+        ...appData,
+        status: { name: appData.status_name || 'Pending' },
+        basic_plan: { name: appData.basic_plan_name || appData.prototype_plan_name || 'N/A' },
+        payment_mode: { name: appData.payment_mode_name || 'N/A' },
+        group_name: appData.group_name,
+        proposal_addressee: appData.proposal_addressee,
+        addressee_designation: appData.addressee_designation,
+        business_address: appData.business_address,
+        minimum_age: appData.minimum_age,
+        maximum_age: appData.maximum_age,
+    };
+
+    const details = {
+        totalAnnualPremium: 0, 
+        contactLocal: '123',
+        rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+        rates65_67: formatDbRatesForTemplate(ratesRows, '65_67') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+        rates68_70: formatDbRatesForTemplate(ratesRows, '68_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+        rates71_74: formatDbRatesForTemplate(ratesRows, '71_74') || { 71: 'n/a', 72: 'n/a', 73: 'n/a', 74: 'n/a' },
+        nelAmount: 500000,
+        nelAge: 65,
+        nmlAmount: 1000000,
+        nmlAge: 60,
+        participationPercentage: 100,
+        logoDataUri
+    };
+
+    if (application.type_of_proposal_id === 30) {
+        switch (application.prototype_id) {
+            case 1: return generateStudentsGTLIPPDFContent(application, user, details);
+            case 2: return generateStudentsGPAPDFContent(application, user, details);
+            case 3: return generateGroupAssociationsPDFContent(application, user, details);
+            case 4: return generateSecurityGuardsPDFContent(application, user, details);
+            case 5: return generateGCLIInitialLoanPDFContent(application, user, details);
+            case 6: return generateGCLIOutstandingLoanBalancePDFContent(application, user, details);
+            case 7: return generateHotelEmployeesPDFContent(application, user, details);
+            case 8: return generateSmallGroupsPDFContent(application, user, details);
+            case 9: return generateBarangayPDFContent(application, user, details);
+            default: return generateGCLIPDFContent(application, user, details);
+        }
+    }
+    return generateGCLIPDFContent(application, user, details);
+};
+
+// Get Template By ID (View HTML)
 export const getTemplateById = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
-        if (isNaN(id)) {
-            return error(res, "Invalid ID format.", 400);
-        }
+        if (isNaN(id)) return error(res, "Invalid ID format.", 400);
 
-        // 1. Fetch Application Data
-        const appData = await Model.getApplicationById(id);
-        if (!appData) {
-            return error(res, "Application not found.", 404);
-        }
-        
-        // Fetch rates from the new table
-        const ratesRows = await Model.getApplicationRates(id);
-
-        // 2. Fetch User Data (CFE / Agent) who created the application
-        let user;
-        if (appData.user_id) {
-            user = await User.getUserById(appData.user_id);
-        }
-
-        if (!user) {
-            user = { firstname: 'Phillife', lastname: 'Representative', departmentName: 'Head Office', locationName: 'Main Office' };
-        }
-
-        // 3. Map flat DB structure to the nested structure required by the template
-        const application = {
-            ...appData,
-            status: { name: appData.status_name || 'Pending' },
-            basic_plan: { name: appData.basic_plan_name || appData.prototype_plan_name || 'N/A' },
-            payment_mode: { name: appData.payment_mode_name || 'N/A' },
-            group_name: appData.group_name,
-            proposal_addressee: appData.proposal_addressee,
-            addressee_designation: appData.addressee_designation,
-            business_address: appData.business_address,
-            minimum_age: appData.minimum_age,
-            maximum_age: appData.maximum_age,
-        };
-
-        // 4. Prepare Details (Rates, Limits, etc.)
-        const details = {
-            totalAnnualPremium: 0, 
-            contactLocal: '123',
-            
-            // Map table rows to template structure
-            // Fallback to hardcoded defaults if DB returns nothing
-            rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-            rates65_67: formatDbRatesForTemplate(ratesRows, '65_67') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-            rates68_70: formatDbRatesForTemplate(ratesRows, '68_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-            rates71_74: formatDbRatesForTemplate(ratesRows, '71_74') || { 71: 'n/a', 72: 'n/a', 73: 'n/a', 74: 'n/a' },
-            
-            nelAmount: 500000,
-            nelAge: 65,
-            nmlAmount: 1000000,
-            nmlAge: 60,
-            participationPercentage: 100
-        };
-
-        // 5. Generate HTML
-        let htmlContent;
-
-        if (application.type_of_proposal_id === 30) {
-            switch (application.prototype_id) {
-                case 1:
-                    htmlContent = generateStudentsGTLIPPDFContent(application, user, details);
-                    break;
-                case 2:
-                    htmlContent = generateStudentsGPAPDFContent(application, user, details);
-                    break;
-                case 3:
-                    htmlContent = generateGroupAssociationsPDFContent(application, user, details);
-                    break;
-                case 4:
-                    htmlContent = generateSecurityGuardsPDFContent(application, user, details);
-                    break;
-                case 5:
-                    htmlContent = generateGCLIInitialLoanPDFContent(application, user, details);
-                    break;
-                case 6:
-                    htmlContent = generateGCLIOutstandingLoanBalancePDFContent(application, user, details);
-                    break;
-                case 7:
-                    htmlContent = generateHotelEmployeesPDFContent(application, user, details);
-                    break;
-                case 8:
-                    htmlContent = generateSmallGroupsPDFContent(application, user, details);
-                    break;
-                case 9:
-                    htmlContent = generateBarangayPDFContent(application, user, details);
-                    break;
-                default:
-                    htmlContent = generateGCLIPDFContent(application, user, details);
-                    break;
-            }
-        } else {
-            htmlContent = generateGCLIPDFContent(application, user, details);
-        }
-
-        // 6. Return HTML response
+        const htmlContent = await generateProposalHtml(id);
         res.setHeader('Content-Type', 'text/html');
         res.send(htmlContent);
-
     } catch (err) {
         console.error("Proposal Generation Error:", err);
         return error(res, err.message, 500);
+    }
+};
+
+// Download Template as PDF
+export const downloadTemplatePDF = async (req, res) => {
+    let browser;
+
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid ID format.", 400);
+
+        const htmlContent = await generateProposalHtml(id);
+
+        if (!puppeteer) {
+            throw new Error("Puppeteer module is not loaded. Ensure 'npm install' was successful.");
+        }
+
+        browser = await puppeteer.launch({
+            headless: true,
+            // Point to your local Chrome installation to avoid cache issues in IIS
+            executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--font-render-hinting=none'
+            ]
+        });
+
+        const page = await browser.newPage();
+
+        // ✅ Set viewport (prevents layout issues)
+        await page.setViewport({ width: 1240, height: 1754 }); // A4 ratio
+
+        // ✅ Load content
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+
+        // ✅ Ensure fonts & styles are fully loaded
+        await page.evaluateHandle('document.fonts.ready');
+
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            preferCSSPageSize: true,
+            margin: {
+                top: '20mm',
+                bottom: '20mm',
+                left: '15mm',
+                right: '15mm'
+            }
+        });
+
+        // Using res.writeHead to set multiple headers clearly
+        res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename=Proposal_${id}.pdf`,
+            'Content-Length': pdfBuffer.length,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
+        res.end(pdfBuffer);
+
+    } catch (err) {
+        console.error("PDF Download Error:", err);
+        return error(res, err.message, 500);
+    } finally {
+        // ✅ ALWAYS close browser (prevents memory leak)
+        if (browser) await browser.close();
+    }
+};
+
+// View Template as PDF (inline in browser)
+export const viewTemplatePDF = async (req, res) => {
+    let browser;
+
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid ID format.", 400);
+
+        const htmlContent = await generateProposalHtml(id);
+
+        if (!puppeteer) {
+            throw new Error("Puppeteer module is not loaded. Ensure 'npm install' was successful.");
+        }
+
+        browser = await puppeteer.launch({
+            headless: true,
+            executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--font-render-hinting=none'
+            ]
+        });
+
+        const page = await browser.newPage();
+        await page.setViewport({ width: 1240, height: 1754 });
+        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
+        await page.evaluateHandle('document.fonts.ready');
+
+        const pdfBuffer = await page.pdf({
+            format: 'A4',
+            printBackground: true,
+            preferCSSPageSize: true,
+            margin: {
+                top: '20mm',
+                bottom: '20mm',
+                left: '15mm',
+                right: '15mm'
+            }
+        });
+
+        res.writeHead(200, {
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `inline; filename=Proposal_${id}.pdf`,
+            'Content-Length': pdfBuffer.length,
+        });
+
+        res.end(pdfBuffer);
+
+    } catch (err) {
+        console.error("PDF View Error:", err);
+        return error(res, err.message, 500);
+    } finally {
+        if (browser) await browser.close();
     }
 };
 

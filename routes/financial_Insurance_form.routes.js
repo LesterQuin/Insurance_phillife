@@ -20,8 +20,11 @@ router.get('/prototype-plans', Controller.getPrototypePlans);
 router.get('/prototypes', Controller.getPrototypes);
 router.get('/:id', Controller.getApplicationById);
 router.delete('/:id', Controller.deleteApplication);
-router.get('/:id/history',  Controller.getApplicationHistory);
+router.get('/:id/history', authenticate, validateGetHistory, Controller.getApplicationHistory);
 
 router.get('/template/:id', Controller.getTemplateById);
+router.get('/template/:id/view-pdf', Controller.viewTemplatePDF);
+router.get('/template/:id/download', Controller.downloadTemplatePDF);
+router.post('/template/:id/download', Controller.downloadTemplatePDF);
 
 export default router;
