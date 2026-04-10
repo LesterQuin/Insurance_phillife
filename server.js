@@ -12,7 +12,21 @@ import systemLookupRoutes from './routes/financial_insurance_system_lookups/fina
 
 dotenv.config();
 const app = express();
-app.use(cors());
+// app.use(cors());
+// 03-24-2026 Mar; Line 16-23
+const corsOptions = {
+  origin: [
+    'http://192.168.101.22:3000',
+    'http://localhost:3000',
+    'http://192.5.5.142:93',
+    'https://192.5.5.142:95',
+    'http://192.5.5.142:85'
+    // 'https://www.yoursite.com'
+  ],
+  credentials: true,
+};
+app.use(cors(corsOptions));
+// app.options('*', cors(corsOptions)); // Comment out
 app.use(express.json());
 app.use(cookieParser());
 app.set('trust proxy', true);
