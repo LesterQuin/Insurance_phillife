@@ -1016,6 +1016,80 @@ body('basic_plan_id')
 ];
 
 // -----------------------------
+// Form validation (Draft)
+// -----------------------------
+export const validateDraftFinancialApplication = [
+    body('application_id').optional().isInt({ min: 1 }).withMessage('Valid Application ID is required for updating a draft'),
+    body('group_name').optional().isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
+    body('business_nature').optional().isLength({ max: 255 }).withMessage('Business Nature must not exceed 255 characters'),
+    body('number_of_lives').optional().isInt({ min: 1 }).withMessage('Number of lives must be at least 1'),
+    body('business_address').optional().isLength({ max: 500 }).withMessage('Business Address must not exceed 500 characters'),
+    body('contact_number').optional().isLength({ max: 20 }).withMessage('Contact Number must not exceed 20 characters'),
+    body('fax_number').optional({ nullable: true }).isLength({ max: 20 }).withMessage('Fax Number must not exceed 20 characters'),
+    body('email').optional().isEmail().withMessage('Valid Email is required'),
+    body('contact_person_salutation').optional().isLength({ max: 20 }).withMessage('Salutation must not exceed 20 characters'),
+    body('contact_person_firstname').optional().isLength({ max: 100 }).withMessage('First Name must not exceed 100 characters'),
+    body('contact_person_mi').optional({ nullable: true, checkFalsy: true }).isLength({ max: 5 }).withMessage('Middle Initial must not exceed 5 characters'),
+    body('contact_person_lastname').optional().isLength({ max: 100 }).withMessage('Last Name must not exceed 100 characters'),
+    body('designation').optional().isLength({ max: 255 }).withMessage('Designation must not exceed 255 characters'),
+    body('proposal_addressee').optional().isLength({ max: 255 }).withMessage('Proposal Addressee must not exceed 255 characters'),
+    body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
+
+    // Age Profile
+    body('minimum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be at least 18'),
+    body('maximum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be within range')
+        .custom((value, { req }) => {
+            const minAge = req.body.minimum_age ? Number(req.body.minimum_age) : null;
+            if (minAge && value && Number(value) < minAge) {
+                throw new Error('Maximum Age must be greater than or equal to Minimum Age');
+            }
+            return true;
+        }),
+
+    // Lookup ID validations (Optional but must be valid if provided)
+    body('group_classification_id').optional().isInt({ min: 0 }).custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
+        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid group_classification_id`);
+        return true;
+    }),
+    body('business_type_id').optional().isInt({ min: 0 }).custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('BUSINESS_TYPE');
+        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid business_type_id`);
+        return true;
+    }),
+    body('group_type_id').optional().isInt({ min: 0 }).custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
+        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid group_type_id`);
+        return true;
+    }),
+    body('payment_mode_id').optional().isInt({ min: 0 }).custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('MODE_OF_PAYMENT');
+        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid payment_mode_id`);
+        return true;
+    }),
+    body('type_of_proposal_id').optional().isInt({ min: 0 }).custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('TYPE_OF_PROPOSAL');
+        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid type_of_proposal_id`);
+        return true;
+    }),
+
+    // Nested Data Structures
+    body('riders').optional({ nullable: true }).isArray().withMessage('riders must be an array'),
+    body('payment').optional({ nullable: true }).isArray().withMessage('payment must be an array'),
+    body('level_ranking').optional({ nullable: true }).isArray().withMessage('level_ranking must be an array'),
+    body('salary_ranking').optional({ nullable: true }).isArray().withMessage('salary_ranking must be an array'),
+
+    body('notes').optional({ nullable: true }).isString().withMessage('Notes must be a string'),
+
+    // Validation result
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
 // System Lookup Validation
 // -----------------------------
 export const validateSystemLookup = [
