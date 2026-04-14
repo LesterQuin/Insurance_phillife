@@ -20,7 +20,7 @@ dns.setDefaultResultOrder('ipv4first');
 // this line allows Node.js to connect to Azure despite certificate validation issues.
 // WARNING: Use this for testing only. Enable SSL for production.
 // Remove this line and ensure your server can validate Azure's SSL certificate before going live.
-// if (process.env.NODE_ENV !== 'production') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+if (process.env.NODE_ENV !== 'production') process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
