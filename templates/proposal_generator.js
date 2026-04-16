@@ -95,20 +95,57 @@ if (planName.lastIndexOf(' ') !== -1) {
         }
 
         html, body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
-        h2, h3 { margin-top: 30px; break-after: avoid; page-break-after: avoid; }
+            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; 
+        }
+        h2 {
+            color: #0d47a1;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #0d47a1;
+            padding-bottom: 5px;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        h3 { 
+            margin-top: 30px; break-after: avoid; page-break-after: avoid; 
+        }
+        .section-group { 
+            break-inside: avoid; page-break-inside: avoid; 
+        }
         .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        table, th, td { border: 1px solid #000; }
-        th, td { padding: 8px; text-align: center; }
-        .note { font-size: 14px; margin-top: 10px; }
-        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #020202; font-style: italic; }
-        .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
-        .page-break { page-break-before: always; }
-        .logo { display: block; margin-left: auto; margin-right: -15mm; margin-top: -10mm; width: 180px; }
-        .center-photo { display: block; width: 100%; height: 550px; object-fit: cover; margin-bottom: 20px; margin-top: 20px; }
-        .footer-logo { width: 200px; }
-        .cover-proposal-title { text-align: left; width: calc(100% - 40mm); font-size: 24pt; font-weight: bold; margin: -5mm 20mm 30px 20mm; color: #2b333c; text-transform: uppercase; line-height: 1.2; }
+        table { 
+            width: 100%; border-collapse: collapse; margin-top: 15px; 
+        }
+        table, th, td { 
+            border: 1px solid #000; 
+        }
+        th, td { 
+            padding: 8px; text-align: center; 
+        }
+        .note { 
+            font-size: 14px; margin-top: 10px; 
+        }
+        .footer-contact { 
+            display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #020202; font-style: italic; 
+        }
+        .footer-link { 
+            color: inherit; text-decoration: none; cursor: pointer; 
+        }
+        .page-break { 
+            page-break-before: always; 
+        }
+        .logo { 
+            display: block; margin-left: auto; margin-right: -15mm; margin-top: -10mm; width: 180px; 
+        }
+        .center-photo { 
+            display: block; width: 100%; height: 550px; object-fit: cover; margin-bottom: 20px; margin-top: 20px; 
+        }
+        .footer-logo { 
+            width: 200px; 
+        }
+        .cover-proposal-title { 
+            text-align: left; width: calc(100% - 40mm); font-size: 24pt; font-weight: bold; margin: -5mm 20mm 30px 20mm; color: #2b333c; text-transform: uppercase; line-height: 1.2; 
+        }
         .header-table {
             width: calc(100% - 40mm) !important;
             margin: 10px auto 0 auto !important;
@@ -149,66 +186,41 @@ if (planName.lastIndexOf(' ') !== -1) {
             flex-shrink: 0; display: flex; justify-content: left; align-items: left; border-top: 1.5px solid #000; padding: 10px 20mm 10px 20mm;
         }
         .main-content {
-            padding: 20mm;
-            padding-left: 20mm;
+            padding: 30mm 20mm 10mm 20mm;
             position: relative;
             background-color: transparent;
             z-index: 1;
-            min-height: 297mm; /* Allow content to expand beyond one page if needed */
+            min-height: 297mm;
             display: flex;
             flex-direction: column;
-            justify-content: center;
+            justify-content: flex-start;
             box-sizing: border-box;
             page-break-after: always; /* Ensure the next section starts on a new page */
         }
-        .content-logo { position: absolute; top: 20px; right: 40px; width: 100px; }
+        .content-logo { 
+            position: absolute; top: 10mm; left: 10mm; width: 150px; z-index: 10; 
+        }
         .plan-details { 
-            margin: 0 20mm; 
+            margin: 0;
             background-color: transparent;
+            position: relative;
         } 
-        /* PREMIUM DIAGONAL RIBBON */
-        .main-content::before,
-        .plan-details::before {
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 30px;
-            height: 100%;
-            z-index: 1;
-            background: linear-gradient(
-                135deg,
-                #0d47a1 0%,
-                #1976d2 25%,
-                #26a69a 60%,
-                #2e7d32 100%
-            );
-            box-shadow: 3px 0 12px rgba(0,0,0,0.15);
+        .layout-table { 
+            width: 100%; border: none !important; border-collapse: collapse; 
         }
-        /* Angled overlay for premium feel */
-        .main-content::after,
-        .plan-details::after {
-            content: "";
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 120px;
-            height: 100%;
-            z-index: 0;
-            background: linear-gradient(
-                120deg,
-                rgba(255,255,255,0.08) 0%,
-                rgba(255,255,255,0.03) 40%,
-                transparent 70%
-            );
-        }
-        .layout-table { width: 100%; border: none !important; border-collapse: collapse; }
         .layout-table > thead > tr > td,
-        .layout-table > tbody > tr > td,
-        .layout-table > tfoot > tr > td { border: none !important; padding: 0; text-align: left; vertical-align: top; }
-        .spacer-top { height: 10mm; }
-        .spacer-bottom { height: 40mm; }
-        .subsequent-footer-logo { position: fixed; bottom: 10mm; right: 10mm; width: 100px; z-index: 1; }
+        .layout-table > tfoot > tr > td { 
+            border: none !important; padding: 0 20mm; text-align: left; vertical-align: top; position: relative; 
+        }
+        .layout-table > tbody > tr > td { 
+            border: none !important; padding: 0 20mm; text-align: left; vertical-align: top; position: relative; 
+        }
+        .spacer-top { 
+            height: 30mm; 
+        }
+        .spacer-bottom { 
+            height: 40mm; 
+        }
         .watermark {
             position: fixed;
             top: 50%;
@@ -261,97 +273,104 @@ if (planName.lastIndexOf(' ') !== -1) {
             </div>
     </div>
 </div>
-<div class="page-break"></div>
-<div class="main-content">
-${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ''}
-<p>
-${formatDate(proposalDate)} <br><br><br>
-${application.contact_person_salutation || ''} ${application.proposal_addressee || ''} <br>
-${application.addressee_designation} <br>
-${application.group_name} <br>
-${application.business_address}
-</p>
-    <p>Dear ${application.addressee_designation || ''} ${addresseeLastName},</p>
-    <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ''}</strong> for the benefit of <strong>${application.group_name || ''}</strong> - debtors.</p>
-    <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
-    <p>Should you have concerns with our program, please feel free to contact us at telephone number (02) 7798 – 5433, local number +63 917 123 4567 or email us at <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a> and we will be more than willing to answer your queries.</p>
-    <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
-    <p>
-Sincerely,<br><br>
 
-<strong>${cfeFullName}</strong> <br>
-${user.departmentName || 'N/A'} <br>
-<strong>${user.locationName || 'N/A'}</strong>
-</p>
+<div class="page-break"></div>
+    <div class="main-content">
+    ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ''}
+        <p>
+            ${formatDate(proposalDate)} <br><br>
+            ${application.contact_person_salutation || ''} ${application.proposal_addressee || ''} <br>
+            ${application.addressee_designation} <br>
+            ${application.group_name} <br>
+            ${application.business_address}
+        </p>
+            <p>Dear ${application.addressee_designation || ''} ${addresseeLastName},</p>
+            <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ''}</strong> for the benefit of <strong>${application.group_name || ''}</strong> - debtors.</p>
+            <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
+            <p>Should you have concerns with our program, please feel free to contact us at telephone number (02) 7798 – 5433, local number +63 917 123 4567 or email us at <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a> and we will be more than willing to answer your queries.</p>
+            <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
+        <p>
+            Sincerely,<br><br>
+
+            <strong>${cfeFullName}</strong> <br>
+            ${user.departmentName || 'N/A'} <br>
+            <strong>${user.locationName || 'N/A'}</strong>
+        </p>
 </div>
 
-<div class="plan-details">
-<table class="layout-table">
-    <thead><tr><td><div class="spacer-top"></div></td></tr></thead>
-    <tbody><tr><td>
-    
-<h2>Summary of Benefits</h2>
-
-<p>
-<strong>Group Credit Life Insurance Plan (GCLIP) – Initial Loan Amount</strong>
-</p>
-
-<p>
-Pays the initial loan amount upon approval of proof of death of the borrower
-while the policy is in force and during the defined period, subject to the
-maximum amount.
-</p>
-
-<table>
-<tr>
-<th>Classification</th>
-<th>Benefit</th>
-</tr>
-
-<tr>
-<td>${application.minimum_age || 18}-${application.maximum_age || 64}</td>
-<td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_64)}</td>
-</tr>
-
-${application.borrower_age_65_67 ? `
-<tr>
-<td>65-67</td>
-<td>Initial amount balance maximum of Php ${formatNumber(maxAmount65_67)}</td>
-</tr>` : ''}
-
-${application.borrower_age_68_70 ? `
-<tr>
-<td>68-70</td>
-<td>Initial amount balance maximum of Php ${formatNumber(maxAmount68_70)}</td>
-</tr>` : ''}
-
-${application.borrower_age_71_74 ? `
-<tr>
-<td>71-74</td>
-<td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_74)}</td>
-</tr>` : ''}
-</table>
-
-<p>
-Death benefit is the Amount of Insurance at loan effective date. It is level
-throughout the term of the loan.
-</p>
-
 <div class="page-break"></div>
+    <div class="plan-details">
+        <table class="layout-table">
+            <thead><tr><td>
+                ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ''}
+                <div class="spacer-top"></div>
+            </td></tr></thead>
+            <tbody><tr><td>
+                <div class="section-group">
+                <h2>Summary of Benefits</h2>
 
-<h3>Single Rate per 1,000 – Borrowers Age ${application.minimum_age}-${application.maximum_age}</h3>
+                <p>
+                    <strong>Group Credit Life Insurance Plan (GCLIP) – Initial Loan Amount</strong>
+                </p>
 
-<table>
-<tr>
-<th>Term of Loan</th>
-<th>Rate</th>
-</tr>
+                <p>
+                    Pays the initial loan amount upon approval of proof of death of the borrower
+                    while the policy is in force and during the defined period, subject to the
+                    maximum amount.
+                </p>
+    <table>
 
-${generateRateRows(rates18_64, ' months')}
-</table>
+        <tr>
+            <th>Classification</th>
+            <th>Benefit</th>
+        </tr>
+
+        <tr>
+            <td>${application.minimum_age || 18}-${application.maximum_age || 64}</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_64)}</td>
+        </tr>
+
+        ${application.borrower_age_65_67 ? `
+        <tr>
+            <td>65-67</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount65_67)}</td>
+        </tr>` : ''}
+
+        ${application.borrower_age_68_70 ? `
+        <tr>
+            <td>68-70</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount68_70)}</td>
+        </tr>` : ''}
+
+        ${application.borrower_age_71_74 ? `
+        <tr>
+            <td>71-74</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_74)}</td>
+        </tr>` : ''}
+    </table>
+
+    <p>
+    Death benefit is the Amount of Insurance at loan effective date. It is level
+    throughout the term of the loan.
+    </p>
+</div>
+
+<div class="section-group">
+    <h2>SINGLE RATE PER 1,000</h2>
+    <h4> Borrowers Age ${application.minimum_age}-${application.maximum_age}</h4>
+
+    <table>
+        <tr>
+        <th>Term of Loan</th>
+        <th>Rate</th>
+        </tr>
+
+        ${generateRateRows(rates18_64, ' months')}
+    </table>
 
 ${application.borrower_age_65_67 ? `
-    <h3>Single Rate per 1,000 – Borrowers Age 65-67</h3>
+    <h2>SINGLE RATE PER 1,000</h2>
+    <h4>Borrowers Age 65-67</h4>
     <table>
         <tr>
             <th>Term of Loan</th>
@@ -362,7 +381,8 @@ ${application.borrower_age_65_67 ? `
 ` : ''}
 
 ${application.borrower_age_68_70 ? `
-    <h3>Single Rate per 1,000 – Borrowers Age 68-70</h3>
+    <h2>SINGLE RATE PER 1,000</h2>
+    <h4>Borrowers Age 68-70</h4>
     <table>
         <tr>
             <th>Term of Loan</th>
@@ -373,112 +393,110 @@ ${application.borrower_age_68_70 ? `
 ` : ''}
 
 ${application.borrower_age_71_74 ? `
-    <h3>Attained Age Rates (12 Months) – Borrowers Age 71-74</h3>
     <table>
         <tr>
-            <th>Age</th>
-            <th>Rate</th>
+            <th>Attained Age</th>
+            <th>GCLIP - 12 months</th>
         </tr>
         ${generateRateRows(rates71_74, '')}
     </table>
 ` : ''}
+                </div>
 
 <div class="page-break"></div>
 
 <h2>Notes</h2>
-
 <div class="notes">
 
-<p>
-1. Rates are inclusive of government-mandated taxes. Renewal rate may change
-depending on the claims experience of the policy.
-</p>
+    <p>
+        1. Rates are inclusive of government-mandated taxes. Renewal rate may change
+        depending on the claims experience of the policy.
+    </p>
 
-<p>
-2. <strong>Eligibility Requirements</strong><br>
-    A. Any in good health and actively-at-work debtor of the Policyholder who is at
-least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
-at the time of loan application. Actively-at-work means
-<ul>
-    <li>Performing usual duties of occupation and/or performing activities of daily living</li>
-    <li>Engaged in lawful employment or business</li>
-</ul>
-</p>
+    <p>
+        2. <strong>Eligibility Requirements</strong><br>
+            A. Any in good health and actively-at-work debtor of the Policyholder who is at
+        least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
+        at the time of loan application. Actively-at-work means
+    <ul>
+        <li>Performing usual duties of occupation and/or performing activities of daily living</li>
+        <li>Engaged in lawful employment or business</li>
+    </ul>
+    </p>
 
-<p>
-3. <strong>Termination of Insurance</strong><br>
-Insurance coverage automatically terminates on the earliest of the following dates:
-</p>
+    <p>
+        3. <strong>Termination of Insurance</strong><br>
+        Insurance coverage automatically terminates on the earliest of the following dates:
+    </p>
 
-<ul>
-<li>The date the policy terminates</li>
-<li>The policy anniversary immediately succeeding the date of the Debtor attains the termination age</li>
-<li>The date any payment towards the loan becomes six (6) months overdue, not with standing payment for his insurance</li>
-<li>The Insured Debtor ceases to be a debtor of the Creditor</li>
-<li>The date the loan matures</li>
-</ul>
+    <ul>
+        <li>The date the policy terminates</li>
+        <li>The policy anniversary immediately succeeding the date of the Debtor attains the termination age</li>
+        <li>The date any payment towards the loan becomes six (6) months overdue, not with standing payment for his insurance</li>
+        <li>The Insured Debtor ceases to be a debtor of the Creditor</li>
+        <li>The date the loan matures</li>
+    </ul>
 
-<p>
-4. <strong>Participation Requirements</strong><br>
-At least ${participationPercentage}% individuals within the policy year
-</p>
+    <p>
+        4. <strong>Participation Requirements</strong><br>
+        At least ${participationPercentage}% individuals within the policy year
+    </p>
 
-<p>
-5. <strong>Evidence of Insurability</strong><br>
-Individual application - borrower,
-<ul>
-    <li>No Evidence Limit (NEL): Php ${formatNumber(nelAmount)} provided eligible individual has not attained his ${nelAge} birthday<br></li>
-    <li>Non-Medical Limit (NML): Php ${formatNumber(nmlAmount)} provided eligible individual has not attained his ${nmlAge} birthday</li>
-</ul>
-</p>
+    <p>
+        5. <strong>Evidence of Insurability</strong><br>
+        Individual application - borrower,
+        <ul>
+            <li>No Evidence Limit (NEL): Php ${formatNumber(nelAmount)} provided eligible individual has not attained his ${nelAge} birthday<br></li>
+            <li>Non-Medical Limit (NML): Php ${formatNumber(nmlAmount)} provided eligible individual has not attained his ${nmlAge} birthday</li>
+        </ul>
+    </p>
 
-<p>
-6. <strong>Payment of Benefits</strong><br>
-Upon approval of proof of death of the Debtor while the insurance is in force , PHILLIFE shall pay the following:
-</p>
+    <p>
+        6. <strong>Payment of Benefits</strong><br>
+        Upon approval of proof of death of the Debtor while the insurance is in force , PHILLIFE shall pay the following:
+    </p>
 
-<ul>
-<li>To the Policyholder: the Outstanding balance of the Debtor's loan</li>
-<li>To the Debtor's benefeciaries: the difference, if any, between the amount of insurance and the outstanding balance of the Debtor's loan. Outstanding balance were derived from amortization of the insured.</li>
-</ul>
+    <ul>
+        <li>To the Policyholder: the Outstanding balance of the Debtor's loan</li>
+        <li>To the Debtor's benefeciaries: the difference, if any, between the amount of insurance and the outstanding balance of the Debtor's loan. Outstanding balance were derived from amortization of the insured.</li>
+    </ul>
 
-<p>
-7. This proposal is subject to the complete provisions to be provided in the Policy.
-</p>
+    <p>
+        7. This proposal is subject to the complete provisions to be provided in the Policy.
+    </p>
 
-<p>
-8. The proposal validity is until ${formatDate(expiryDate)}.
-</p>
-
-</div>
-
-<div class="signature">
-
-<p><strong>Conforme (Policyholder):</strong></p>
-
-<p>
-${application.contact_person_salutation} ${application.proposal_addressee}: ______________________________ <br>
-</p>
-
-<p>
-${application.addressee_designation}: ______________________________ <br>
-</p>
-
-<p>
-Signature: ______________________________ <br>
-</p>
-
-<p>
-Date Signed: ______________________________ <br>
-</p>
+    <p>
+        8. The proposal validity is until ${formatDate(expiryDate)}.
+    </p>
 
 </div>
 
-    </td></tr></tbody>
-    <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
-</table>
+    <div class="signature">
+
+    <p><strong>Conforme (Policyholder):</strong></p>
+
+    <p>
+    ${application.contact_person_salutation} ${application.proposal_addressee}: ______________________________ <br>
+    </p>
+
+    <p>
+    ${application.addressee_designation}: ______________________________ <br>
+    </p>
+
+    <p>
+    Signature: ______________________________ <br>
+    </p>
+
+    <p>
+    Date Signed: ______________________________ <br>
+    </p>
+
+        </div>
+    </div>
+        </td></tr></tbody>
+        <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
+    </table>
 </div>
-${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="subsequent-footer-logo" />` : ''}
 
 </body>
 </html>
