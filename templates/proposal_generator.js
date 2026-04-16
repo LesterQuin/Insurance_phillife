@@ -1,30 +1,45 @@
 // Helper to format numbers with commas for currency.
 const capitalize = (str) => {
-    if (!str) return '';
-    const s = String(str);
-    return s.charAt(0).toUpperCase() + s.slice(1);
+  if (!str) return "";
+  const s = String(str);
+  return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 const formatNumber = (num) => {
-    if (num == null || isNaN(num)) return '0.00';
-    return num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (num == null || isNaN(num)) return "0.00";
+  return num.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 };
 
 const formatDate = (date) => {
-    // Adding timeZone: 'UTC' prevents the date from shifting to the next day
-    // due to local timezone conversion of a UTC-like date string from the database.
-    return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+  // Adding timeZone: 'UTC' prevents the date from shifting to the next day
+  // due to local timezone conversion of a UTC-like date string from the database.
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 };
 
 // Helper to generate table rows dynamically for rates
-const generateRateRows = (rates, suffix = '') => { 
-    const keys = Object.keys(rates).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
-    if (keys.length === 0) return '<tr><td colspan="2">N/A</td></tr>';
-    return keys.map(key => `
+const generateRateRows = (rates, suffix = "") => {
+  const keys = Object.keys(rates)
+    .map(Number)
+    .filter((n) => !isNaN(n))
+    .sort((a, b) => a - b);
+  if (keys.length === 0) return '<tr><td colspan="2">N/A</td></tr>';
+  return keys
+    .map(
+      (key) => `
 <tr>
 <td>${key}${suffix}</td>
 <td>${rates[key]}</td>
-</tr>`).join('');
+</tr>`,
+    )
+    .join("");
 };
 
 /**
@@ -35,54 +50,58 @@ const generateRateRows = (rates, suffix = '') => {
  * @returns {string} - The complete HTML content for the proposal.
  */
 export const generateGCLIPDFContent = (application, user, details) => {
-    const proposalDate = new Date(application.updated_at);
-    const expiryDate = new Date(proposalDate);
-    expiryDate.setDate(expiryDate.getDate() + 30);
+  const proposalDate = new Date(application.updated_at);
+  const expiryDate = new Date(proposalDate);
+  expiryDate.setDate(expiryDate.getDate() + 30);
 
-    const addresseeLastName = application.proposal_addressee?.split(' ').pop() || '';
+  const addresseeLastName =
+    application.proposal_addressee?.split(" ").pop() || "";
 
-    // Defaulting details to avoid errors if they are not provided
-    const {
-        totalAnnualPremium = 0,
-        maxAmount18_64 = 0,
-        maxAmount65_67 = 0,
-        maxAmount68_70 = 0,
-        maxAmount71_74 = 0,
-        rates18_64 = {},
-        rates65_67 = {},
-        rates68_70 = {},
-        rates71_74 = {},
-        participationPercentage = 75,
-        nelAmount = 0,
-        nelAge = 0,
-        nmlAmount = 0,
-        nmlAge = 0,
-        logoDataUri = null,
-        centerPhotoUri = null,
-    } = details || {};
+  // Defaulting details to avoid errors if they are not provided
+  const {
+    totalAnnualPremium = 0,
+    maxAmount18_64 = 0,
+    maxAmount65_67 = 0,
+    maxAmount68_70 = 0,
+    maxAmount71_74 = 0,
+    rates18_64 = {},
+    rates65_67 = {},
+    rates68_70 = {},
+    rates71_74 = {},
+    participationPercentage = 75,
+    nelAmount = 0,
+    nelAge = 0,
+    nmlAmount = 0,
+    nmlAge = 0,
+    logoDataUri = null,
+    centerPhotoUri = null,
+  } = details || {};
 
-    const cfeFullName = `${user.firstname} ${user.lastname}`;
+  const cfeFullName = `${user.firstname} ${user.lastname}`;
 
-const planName = (application.basic_plan?.name || '').trim();
-const lastSpaceIndex = planName.lastIndexOf(' ') !== -1 ? planName.lastIndexOf(' ') : planName.length;
+  const planName = (application.basic_plan?.name || "").trim();
+  const lastSpaceIndex =
+    planName.lastIndexOf(" ") !== -1
+      ? planName.lastIndexOf(" ")
+      : planName.length;
 
-let displayTitle = '';
-if (planName.lastIndexOf(' ') !== -1) {
+  let displayTitle = "";
+  if (planName.lastIndexOf(" ") !== -1) {
     displayTitle = `
         <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
         <br>
         <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
     `;
-} else {
+  } else {
     // Fallback for single-word plan names
     displayTitle = `
         <span style="color:#0d47a1;">${planName}</span>
         <br>
         <span style="color:#2e7d32;">PROPOSAL</span>
     `;
-}
+  }
 
-    return `
+  return `
     <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -240,28 +259,32 @@ if (planName.lastIndexOf(' ') !== -1) {
 </head>
 <body>
     <!-- To disable the watermark entirely, you can comment out the line below: -->
-    ${['pending', 'draft', 'rejected'].includes(application.status?.name?.toLowerCase()) && logoDataUri
+    ${
+      ["pending", "draft", "rejected"].includes(
+        application.status?.name?.toLowerCase(),
+      ) && logoDataUri
         ? `<div class="watermark"></div>`
-        : ''}
+        : ""
+    }
 <div class="cover-page">
     <div class="cover-top">
-        ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ''}
+        ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ""}
     </div>
     <div class="cover-middle">
             <div class="cover-proposal-title">
                 ${displayTitle}
             </div>
-            ${centerPhotoUri ? `<img src="${centerPhotoUri}" alt="Plan Image" class="center-photo" />` : ''}
+            ${centerPhotoUri ? `<img src="${centerPhotoUri}" alt="Plan Image" class="center-photo" />` : ""}
         <table class="header-table">
             <tr>
                 <td><strong>Presented To:</strong><br>${capitalize(application.group_name)}</td>
-                <td><strong>Proposal Status:</strong><br>${capitalize(application.status?.name || '')}</td>
+                <td><strong>Proposal Status:</strong><br>${capitalize(application.status?.name || "")}</td>
                 <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
             </tr>
             <tr>
-                <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || '')}</td>
+                <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || "")}</td>
                 <td><strong>Total Annual Premium:</strong><br>Php ${formatNumber(totalAnnualPremium)}</td>
-                <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || '')}</td>
+                <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || "")}</td>
             </tr>
         </table>
     </div>
@@ -276,16 +299,16 @@ if (planName.lastIndexOf(' ') !== -1) {
 
 <div class="page-break"></div>
     <div class="main-content">
-    ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ''}
+    ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
         <p>
             ${formatDate(proposalDate)} <br><br>
-            ${application.contact_person_salutation || ''} ${application.proposal_addressee || ''} <br>
+            ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
             ${application.addressee_designation} <br>
             ${application.group_name} <br>
             ${application.business_address}
         </p>
-            <p>Dear ${application.addressee_designation || ''} ${addresseeLastName},</p>
-            <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ''}</strong> for the benefit of <strong>${application.group_name || ''}</strong> - debtors.</p>
+            <p>Dear ${application.addressee_designation || ""} ${addresseeLastName},</p>
+            <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
             <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
             <p>Should you have concerns with our program, please feel free to contact us at telephone number (02) 7798 – 5433, local number +63 917 123 4567 or email us at <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a> and we will be more than willing to answer your queries.</p>
             <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
@@ -293,8 +316,8 @@ if (planName.lastIndexOf(' ') !== -1) {
             Sincerely,<br><br>
 
             <strong>${cfeFullName}</strong> <br>
-            ${user.departmentName || 'N/A'} <br>
-            <strong>${user.locationName || 'N/A'}</strong>
+            ${user.departmentName || "N/A"} <br>
+            <strong>${user.locationName || "N/A"}</strong>
         </p>
 </div>
 
@@ -302,7 +325,7 @@ if (planName.lastIndexOf(' ') !== -1) {
     <div class="plan-details">
         <table class="layout-table">
             <thead><tr><td>
-                ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ''}
+                ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
                 <div class="spacer-top"></div>
             </td></tr></thead>
             <tbody><tr><td>
@@ -330,23 +353,35 @@ if (planName.lastIndexOf(' ') !== -1) {
             <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_64)}</td>
         </tr>
 
-        ${application.borrower_age_65_67 ? `
+        ${
+          application.borrower_age_65_67
+            ? `
         <tr>
             <td>65-67</td>
             <td>Initial amount balance maximum of Php ${formatNumber(maxAmount65_67)}</td>
-        </tr>` : ''}
+        </tr>`
+            : ""
+        }
 
-        ${application.borrower_age_68_70 ? `
+        ${
+          application.borrower_age_68_70
+            ? `
         <tr>
             <td>68-70</td>
             <td>Initial amount balance maximum of Php ${formatNumber(maxAmount68_70)}</td>
-        </tr>` : ''}
+        </tr>`
+            : ""
+        }
 
-        ${application.borrower_age_71_74 ? `
+        ${
+          application.borrower_age_71_74
+            ? `
         <tr>
             <td>71-74</td>
             <td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_74)}</td>
-        </tr>` : ''}
+        </tr>`
+            : ""
+        }
     </table>
 
     <p>
@@ -365,10 +400,12 @@ if (planName.lastIndexOf(' ') !== -1) {
         <th>Rate</th>
         </tr>
 
-        ${generateRateRows(rates18_64, ' months')}
+        ${generateRateRows(rates18_64, " months")}
     </table>
 
-${application.borrower_age_65_67 ? `
+${
+  application.borrower_age_65_67
+    ? `
     <h2>SINGLE RATE PER 1,000</h2>
     <h4>Borrowers Age 65-67</h4>
     <table>
@@ -376,11 +413,15 @@ ${application.borrower_age_65_67 ? `
             <th>Term of Loan</th>
             <th>Rate</th>
         </tr>
-        ${generateRateRows(rates65_67, ' months')}
+        ${generateRateRows(rates65_67, " months")}
     </table>
-` : ''}
+`
+    : ""
+}
 
-${application.borrower_age_68_70 ? `
+${
+  application.borrower_age_68_70
+    ? `
     <h2>SINGLE RATE PER 1,000</h2>
     <h4>Borrowers Age 68-70</h4>
     <table>
@@ -388,19 +429,25 @@ ${application.borrower_age_68_70 ? `
             <th>Term of Loan</th>
             <th>Rate</th>
         </tr>
-        ${generateRateRows(rates68_70, ' months')}
+        ${generateRateRows(rates68_70, " months")}
     </table>
-` : ''}
+`
+    : ""
+}
 
-${application.borrower_age_71_74 ? `
+${
+  application.borrower_age_71_74
+    ? `
     <table>
         <tr>
             <th>Attained Age</th>
             <th>GCLIP - 12 months</th>
         </tr>
-        ${generateRateRows(rates71_74, '')}
+        ${generateRateRows(rates71_74, "")}
     </table>
-` : ''}
+`
+    : ""
+}
                 </div>
 
 <div class="page-break"></div>
