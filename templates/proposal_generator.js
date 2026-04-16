@@ -542,6 +542,15 @@ ${
         8. The proposal validity is until ${formatDate(expiryDate)}.
     </p>
 
+        ${application.notes ? `
+        <div class="section-group">
+            <p>9. <strong>Notes:</strong></p>
+            <div style="margin-left: 5mm; margin-top: -10px;">
+                ${application.notes}
+            </div>
+        </div>
+        ` : ""}
+
 </div>
 
     <div class="signature">
