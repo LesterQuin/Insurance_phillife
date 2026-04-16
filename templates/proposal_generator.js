@@ -75,6 +75,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
     nmlAge = 0,
     logoDataUri = null,
     centerPhotoUri = null,
+    footerPhotoUri = null,
   } = details || {};
 
   const cfeFullName = `${user.firstname} ${user.lastname}`;
@@ -202,7 +203,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10mm; 
         }
         .cover-bottom {
-            flex-shrink: 0; display: flex; justify-content: left; align-items: left; border-top: 1.5px solid #000; padding: 10px 20mm 10px 20mm;
+            flex-shrink: 0; display: flex; justify-content: left; align-items: left; padding: 10px 15mm 10px 20mm;
         }
         .main-content {
             padding: 30mm 20mm 10mm 20mm;
@@ -255,7 +256,24 @@ export const generateGCLIPDFContent = (application, user, details) => {
             z-index: 9999;
             pointer-events: none;
         }
-    </style>
+        .subsequent-footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 101%;
+            z-index: 0;
+            pointer-events: none;
+        }
+        .plan-name-footer {
+            position: absolute;
+            bottom: 4mm;
+            left: 10mm;
+            font-size: 10pt;
+            color: #ffffff;
+            z-index: 5;
+            font-weight: bold;
+        }
+        </style>
 </head>
 <body>
     <!-- To disable the watermark entirely, you can comment out the line below: -->
@@ -266,6 +284,14 @@ export const generateGCLIPDFContent = (application, user, details) => {
         ? `<div class="watermark"></div>`
         : ""
     }
+
+    ${footerPhotoUri ? `
+        <div class="subsequent-footer">
+            <div class="plan-name-footer">${planName}</div>
+            <img src="${footerPhotoUri}" style="width: 101%; display: block;" />
+        </div>
+    ` : ""}
+
 <div class="cover-page">
     <div class="cover-top">
         ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ""}
