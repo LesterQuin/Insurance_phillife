@@ -176,13 +176,13 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
         .header-table td {
             width: 33.33%;
-            padding: 12px 14px;
+            padding: 10px 12px;
             border: none !important;      
             background: #ffffff;          
             border-radius: 6px;
             vertical-align: top;
             text-align: left;
-            line-height: 1.3;
+            line-height: 1.1;
             box-sizing: border-box;
             box-shadow: 0 1px 1px rgba(0,0,0,0.08);
         }

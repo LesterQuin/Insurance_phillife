@@ -1,6 +1,6 @@
 // templates/tempPasswordTemplate.js
 export const tempPasswordTemplate = (lastname, tempPassword, baseUrl) => {
-    return `
+  return `
 <!DOCTYPE html>
 <html lang="en">
     <head>
@@ -39,7 +39,7 @@ export const tempPasswordTemplate = (lastname, tempPassword, baseUrl) => {
             </div>
 
             <p style="margin:20px 0; font-size:16px;">
-                Please <a href="https://heritagecapitalbrew.phillife.com.ph/login-staff"  style="color:#3498db; text-decoration:none;">login</a> and reset your password immediately for security.
+                Please <a href="http://192.5.5.142:85/login"  style="color:#3498db; text-decoration:none;">login</a> and reset your password immediately for security.
             </p>
 
             <p style="margin:25px 0 0; font-size:14px; color:#555; text-align:center; font-style:italic;">
