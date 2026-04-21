@@ -67,6 +67,41 @@ const cleanupOtherFields = async (data) => {
     return mutableData;
 };
 
+// Helper to nullify fields based on proposal type (Prototype vs Product)
+const cleanProposalFields = (data) => {
+    const mutableData = { ...data };
+    const PROTOTYPE_TYPE_ID = 30;
+
+    if (mutableData.type_of_proposal_id && Number(mutableData.type_of_proposal_id) === PROTOTYPE_TYPE_ID) {
+        mutableData.plan_id = null;
+        mutableData.basic_plan_id = null;
+        mutableData.riders = [];
+        mutableData.amount_loans_id = null;
+        mutableData.loans_amount = null;
+        mutableData.payment = [];
+        mutableData.coverage_type_id = null;
+        mutableData.level_ranking = null;
+        mutableData.uniform_coverage_amount = null;
+        mutableData.salary_ranking = null;
+        
+        // Reset age bracket flags for prototypes to avoid constraint errors
+        mutableData.borrower_age_65_67 = 0;
+        mutableData.borrower_age_68_70 = 0;
+        mutableData.borrower_age_71_74 = 0;
+    } else if (mutableData.type_of_proposal_id) {
+        mutableData.prototype_id = null;
+    }
+
+    // Coerce boolean age bracket flags to 0 or 1 to satisfy NOT NULL constraints
+    ['borrower_age_65_67', 'borrower_age_68_70', 'borrower_age_71_74'].forEach(field => {
+        if (mutableData[field] !== undefined) {
+            mutableData[field] = mutableData[field] ? 1 : 0;
+        }
+    });
+
+    return mutableData;
+};
+
 // Helper to expand simplified rider inputs and enforce rules
 const preprocessRiders = (data) => {
     // 1. Get Designations from rankings if available
@@ -295,22 +330,11 @@ export const createApplication = async (req, res) => {
         const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
-        // If it's a Prototype, nullify product-specific fields.
-        if (Number(dataToSave.type_of_proposal_id) === 30) { // 30 is Prototype
-            dataToSave.plan_id = null;
-            dataToSave.basic_plan_id = null;
-            dataToSave.riders = [];
-            dataToSave.amount_loans_id = null;
-            dataToSave.loans_amount = null;
-            dataToSave.payment = [];
-            dataToSave.coverage_type_id = null;
-            dataToSave.level_ranking = null;
-            dataToSave.uniform_coverage_amount = null;
-            dataToSave.salary_ranking = null;
-        } else { 
-            dataToSave.prototype_id = null;
-        }
-        
+        // Set status to Pending (ID: 1) since validateFinancialApplication middleware passed
+        const STATUS_PENDING = 1;
+        dataToSave.status_id = STATUS_PENDING;
+
+        dataToSave = cleanProposalFields(dataToSave);
         const cleanedData = await cleanupOtherFields(dataToSave);
         const processedData = preprocessRiders(cleanedData);
         processedData.ip_address = normalizeIp(req.ip);
@@ -339,6 +363,67 @@ export const createApplication = async (req, res) => {
     }
 };
 
+// Save Application as Draft
+export const saveDraft = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        let dataToSave = { ...req.body };
+        const agentCodeFromBody = req.body.agent_code;
+        const applicationId = dataToSave.application_id;
+
+        // Set status to Draft. 
+        const STATUS_DRAFT = 4;
+        dataToSave.status_id = STATUS_DRAFT;
+
+        dataToSave = cleanProposalFields(dataToSave);
+        const cleanedData = await cleanupOtherFields(dataToSave);
+        const processedData = preprocessRiders(cleanedData);
+        processedData.ip_address = normalizeIp(req.ip);
+
+        if (processedData.notes) {
+            processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
+        }
+
+        let app;
+        if (applicationId) {
+            // If an ID exists, we update the existing draft (Auto-save mode)
+            const existingDraft = await Model.getApplicationById(applicationId);
+            if (!existingDraft) return error(res, 'Draft not found', 404);
+            
+            const loggedInId = Number(userId);
+            const creatorId = Number(existingDraft.user_id);
+            let isAuthorized = false;
+
+            if (loggedInId === creatorId) {
+                isAuthorized = true;
+            } else if (agentCodeFromBody) {
+                const creatorUser = await User.getUserById(existingDraft.user_id);
+                if (creatorUser && creatorUser.agent_code === agentCodeFromBody.trim()) {
+                    isAuthorized = true;
+                }
+            }
+
+            if (!isAuthorized) {
+                return error(res, 'You are not authorized to update this draft.', 403);
+            }
+
+            const { agent_code, ...finalData } = processedData;
+            await Model.updateApplication(applicationId, finalData, userId);
+            app = await Model.getApplicationById(applicationId);
+        } else {
+            // If no ID exists, create a new draft entry
+            const newRecord = await Model.createApplication(processedData, userId);
+            app = await Model.getApplicationById(newRecord.application_id);
+        }
+        
+        const response = await buildApplicationResponse(app);
+        return success(res, response, 'Application saved as draft successfully', applicationId ? 200 : 201);
+    } catch (err) {
+        console.error('Draft Save Error:', err);
+        return error(res, err.message);
+    }
+};
+
 // Helper to generate HTML for a proposal (Internal use only)
 const generateProposalHtml = async (id) => {
     const appData = await Model.getApplicationById(id);
@@ -353,13 +438,49 @@ const generateProposalHtml = async (id) => {
     // Load logo and convert to base64 for PDF embedding
     let logoDataUri = null;
     try {
-        const logoPath = path.resolve('img/phillife-logo-hd.jpg');
+        const logoPath = path.join(process.cwd(), 'img', 'phillife-logo-hd.jpg');
         if (fs.existsSync(logoPath)) {
             const logoBase64 = fs.readFileSync(logoPath, { encoding: 'base64' });
             logoDataUri = `data:image/jpeg;base64,${logoBase64}`;
         }
     } catch (logoErr) {
         console.error("Logo loading error:", logoErr);
+    }
+
+    // Load center photo and convert to base64 for PDF embedding
+    let centerPhotoUri = null;
+    try {
+        const photoPath = path.join(process.cwd(), 'img', 'cover.png');
+        if (fs.existsSync(photoPath)) {
+            const photoBase64 = fs.readFileSync(photoPath, { encoding: 'base64' });
+            centerPhotoUri = `data:image/jpeg;base64,${photoBase64}`;
+        }
+    } catch (photoErr) {
+        console.error("Center photo loading error:", photoErr);
+    }
+
+    // Load Left Logo (Up.png) and convert to base64 for PDF embedding
+    let leftLogoUri = null;
+    try {
+        const leftLogoPath = path.join(process.cwd(), 'img', 'Up.png');
+        if (fs.existsSync(leftLogoPath)) {
+            const leftLogoBase64 = fs.readFileSync(leftLogoPath, { encoding: 'base64' });
+            leftLogoUri = `data:image/png;base64,${leftLogoBase64}`;
+        }
+    } catch (leftLogoErr) {
+        console.error("Left logo loading error:", leftLogoErr);
+    }
+
+    // Load Footer Image (footer.png)
+    let footerPhotoUri = null;
+    try {
+        const footerPath = path.join(process.cwd(), 'img', 'footer.png');
+        if (fs.existsSync(footerPath)) {
+            const footerBase64 = fs.readFileSync(footerPath, { encoding: 'base64' });
+            footerPhotoUri = `data:image/png;base64,${footerBase64}`;
+        }
+    } catch (footerErr) {
+        console.error("Footer photo loading error:", footerErr);
     }
 
     const application = {
@@ -382,12 +503,16 @@ const generateProposalHtml = async (id) => {
         rates65_67: formatDbRatesForTemplate(ratesRows, '65_67') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
         rates68_70: formatDbRatesForTemplate(ratesRows, '68_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
         rates71_74: formatDbRatesForTemplate(ratesRows, '71_74') || { 71: 'n/a', 72: 'n/a', 73: 'n/a', 74: 'n/a' },
+        // ...maxAmountsMap, // Merges values like maxAmount18_64 into details
         nelAmount: 500000,
         nelAge: 65,
         nmlAmount: 1000000,
         nmlAge: 60,
         participationPercentage: 100,
-        logoDataUri
+        logoDataUri,
+        centerPhotoUri,
+        leftLogoUri,
+        footerPhotoUri
     };
 
     if (application.type_of_proposal_id === 30) {
@@ -422,55 +547,75 @@ export const getTemplateById = async (req, res) => {
     }
 };
 
-// Download Template as PDF
-export const downloadTemplatePDF = async (req, res) => {
+// Helper for unified PDF generation logic to ensure consistent pagination and layout
+const generatePDFBuffer = async (htmlContent) => {
     let browser;
-
     try {
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return error(res, "Invalid ID format.", 400);
-
-        const htmlContent = await generateProposalHtml(id);
-
-        if (!puppeteer) {
-            throw new Error("Puppeteer module is not loaded. Ensure 'npm install' was successful.");
-        }
-
         browser = await puppeteer.launch({
             headless: true,
-            // Point to your local Chrome installation to avoid cache issues in IIS
             executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
             args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-gpu',
-                '--font-render-hinting=none'
+                '--no-zygote',
+                '--single-process',
+                '--font-render-hinting=none',
+                '--force-color-profile=srgb',
             ]
         });
 
         const page = await browser.newPage();
-
-        // ✅ Set viewport (prevents layout issues)
-        await page.setViewport({ width: 1240, height: 1754 }); // A4 ratio
-
-        // ✅ Load content
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-
-        // ✅ Ensure fonts & styles are fully loaded
+        // Standard A4 dimensions at 96 DPI helps accurate pagination calculation
+        await page.setViewport({ width: 794, height: 1122, deviceScaleFactor: 1 }); 
+        
+        await page.setContent(htmlContent, { waitUntil: 'load' });
         await page.evaluateHandle('document.fonts.ready');
+        
+        // Small delay to allow layout engine to stabilize for counter(page) calculations
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-        const pdfBuffer = await page.pdf({
+        return await page.pdf({
             format: 'A4',
             printBackground: true,
-            preferCSSPageSize: true,
+            displayHeaderFooter: true,
+
+            headerTemplate: `<div></div>`,
+
+            footerTemplate: `
+                <div style="
+                    width: 100%;
+                    font-size: 15px;
+                    color: white;
+                    padding: 0 30px;
+                    text-align: right;
+                ">
+                    Page <span class="pageNumber"></span>
+                </div>
+            `,
+
             margin: {
                 top: '20mm',
                 bottom: '20mm',
-                left: '15mm',
-                right: '15mm'
+                left: '0mm',
+                right: '0mm'
             }
         });
+    } finally {
+        // Ensure browser is always closed to prevent memory leaks
+        if (browser) await browser.close();
+    }
+};
+
+// Download Template as PDF
+export const downloadTemplatePDF = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid ID format.", 400);
+
+        const htmlContent = await generateProposalHtml(id);
+        const pdfBuffer = await generatePDFBuffer(htmlContent);
 
         // Using res.writeHead to set multiple headers clearly
         res.writeHead(200, {
@@ -483,58 +628,20 @@ export const downloadTemplatePDF = async (req, res) => {
         });
 
         res.end(pdfBuffer);
-
     } catch (err) {
         console.error("PDF Download Error:", err);
         return error(res, err.message, 500);
-    } finally {
-        // ✅ ALWAYS close browser (prevents memory leak)
-        if (browser) await browser.close();
     }
 };
 
 // View Template as PDF (inline in browser)
 export const viewTemplatePDF = async (req, res) => {
-    let browser;
-
     try {
         const id = parseInt(req.params.id);
         if (isNaN(id)) return error(res, "Invalid ID format.", 400);
 
         const htmlContent = await generateProposalHtml(id);
-
-        if (!puppeteer) {
-            throw new Error("Puppeteer module is not loaded. Ensure 'npm install' was successful.");
-        }
-
-        browser = await puppeteer.launch({
-            headless: true,
-            executablePath: process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--font-render-hinting=none'
-            ]
-        });
-
-        const page = await browser.newPage();
-        await page.setViewport({ width: 1240, height: 1754 });
-        await page.setContent(htmlContent, { waitUntil: 'networkidle0' });
-        await page.evaluateHandle('document.fonts.ready');
-
-        const pdfBuffer = await page.pdf({
-            format: 'A4',
-            printBackground: true,
-            preferCSSPageSize: true,
-            margin: {
-                top: '20mm',
-                bottom: '20mm',
-                left: '15mm',
-                right: '15mm'
-            }
-        });
+        const pdfBuffer = await generatePDFBuffer(htmlContent);
 
         res.writeHead(200, {
             'Content-Type': 'application/pdf',
@@ -543,12 +650,9 @@ export const viewTemplatePDF = async (req, res) => {
         });
 
         res.end(pdfBuffer);
-
     } catch (err) {
         console.error("PDF View Error:", err);
         return error(res, err.message, 500);
-    } finally {
-        if (browser) await browser.close();
     }
 };
 
@@ -908,34 +1012,28 @@ export const getAllApplications = async (req, res) => {
 export const saveRates = async (req, res) => {
     try {
         const userId = req.user.user_id;
+        
+        // 1. Department Check: Only Actuarial (ID 18) can set or update rates
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+
+        if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+            return error(res, 'Access Denied: Only users from the Actuarial department are authorized to input or update rates.', 403);
+        }
+
         const { application_id, ...ratesData } = req.body;
 
-        // 1. Authorization Check (Similar to updateApplication)
         const existingApplication = await Model.getApplicationById(application_id);
         if (!existingApplication) {
             return error(res, 'Application not found', 404);
         }
 
-        const loggedInId = Number(userId);
-        const creatorId = Number(existingApplication.user_id);
-        let isAuthorized = false;
-
-        if (loggedInId === creatorId) {
-            isAuthorized = true;
-        } else if (req.user.agent_code) {
-             // If user has agent code, check if it matches the creator's agent code
-            const creatorUser = await User.getUserById(existingApplication.user_id);
-                if (creatorUser && creatorUser.agent_code === req.user.agent_code.trim()) {
-                    isAuthorized = true;
-                }
-        }
-
-        // if (!isAuthorized) {
-        //     return error(res, 'You are not authorized to update rates for this application.', 403);
-        // }
-
         // 2. Save Rates to Normalized Table
         await Model.saveApplicationRates(application_id, ratesData);
+
+        // Automatically transition to Approved status (ID: 2) when rates are input
+        const STATUS_APPROVED = 2;
+        await Model.updateApplication(application_id, { status_id: STATUS_APPROVED }, userId);
         
         // Fetch updated application to return
         const updatedApp = await Model.getApplicationById(application_id);
@@ -1014,7 +1112,18 @@ export const updateApplication = async (req, res) => {
         
         const { agent_code, ...updateData } = req.body;
         
-        const cleanedData = await cleanupOtherFields(updateData);
+        // Automatically transition from Draft to Processing status
+        const STATUS_DRAFT = 4;
+        const STATUS_PENDING = 1;
+        if (Number(existingApplication.status_id) === STATUS_DRAFT) {
+            updateData.status_id = STATUS_PENDING;
+        }
+
+        // const cleanedData = await cleanupOtherFields(updateData);
+        // const processedData = preprocessRiders(cleanedData);
+
+        const cleanedProposal = cleanProposalFields(updateData);
+        const cleanedData = await cleanupOtherFields(cleanedProposal);
         const processedData = preprocessRiders(cleanedData);
         processedData.ip_address = normalizeIp(req.ip);
 
