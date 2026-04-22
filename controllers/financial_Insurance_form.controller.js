@@ -102,6 +102,21 @@ const cleanProposalFields = (data) => {
     return mutableData;
 };
 
+// Helper to handle channel type business rules
+const handleChannelType = (data, user) => {
+    const mutableData = { ...data };
+    if (mutableData.channel_type_id !== undefined) {
+        const channelId = Number(mutableData.channel_type_id);
+        // If Direct (55) is selected, we set the channel_name to the logged-in user's name
+        if (channelId === 55 && user) {
+            mutableData.channel_name = [user.firstname, user.middlename, user.lastname, user.suffix]
+                .filter(Boolean)
+                .join(' ');
+        }
+    }
+    return mutableData;
+};
+
 // Helper to expand simplified rider inputs and enforce rules
 const preprocessRiders = (data) => {
     // 1. Get Designations from rankings if available
@@ -294,6 +309,13 @@ const buildApplicationResponse = async (app) => {
                     app.coverage_type_id === 34 ? salaryRanking :
                     app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
         },
+        channel_type: {
+            id: app.channel_type_id,
+            name: app.channel_type_name,
+            channel_name: app.channel_name || null
+        },
+        commission_rate: app.commission_rate || null,
+        service_fee: app.service_fee || null,
         payment: paymentTerms,
         type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
         prototype_plan: { 
@@ -336,7 +358,8 @@ export const createApplication = async (req, res) => {
 
         dataToSave = cleanProposalFields(dataToSave);
         const cleanedData = await cleanupOtherFields(dataToSave);
-        const processedData = preprocessRiders(cleanedData);
+        const channelData = handleChannelType(cleanedData, req.user);
+        const processedData = preprocessRiders(channelData);
         processedData.ip_address = normalizeIp(req.ip);
 
         // Sanitize notes if they exist
@@ -377,7 +400,8 @@ export const saveDraft = async (req, res) => {
 
         dataToSave = cleanProposalFields(dataToSave);
         const cleanedData = await cleanupOtherFields(dataToSave);
-        const processedData = preprocessRiders(cleanedData);
+        const channelData = handleChannelType(cleanedData, req.user);
+        const processedData = preprocessRiders(channelData);
         processedData.ip_address = normalizeIp(req.ip);
 
         if (processedData.notes) {
@@ -813,6 +837,13 @@ export const getPrototypes = async (req, res) => {
                             app.coverage_type_id === 34 ? salaryRanking :
                             app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
                 },
+                channel_type: {
+                    id: app.channel_type_id,
+                    name: app.channel_type_name,
+                    channel_name: app.channel_name || null
+                },
+                commission_rate: app.commission_rate || null,
+                service_fee: app.service_fee || null,
                 level_ranking: levelRanking,
                 salary_ranking: salaryRanking,
                 uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
@@ -971,6 +1002,13 @@ export const getAllApplications = async (req, res) => {
                             app.coverage_type_id === 34 ? salaryRanking :
                             app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
                 },
+                channel_type: {
+                    id: app.channel_type_id,
+                    name: app.channel_type_name,
+                    channel_name: app.channel_name || null
+                },
+                commission_rate: app.commission_rate || null,
+                service_fee: app.service_fee || null,
                 payment: paymentsByAppId[app.application_id] || [],
                 type_of_proposal: {
                     id: app.type_of_proposal_id,
@@ -1124,7 +1162,8 @@ export const updateApplication = async (req, res) => {
 
         const cleanedProposal = cleanProposalFields(updateData);
         const cleanedData = await cleanupOtherFields(cleanedProposal);
-        const processedData = preprocessRiders(cleanedData);
+        const channelData = handleChannelType(cleanedData, req.user);
+        const processedData = preprocessRiders(channelData);
         processedData.ip_address = normalizeIp(req.ip);
 
         // Sanitize notes if they exist

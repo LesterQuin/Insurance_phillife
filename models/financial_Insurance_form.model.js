@@ -63,6 +63,10 @@ export const createApplication = async (data, userId) => {
             .input('borrower_age_65_67', sql.Bit, data.borrower_age_65_67 || false)
             .input('borrower_age_68_70', sql.Bit, data.borrower_age_68_70 || false)
             .input('borrower_age_71_74', sql.Bit, data.borrower_age_71_74 || false)
+            .input('channel_type_id', sql.Int, data.channel_type_id || null)
+            .input('channel_name', sql.NVarChar, data.channel_name || null)
+            .input('commission_rate', sql.NVarChar, data.commission_rate || null)
+            .input('service_fee', sql.NVarChar, data.service_fee || null)
             .input('notes', sql.NVarChar(sql.MAX), data.notes || null)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
@@ -71,14 +75,14 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id,
-                    borrower_age_65_67, borrower_age_68_70, borrower_age_71_74, notes
+                    borrower_age_65_67, borrower_age_68_70, borrower_age_71_74, channel_type_id, channel_name, commission_rate, service_fee, notes
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id,
-                    @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74, @notes
+                    @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74, @channel_type_id, @channel_name, @commission_rate, @service_fee, @notes
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -292,6 +296,10 @@ export const getAllApplications = async () => {
                 fia.borrower_age_65_67,
                 fia.borrower_age_68_70,
                 fia.borrower_age_71_74,
+                fia.channel_type_id,
+                fia.channel_name,
+                fia.commission_rate,
+                fia.service_fee,
                 fia.notes,
                 fia.created_at,
                 fia.updated_at,
@@ -308,6 +316,7 @@ export const getAllApplications = async () => {
                 pp.acronym AS prototype_plan_acronym,
                 al.name AS amount_loans_name,
                 ct.name AS coverage_type_name,
+                chant.name AS channel_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
@@ -335,6 +344,8 @@ export const getAllApplications = async () => {
                 ON fia.amount_loans_id = al.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
+                ON fia.channel_type_id = chant.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             ORDER BY fia.created_at DESC;
@@ -361,6 +372,10 @@ export const getPrototypes = async () => {
                 fia.borrower_age_65_67,
                 fia.borrower_age_68_70,
                 fia.borrower_age_71_74,
+                fia.channel_type_id,
+                fia.channel_name,
+                fia.commission_rate,
+                fia.service_fee,
                 fia.notes,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
@@ -375,6 +390,7 @@ export const getPrototypes = async () => {
                 pp.acronym AS prototype_plan_acronym,
                 al.name AS amount_loans_name,
                 ct.name AS coverage_type_name,
+                chant.name AS channel_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
@@ -391,6 +407,8 @@ export const getPrototypes = async () => {
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
+                ON fia.channel_type_id = chant.id
             WHERE fia.type_of_proposal_id = 30
             ORDER BY fia.created_at DESC
         `);
@@ -420,6 +438,7 @@ export const getApplicationById = async (id) => {
                 pp.acronym AS prototype_plan_acronym,
                 al.name as amount_loans_name,
                 ct.name AS coverage_type_name,
+                chant.name AS channel_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
@@ -447,6 +466,8 @@ export const getApplicationById = async (id) => {
                 ON fia.amount_loans_id = al.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
+                ON fia.channel_type_id = chant.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             WHERE fia.application_id = @id
@@ -671,6 +692,14 @@ export const updateApplication = async (id, data, userId) => {
         addClause('borrower_age_68_70', data.borrower_age_68_70, sql.Bit);
         addClause('borrower_age_71_74', data.borrower_age_71_74, sql.Bit);
         addClause('notes', data.notes, sql.NVarChar(sql.MAX));
+
+        // Channel fields
+        addClause('channel_type_id', data.channel_type_id, sql.Int);
+        addClause('channel_name', data.channel_name);
+
+        // New fields
+        addClause('commission_rate', data.commission_rate);
+        addClause('service_fee', data.service_fee);
 
         if (data.payment !== undefined) {
             const paymentTerm = (Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;

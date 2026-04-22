@@ -643,6 +643,37 @@ export const validateFinancialApplication = [
             return true;
         }),
 
+    // -----------------------------
+    // Channel Type
+    // -----------------------------
+    body('channel_type_id')
+        .notEmpty().withMessage('Channel Type is required')
+        .isInt({ min: 1 }).withMessage('channel_type_id must be a valid integer')
+        .custom(async (value, { req }) => {
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.CHANNEL_TYPE) {
+                req.lookupCache.CHANNEL_TYPE = await Financial.getLookupListByCategory('CHANNEL_TYPE');
+            }
+            const lookups = req.lookupCache.CHANNEL_TYPE;
+            const item = lookups.find(l => l.id === Number(value));
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} (${l.name})`).join(', ');
+                throw new Error(`Invalid channel_type_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('channel_name')
+        .if(body('channel_type_id').custom(val => [56, 57].includes(Number(val))))
+        .notEmpty().withMessage('Channel name is required for Booker and General Agency.')
+        .isLength({ max: 255 }).withMessage('Channel name must not exceed 255 characters'),
+
+    body('commission_rate')
+        .notEmpty().withMessage('Commission Rate is required')
+        .isLength({ max: 255 }).withMessage('Commission Rate must not exceed 255 characters'),
+    body('service_fee')
+        .notEmpty().withMessage('Service Fee is required')
+        .isLength({ max: 255 }).withMessage('Service Fee must not exceed 255 characters'),
+
     // ------------------------------------------
     // Prototype / Product Plan (Conditional)
     // ------------------------------------------
@@ -1256,6 +1287,38 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
+
+    // -----------------------------
+    // Channel Type (Update)
+    // -----------------------------
+    body('channel_type_id')
+        .optional()
+        .isInt({ min: 1 }).withMessage('channel_type_id must be a valid integer')
+        .custom(async (value, { req }) => {
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.CHANNEL_TYPE) {
+                req.lookupCache.CHANNEL_TYPE = await Financial.getLookupListByCategory('CHANNEL_TYPE');
+            }
+            const lookups = req.lookupCache.CHANNEL_TYPE;
+            const item = lookups.find(l => l.id === Number(value));
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} (${l.name})`).join(', ');
+                throw new Error(`Invalid channel_type_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('channel_name')
+        .if(body('channel_type_id').exists())
+        .custom((value, { req }) => {
+            const channelId = Number(req.body.channel_type_id);
+            if ([56, 57].includes(channelId) && (!value || value.trim() === '')) {
+                throw new Error('Channel name is required for Booker and General Agency.');
+            }
+            return true;
+        }),
+
+    body('commission_rate').optional().isLength({ max: 255 }).withMessage('Commission Rate must not exceed 255 characters'),
+    body('service_fee').optional().isLength({ max: 255 }).withMessage('Service Fee must not exceed 255 characters'),
 
     // Dependent field validations - sub_group_type_id can be array or string
     body('sub_group_type_id').optional().custom(async (value, { req }) => {
