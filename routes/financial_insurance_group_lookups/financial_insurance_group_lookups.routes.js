@@ -15,6 +15,7 @@ router.get("/category/COVERAGE_MULTIPLIER", Controller.getByCoverageMultiplier);
 router.get("/category/LOAN_AMOUNT_TYPE", Controller.getByLoanAmountType);
 router.get("/category/PAYMENT_TERM", Controller.getByPaymentTerm);
 router.get("/category/PAYMENT_YEAR", Controller.getByPaymentYear);
+router.get("/category/CHANNEL_TYPE", Controller.getByChannelType);
 
 // Get by ID
 router.get("/name/:id", Controller.getById);

@@ -45,6 +45,7 @@ export const getByCoverageMultiplier = (req, res) => fetchByCategory(res, 'COVER
 export const getByLoanAmountType = (req, res) => fetchByCategory(res, 'LOAN_AMOUNT_TYPE');
 export const getByPaymentTerm = (req, res) => fetchByCategory(res, 'PAYMENT_TERM');
 export const getByPaymentYear = (req, res) => fetchByCategory(res, 'PAYMENT_YEAR');
+export const getByChannelType = (req, res) => fetchByCategory(res, 'CHANNEL_TYPE');
 
 // Generic Get by Category (Optional usage via params)
 export const getByCategory = async (req, res) => {
