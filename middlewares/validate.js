@@ -667,12 +667,12 @@ export const validateFinancialApplication = [
         .notEmpty().withMessage('Channel name is required for Booker and General Agency.')
         .isLength({ max: 255 }).withMessage('Channel name must not exceed 255 characters'),
 
-    body('commission_rate')
-        .notEmpty().withMessage('Commission Rate is required')
-        .isLength({ max: 255 }).withMessage('Commission Rate must not exceed 255 characters'),
-    body('service_fee')
-        .notEmpty().withMessage('Service Fee is required')
-        .isLength({ max: 255 }).withMessage('Service Fee must not exceed 255 characters'),
+    // body('commission_rate')
+    //     .notEmpty().withMessage('Commission Rate is required')
+    //     .isLength({ max: 255 }).withMessage('Commission Rate must not exceed 255 characters'),
+    // body('service_fee')
+    //     .notEmpty().withMessage('Service Fee is required')
+    //     .isLength({ max: 255 }).withMessage('Service Fee must not exceed 255 characters'),
 
     // ------------------------------------------
     // Prototype / Product Plan (Conditional)
@@ -860,18 +860,18 @@ body('basic_plan_id')
     body('riders.*.unit').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isInt({ min: 0 }).withMessage('Rider unit must be a non-negative integer'),
 
     // Single Rate for Borrowers
-    body('borrower_age_65_67')
+    body('borrower_age_66_70')
         .if(body('type_of_proposal_id').equals('31'))
         .optional()
-        .isBoolean().withMessage('Borrower age 65-67 selection must be a boolean (true/false)'),
-    body('borrower_age_68_70')
+        .isBoolean().withMessage('Borrower age 66-70 selection must be a boolean (true/false)'),
+    body('borrower_age_71_75')
         .if(body('type_of_proposal_id').equals('31'))
         .optional()
-        .isBoolean().withMessage('Borrower age 68-70 selection must be a boolean (true/false)'),
-    body('borrower_age_71_74')
+        .isBoolean().withMessage('Borrower age 71-75 selection must be a boolean (true/false)'),
+    body('borrower_age_76_80')
         .if(body('type_of_proposal_id').equals('31'))
         .optional()
-        .isBoolean().withMessage('Borrower age 71-74 selection must be a boolean (true/false)'),
+        .isBoolean().withMessage('Borrower age 76-80 selection must be a boolean (true/false)'),
 
     // Optional validation for new product-specific fields
     body('amount_loans_id')
@@ -1001,15 +1001,9 @@ body('basic_plan_id')
                     if (value == null || value.length < 2) {
                         throw new Error('Salary Ranking is required and must have at least 2 entries.');
                     }
-                    if (value.length > 4) {
-                        throw new Error('Salary Ranking cannot have more than 4 entries.');
-                    }
-                    // Check for uniqueness of salary_multiplier
-                    const multipliers = value.map(item => item.salary_multiplier);
-                    const uniqueMultipliers = new Set(multipliers);
-                    if (uniqueMultipliers.size !== multipliers.length) {
-                        throw new Error('Salary multipliers within Salary Ranking must be unique.');
-                    }
+                    // if (value.length > 4) {
+                    //     throw new Error('Salary Ranking cannot have more than 4 entries.');
+                    // }
                 } else if (value != null) { 
                     throw new Error('Salary Ranking should only be provided for By Salary Rank coverage type.');
                 }
@@ -1020,11 +1014,10 @@ body('basic_plan_id')
         .if(body('type_of_proposal_id').equals('31'))
         .if(body('salary_ranking').exists())
         .notEmpty().withMessage('Salary Multiplier is required in Salary Ranking')
-        .custom(async (value) => {
-            const lookups = await Financial.getLookupListByCategory('COVERAGE_MULTIPLIER');
-            const validMultipliers = lookups.map(l => l.name);
-            if (!validMultipliers.includes(value)) {
-                throw new Error(`Invalid salary_multiplier (${value}). Valid options: ${validMultipliers.join(', ')}`);
+        .custom((value) => {
+            const numericValue = parseInt(String(value).replace(/x/i, ''), 10);
+            if (isNaN(numericValue) || numericValue < 12 || numericValue > 48) {
+                throw new Error('Salary Multiplier must be a number between 12 and 48 (e.g., 12, 15, 18, 24).');
             }
             return true;
         }),
@@ -1154,7 +1147,7 @@ export const validateRates = [
             const app = await Financial.getApplicationById(applicationId);
             if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
 
-            const keys = ['18-64', '65-67', '68-70', '71-74'];
+            const keys = ['18-64', '66-70', '71-75', '76-80'];
             let hasData = false;
             
             keys.forEach(key => {
@@ -1165,18 +1158,18 @@ export const validateRates = [
                     }
                     
                     // Validate against application boolean flags
-                    if (key === '65-67' && !app.borrower_age_65_67) {
-                        throw new Error(`Rates for '65-67' cannot be added because the age bracket is not selected for this application.`);
+                    if (key === '66-70' && !app.borrower_age_66_70) {
+                        throw new Error(`Rates for '66-70' cannot be added because the age bracket is not selected for this application.`);
                     }
-                    if (key === '68-70' && !app.borrower_age_68_70) {
-                        throw new Error(`Rates for '68-70' cannot be added because the age bracket is not selected for this application.`);
+                    if (key === '71-75' && !app.borrower_age_71_75) {
+                        throw new Error(`Rates for '71-75' cannot be added because the age bracket is not selected for this application.`);
                     }
-                    if (key === '71-74' && !app.borrower_age_71_74) {
-                        throw new Error(`Rates for '71-74' cannot be added because the age bracket is not selected for this application.`);
+                    if (key === '76-80' && !app.borrower_age_76_80) {
+                        throw new Error(`Rates for '76-80' cannot be added because the age bracket is not selected for this application.`);
                     }
 
                     req.body[key].forEach((item, index) => {
-                        const termKey = key === '71-74' ? 'term_or_age' : 'term_or_months';
+                        const termKey = key === '76-80' ? 'term_or_age' : 'term_or_months';
                         if (!item[termKey]) {
                             throw new Error(`Item ${index + 1} in ${key} is missing '${termKey}'.`);
                         }
@@ -1188,7 +1181,7 @@ export const validateRates = [
             });
 
             if (!hasData) {
-                throw new Error('At least one rate group (18-64, 65-67, 68-70, 71-74) is required.');
+                throw new Error('At least one rate group (18-64, 66-70, 71-75, 76-80) is required.');
             }
             return true;
         }),
@@ -1479,9 +1472,9 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     }),
 
     // Single Rate for Borrowers (Update)
-    body('borrower_age_65_67').optional({ nullable: true }).isBoolean().withMessage('Borrower age 65-67 selection must be a boolean'),
-    body('borrower_age_68_70').optional({ nullable: true }).isBoolean().withMessage('Borrower age 68-70 selection must be a boolean'),
-    body('borrower_age_71_74').optional({ nullable: true }).isBoolean().withMessage('Borrower age 71-74 selection must be a boolean'),
+    body('borrower_age_66_70').optional({ nullable: true }).isBoolean().withMessage('Borrower age 66-70 selection must be a boolean'),
+    body('borrower_age_71_75').optional({ nullable: true }).isBoolean().withMessage('Borrower age 71-75 selection must be a boolean'),
+    body('borrower_age_76_80').optional({ nullable: true }).isBoolean().withMessage('Borrower age 76-80 selection must be a boolean'),
 
     // Optional validation for new product-specific fields on update
     body('amount_loans_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Amount Loans ID must be a non-negative integer')

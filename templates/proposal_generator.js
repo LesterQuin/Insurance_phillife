@@ -61,13 +61,13 @@ export const generateGCLIPDFContent = (application, user, details) => {
   const {
     totalAnnualPremium = 0,
     maxAmount18_64 = 0,
-    maxAmount65_67 = 0,
-    maxAmount68_70 = 0,
-    maxAmount71_74 = 0,
+    maxAmount66_70 = 0,
+    maxAmount71_75 = 0,
+    maxAmount76_80 = 0,
     rates18_64 = {},
-    rates65_67 = {},
-    rates68_70 = {},
-    rates71_74 = {},
+    rates66_70 = {},
+    rates71_75 = {},
+    rates76_80 = {},
     participationPercentage = 75,
     nelAmount = 0,
     nelAge = 0,
@@ -380,31 +380,31 @@ export const generateGCLIPDFContent = (application, user, details) => {
         </tr>
 
         ${
-          application.borrower_age_65_67
+          application.borrower_age_66_70
             ? `
         <tr>
-            <td>65-67</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount65_67)}</td>
+            <td>66-70</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount66_70)}</td>
         </tr>`
             : ""
         }
 
         ${
-          application.borrower_age_68_70
+          application.borrower_age_71_75
             ? `
         <tr>
-            <td>68-70</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount68_70)}</td>
+            <td>71-75</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_75)}</td>
         </tr>`
             : ""
         }
 
         ${
-          application.borrower_age_71_74
+          application.borrower_age_76_80
             ? `
         <tr>
-            <td>71-74</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_74)}</td>
+            <td>76-80</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount76_80)}</td>
         </tr>`
             : ""
         }
@@ -430,46 +430,46 @@ export const generateGCLIPDFContent = (application, user, details) => {
     </table>
 
 ${
-  application.borrower_age_65_67
+  application.borrower_age_66_70
     ? `
     <h2>SINGLE RATE PER 1,000</h2>
-    <h4>Borrowers Age 65-67</h4>
+    <h4>Borrowers Age 66-70</h4>
     <table>
         <tr>
             <th>Term of Loan</th>
             <th>Rate</th>
         </tr>
-        ${generateRateRows(rates65_67, " months")}
+        ${generateRateRows(rates66_70, " months")}
     </table>
 `
     : ""
 }
 
 ${
-  application.borrower_age_68_70
+  application.borrower_age_71_75
     ? `
     <h2>SINGLE RATE PER 1,000</h2>
-    <h4>Borrowers Age 68-70</h4>
+    <h4>Borrowers Age 71-75</h4>
     <table>
         <tr>
             <th>Term of Loan</th>
             <th>Rate</th>
         </tr>
-        ${generateRateRows(rates68_70, " months")}
+        ${generateRateRows(rates71_75, " months")}
     </table>
 `
     : ""
 }
 
 ${
-  application.borrower_age_71_74
+  application.borrower_age_76_80
     ? `
     <table>
         <tr>
             <th>Attained Age</th>
             <th>GCLIP - 12 months</th>
         </tr>
-        ${generateRateRows(rates71_74, "")}
+        ${generateRateRows(rates76_80, "")}
     </table>
 `
     : ""

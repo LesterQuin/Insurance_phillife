@@ -60,9 +60,9 @@ export const createApplication = async (data, userId) => {
             .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
             .input('payment_term_id', sql.Int, paymentTerm ? paymentTerm.payment_term_id : null)
             .input('sub_payment_term_id', sql.Int, paymentTerm ? paymentTerm.sub_payment_term_id : null)
-            .input('borrower_age_65_67', sql.Bit, data.borrower_age_65_67 || false)
-            .input('borrower_age_68_70', sql.Bit, data.borrower_age_68_70 || false)
-            .input('borrower_age_71_74', sql.Bit, data.borrower_age_71_74 || false)
+            .input('borrower_age_66_70', sql.Bit, data.borrower_age_66_70 || false)
+            .input('borrower_age_71_75', sql.Bit, data.borrower_age_71_75 || false)
+            .input('borrower_age_76_80', sql.Bit, data.borrower_age_76_80 || false)
             .input('channel_type_id', sql.Int, data.channel_type_id || null)
             .input('channel_name', sql.NVarChar, data.channel_name || null)
             .input('commission_rate', sql.NVarChar, data.commission_rate || null)
@@ -75,14 +75,14 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id,
-                    borrower_age_65_67, borrower_age_68_70, borrower_age_71_74, channel_type_id, channel_name, commission_rate, service_fee, notes
+                    borrower_age_66_70, borrower_age_71_75, borrower_age_76_80, channel_type_id, channel_name, commission_rate, service_fee, notes
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id,
-                    @borrower_age_65_67, @borrower_age_68_70, @borrower_age_71_74, @channel_type_id, @channel_name, @commission_rate, @service_fee, @notes
+                    @borrower_age_66_70, @borrower_age_71_75, @borrower_age_76_80, @channel_type_id, @channel_name, @commission_rate, @service_fee, @notes
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -293,9 +293,9 @@ export const getAllApplications = async () => {
                 fia.amount_loans_id,
                 fia.loans_amount,
                 fia.coverage_type_id,
-                fia.borrower_age_65_67,
-                fia.borrower_age_68_70,
-                fia.borrower_age_71_74,
+                fia.borrower_age_66_70,
+                fia.borrower_age_71_75,
+                fia.borrower_age_76_80,
                 fia.channel_type_id,
                 fia.channel_name,
                 fia.commission_rate,
@@ -369,9 +369,9 @@ export const getPrototypes = async () => {
                 fia.amount_loans_id,
                 fia.loans_amount,
                 fia.coverage_type_id,
-                fia.borrower_age_65_67,
-                fia.borrower_age_68_70,
-                fia.borrower_age_71_74,
+                fia.borrower_age_66_70,
+                fia.borrower_age_71_75,
+                fia.borrower_age_76_80,
                 fia.channel_type_id,
                 fia.channel_name,
                 fia.commission_rate,
@@ -688,9 +688,9 @@ export const updateApplication = async (id, data, userId) => {
         addClause('coverage_type_id', data.coverage_type_id, sql.Int);
 
         // Borrower age selections
-        addClause('borrower_age_65_67', data.borrower_age_65_67, sql.Bit);
-        addClause('borrower_age_68_70', data.borrower_age_68_70, sql.Bit);
-        addClause('borrower_age_71_74', data.borrower_age_71_74, sql.Bit);
+        addClause('borrower_age_66_70', data.borrower_age_66_70, sql.Bit);
+        addClause('borrower_age_71_75', data.borrower_age_71_75, sql.Bit);
+        addClause('borrower_age_76_80', data.borrower_age_76_80, sql.Bit);
         addClause('notes', data.notes, sql.NVarChar(sql.MAX));
 
         // Channel fields
@@ -1041,9 +1041,9 @@ export const saveApplicationRates = async (applicationId, ratesData) => {
         // 3. Insert new rates
         const categories = {
             '18-64': '18_64',
-            '65-67': '65_67',
-            '68-70': '68_70',
-            '71-74': '71_74'
+            '66-70': '66_70',
+            '71-75': '71_75',
+            '76-80': '76_80'
         };
 
         for (const [jsonKey, dbCategory] of Object.entries(categories)) {

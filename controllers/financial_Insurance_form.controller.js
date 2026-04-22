@@ -85,15 +85,15 @@ const cleanProposalFields = (data) => {
         mutableData.salary_ranking = null;
         
         // Reset age bracket flags for prototypes to avoid constraint errors
-        mutableData.borrower_age_65_67 = 0;
-        mutableData.borrower_age_68_70 = 0;
-        mutableData.borrower_age_71_74 = 0;
+        mutableData.borrower_age_66_70 = 0;
+        mutableData.borrower_age_71_75 = 0;
+        mutableData.borrower_age_76_80 = 0;
     } else if (mutableData.type_of_proposal_id) {
         mutableData.prototype_id = null;
     }
 
     // Coerce boolean age bracket flags to 0 or 1 to satisfy NOT NULL constraints
-    ['borrower_age_65_67', 'borrower_age_68_70', 'borrower_age_71_74'].forEach(field => {
+    ['borrower_age_66_70', 'borrower_age_71_75', 'borrower_age_76_80'].forEach(field => {
         if (mutableData[field] !== undefined) {
             mutableData[field] = mutableData[field] ? 1 : 0;
         }
@@ -211,7 +211,7 @@ const formatDbRatesForTemplate = (dbRows, category) => {
     if (filtered.length === 0) return null;
 
     return filtered.reduce((acc, row) => {
-        const key = category === '71_74' ? row.attained_age : row.term_months;
+        const key = category === '76_80' ? row.attained_age : row.term_months;
         if (key) acc[key] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
         return acc;
     }, {});
@@ -332,9 +332,9 @@ const buildApplicationResponse = async (app) => {
             name: app.amount_loans_name
         } : null,
         loans_amount: app.loans_amount,
-        borrower_age_65_67: app.borrower_age_65_67,
-        borrower_age_68_70: app.borrower_age_68_70,
-        borrower_age_71_74: app.borrower_age_71_74,
+        borrower_age_66_70: app.borrower_age_66_70,
+        borrower_age_71_75: app.borrower_age_71_75,
+        borrower_age_76_80: app.borrower_age_76_80,
         riders: riders,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
@@ -524,9 +524,9 @@ const generateProposalHtml = async (id) => {
         totalAnnualPremium: 0, 
         contactLocal: '123',
         rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-        rates65_67: formatDbRatesForTemplate(ratesRows, '65_67') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-        rates68_70: formatDbRatesForTemplate(ratesRows, '68_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-        rates71_74: formatDbRatesForTemplate(ratesRows, '71_74') || { 71: 'n/a', 72: 'n/a', 73: 'n/a', 74: 'n/a' },
+        rates66_70: formatDbRatesForTemplate(ratesRows, '66_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+        rates71_75: formatDbRatesForTemplate(ratesRows, '71_75') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
+        rates76_80: formatDbRatesForTemplate(ratesRows, '76_80') || { 76: 'n/a', 77: 'n/a', 78: 'n/a', 79: 'n/a', 80: 'n/a' },
         // ...maxAmountsMap, // Merges values like maxAmount18_64 into details
         nelAmount: 500000,
         nelAge: 65,
@@ -850,9 +850,9 @@ export const getPrototypes = async (req, res) => {
                 coverage_totals: coverage_totals,
                 amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
                 loans_amount: app.loans_amount,
-                borrower_age_65_67: app.borrower_age_65_67,
-                borrower_age_68_70: app.borrower_age_68_70,
-                borrower_age_71_74: app.borrower_age_71_74,
+                borrower_age_66_70: app.borrower_age_66_70,
+                borrower_age_71_75: app.borrower_age_71_75,
+                borrower_age_76_80: app.borrower_age_76_80,
                 type_of_proposal: {
                     id: app.type_of_proposal_id,
                     name: app.type_of_proposal_name
@@ -1028,9 +1028,9 @@ export const getAllApplications = async (req, res) => {
                 level_ranking: levelRanking,
                 salary_ranking: salaryRanking,
                 uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
-                borrower_age_65_67: app.borrower_age_65_67,
-                borrower_age_68_70: app.borrower_age_68_70,
-                borrower_age_71_74: app.borrower_age_71_74,
+                borrower_age_66_70: app.borrower_age_66_70,
+                borrower_age_71_75: app.borrower_age_71_75,
+                borrower_age_76_80: app.borrower_age_76_80,
                 coverage_totals: coverage_totals,
                 riders: appRiders,
                 notes: app.notes,
