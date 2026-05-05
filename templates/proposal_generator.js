@@ -155,7 +155,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             page-break-before: always; 
         }
         .logo { 
-            display: block; margin-left: auto; margin-right: -15mm; margin-top: -10mm; width: 180px; 
+            display: block; margin-left: auto; margin-right: -15mm; margin-top: -10mm; width: 200px; 
         }
         .center-photo { 
             display: block; width: 100%; height: 550px; object-fit: cover; margin-bottom: 20px; margin-top: 20px; 
@@ -197,8 +197,46 @@ export const generateGCLIPDFContent = (application, user, details) => {
             display: flex; flex-direction: column; height: 297mm; padding: 15mm 0 0 0; box-sizing: border-box; background-color: white; position: relative; z-index: 2;
         }
         .cover-top {
-            flex-shrink: 0; padding: 0 20mm;
+            position: relative; 
+            padding: 0 20mm;
         }
+        .gradient-bar {
+            position: absolute;
+            top: -2mm;       
+            left: 20mm;     
+            width: 70mm;    
+            height: 13px;
+            background: linear-gradient(
+                90deg,
+                #2b2a8c 0%,
+                #253b97 15%,
+                #1b5aa1 30%,
+                #13728f 45%,
+                #0f8b7b 60%,
+                #0ca363 75%,
+                #0db14b 100%
+            );
+            border-radius: 1px;
+        } 
+        .subsequent-header-gradient {
+            position: absolute;
+            top: 15mm;          
+            right: -1mm;        
+            width: 70mm;
+            height: 13px;
+            background: linear-gradient(
+                90deg, 
+                #2b2a8c 0%,
+                #253b97 15%,
+                #1b5aa1 30%,
+                #13728f 45%,
+                #0f8b7b 60%,
+                #0ca363 75%,
+                #0db14b 100%
+            );
+            border-radius: 1px;
+            z-index: 5;
+        }   
         .cover-middle {
             flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10mm; 
         }
@@ -218,7 +256,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             page-break-after: always; /* Ensure the next section starts on a new page */
         }
         .content-logo { 
-            position: absolute; top: 10mm; left: 10mm; width: 150px; z-index: 10; 
+            position: absolute; top: 10mm; left: 10mm; width: 160px; z-index: 10; 
         }
         .plan-details { 
             margin: 0;
@@ -294,6 +332,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
 
 <div class="cover-page">
     <div class="cover-top">
+        <div class="gradient-bar"></div>
         ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ""}
     </div>
     <div class="cover-middle">
@@ -326,6 +365,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
 <div class="page-break"></div>
     <div class="main-content">
     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+    <div class="subsequent-header-gradient"></div>
         <p>
             ${formatDate(proposalDate)} <br><br>
             ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
@@ -352,6 +392,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         <table class="layout-table">
             <thead><tr><td>
                 ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+                <div class="subsequent-header-gradient"></div>
                 <div class="spacer-top"></div>
             </td></tr></thead>
             <tbody><tr><td>
@@ -558,19 +599,23 @@ ${
     <p><strong>Conforme (Policyholder):</strong></p>
 
     <p>
-    ${application.contact_person_salutation} ${application.proposal_addressee}: ______________________________ <br>
+    ${application.contact_person_salutation} ${application.proposal_addressee}: <br>
+    ______________________________ <br>
     </p>
 
     <p>
-    ${application.addressee_designation}: ______________________________ <br>
+    ${application.addressee_designation}: <br>
+    ______________________________ <br>
     </p>
 
     <p>
-    Signature: ______________________________ <br>
+    Signature: <br>
+    ______________________________ <br>
     </p>
 
     <p>
-    Date Signed: ______________________________ <br>
+    Date Signed: <br>
+    ______________________________ <br>
     </p>
 
         </div>

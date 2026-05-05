@@ -10,6 +10,7 @@ import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-grap
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { auditLog, AuditStatus, AuditActions } from '../../utils/logger.js';
 import dns from 'node:dns';
 
 // Fix for Node.js 18+ where IPv6 is prioritized over IPv4.
@@ -161,6 +162,15 @@ export const register = async (req, res) => {
             )
         });
 
+        await auditLog(req, {
+            userId: newAgent.userId,
+            entityId: newAgent.userId,
+            action: AuditActions.USER_REGISTERED,
+            entity: 'UserMgmt',
+            metadata: { email, role_id, agent_code },
+            status: AuditStatus.INFO
+        });
+
         res.status(201).json({
             status: true,
             message: "User registered, temporary password sent via email"
@@ -186,10 +196,25 @@ export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
+        await auditLog(req, {
+            action: AuditActions.LOGIN_ATTEMPT,
+            entity: 'Auth',
+            metadata: { email },
+            status: AuditStatus.INFO
+        });
+
         // Validation is now handled by middleware
         // Fetch user from DB
         const user = await User.getUserByEmail(email);
         if (!user || !user.is_active) { // Check if user exists AND is active
+            await auditLog(req, {
+                userId: user?.user_id,
+                entityId: user?.user_id,
+                action: AuditActions.LOGIN_FAILED,
+                entity: 'Auth',
+                status: AuditStatus.WARNING,
+                metadata: { email, reason: !user ? 'User not found' : 'Inactive account' }
+            });
             return res.status(401).json({
                 status: false,
                 message: "Invalid credentials or account is inactive."
@@ -199,9 +224,39 @@ export const login = async (req, res) => {
         // Compare password
         const valid = await bcrypt.compare(password, user.password_hash);
         if (!valid) {
+            await auditLog(req, {
+                userId: user.user_id,
+                entityId: user.user_id,
+                action: AuditActions.LOGIN_FAILED,
+                entity: 'Auth',
+                status: AuditStatus.WARNING,
+                metadata: { email, reason: 'Invalid password' }
+            });
             return res.status(401).json({
                 status: false,
                 message: "Invalid credentials"
+            });
+        }
+
+        // Check if an OTP was recently sent and is still valid (5-minute cooldown)
+        if (user.mustVerifyOtp && user.otpExpiresAt && new Date() < new Date(user.otpExpiresAt)) {
+            const remainingMs = new Date(user.otpExpiresAt) - new Date();
+            const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+
+            await auditLog(req, {
+                userId: user.user_id,
+                entityId: user.user_id,
+                action: AuditActions.LOGIN_FAILED,
+                entity: 'Auth',
+                metadata: { reason: 'Login OTP throttled (cooldown)', remainingMinutes },
+                status: AuditStatus.CRITICAL
+            });
+
+            return res.status(429).json({
+                status: false,
+                message: `An OTP was recently sent. Please check your email or wait ${remainingMinutes} minute(s) before requesting a new one.`,
+                mustChangePassword: user.mustChangePassword,
+                otpCooldown: true
             });
         }
 
@@ -217,6 +272,13 @@ export const login = async (req, res) => {
             html: otpTemplate(user.lastname, otp)
         });
 
+        await auditLog(req, {
+            userId: user.user_id,
+            entityId: user.user_id,
+            action: AuditActions.OTP_SENT,
+            entity: 'Auth'
+        });
+
         res.json({
             status: true,
             message: 'OTP sent to your email.',
@@ -226,6 +288,16 @@ export const login = async (req, res) => {
     } catch (err) {
         console.error('LOGIN ERROR:', err);
         const underlyingError = err.innerError || err.cause || (err.errors && err.errors[0]) || err;
+
+        const user = await User.getUserByEmail(req.body.email);
+        await auditLog(req, {
+            userId: user?.user_id,
+            entityId: user?.user_id,
+            action: AuditActions.LOGIN_FAILED,
+            entity: 'Auth',
+            status: AuditStatus.ERROR,
+            metadata: { error: err.message, email: req.body.email }
+        });
 
         res.status(500).json({
             status: false,
@@ -250,10 +322,20 @@ export const verifyOTP = async (req, res) => {
         });
 
         const valid = await User.verifyOTP(user.user_id, otp);
-        if (!valid) return res.status(401).json({
-            status: false,
-            message: 'Invalid or expired OTP.'
-        });
+        if (!valid) {
+            await auditLog(req, {
+                userId: user.user_id,
+                entityId: user.user_id,
+                action: AuditActions.LOGIN_FAILED,
+                entity: 'Auth',
+                status: AuditStatus.WARNING,
+                metadata: { email, reason: 'Invalid OTP' }
+            });
+            return res.status(401).json({
+                status: false,
+                message: 'Invalid or expired OTP.'
+            });
+        }
 
         await User.clearOTP(user.user_id);
 
@@ -271,6 +353,13 @@ export const verifyOTP = async (req, res) => {
         res.cookie('accessToken', accessToken, { ...cookieOptions, maxAge: 8 * 60 * 60 * 1000 }); // 8 hours
         res.cookie('refreshToken', refreshToken, cookieOptions); // 7 days
 
+        await auditLog(req, {
+            userId: user.user_id,
+            entityId: user.user_id,
+            action: AuditActions.LOGIN_SUCCESS,
+            entity: 'Auth'
+        });
+
         res.json({
             status: true,
             accessToken,
@@ -280,6 +369,16 @@ export const verifyOTP = async (req, res) => {
 
     } catch (err) {
         console.error('VERIFY OTP ERROR:', err);
+        const user = await User.getUserByEmail(req.body.email);
+        await auditLog(req, {
+            userId: user?.user_id,
+            entityId: user?.user_id,
+            action: AuditActions.LOGIN_FAILED,
+            entity: 'Auth',
+            status: AuditStatus.ERROR,
+            metadata: { error: err.message, email: req.body.email }
+        });
+
         res.status(500).json({
             status: false,
             message: 'Server error',
@@ -313,6 +412,26 @@ export const resendOTP = async (req, res) => {
             }
         }
 
+        // Check if the existing OTP is still valid
+        if (user.mustVerifyOtp && user.otpExpiresAt && new Date() < new Date(user.otpExpiresAt)) {
+            const remainingMs = new Date(user.otpExpiresAt) - new Date();
+            const remainingMinutes = Math.ceil(remainingMs / 1000 / 60);
+
+            await auditLog(req, {
+                userId: user.user_id,
+                entityId: user.user_id,
+                action: AuditActions.LOGIN_FAILED,
+                entity: 'Auth',
+                metadata: { type: 'resend_throttled', remainingMinutes },
+                status: AuditStatus.CRITICAL
+            });
+
+            return res.status(429).json({
+                status: false,
+                message: `Please wait ${remainingMinutes} minute(s) before requesting another OTP.`
+            });
+        }
+
         const otp = generateOTP();
         await User.saveOTP(user.user_id, otp);
 
@@ -321,6 +440,14 @@ export const resendOTP = async (req, res) => {
             to: email,
             subject: 'Resent OTP',
             html: otpTemplate(user.lastname, otp)
+        });
+
+        await auditLog(req, {
+            userId: user.user_id,
+            entityId: user.user_id,
+            action: AuditActions.OTP_SENT,
+            entity: 'Auth',
+            metadata: { type: 'resend' }
         });
 
         res.json({
@@ -343,6 +470,16 @@ export const resetPassword = async (req, res) => {
         
         // Validation is now handled by middleware
         await User.updatePassword(email, newPassword);
+
+        const user = await User.getUserByEmail(email);
+        await auditLog(req, {
+            userId: user?.user_id,
+            entityId: user?.user_id,
+            action: AuditActions.PASSWORD_RESET,
+            entity: 'Auth',
+            metadata: { email }
+        });
+
         res.json({
             status: true,
             message: 'Password updated successfully.'
@@ -371,6 +508,13 @@ export const logout = async (req, res) => {
         // Clear tokens from database
         await User.clearTokens(user.user_id);
         
+        await auditLog(req, {
+            userId: user.user_id,
+            entityId: user.user_id,
+            action: AuditActions.LOGOUT,
+            entity: 'Auth'
+        });
+
         // Clear cookies
         res.clearCookie('accessToken');
         res.clearCookie('refreshToken');
@@ -431,6 +575,13 @@ export const refreshToken = async (req, res) => {
             maxAge: 8 * 60 * 60 * 1000 
         });
 
+        await auditLog(req, {
+            userId: user.user_id,
+            entityId: user.user_id,
+            action: AuditActions.TOKEN_REFRESHED,
+            entity: 'Auth'
+        });
+
         res.json({
             status: true,
             accessToken: newAccessToken,
@@ -482,6 +633,14 @@ export const updateProfile = async (req, res) => {
             newPassword
         });
 
+        await auditLog(req, {
+            userId: userId,
+            entityId: userId,
+            action: AuditActions.USER_UPDATED,
+            entity: 'UserMgmt',
+            metadata: { fields: Object.keys(req.body).filter(key => key  !== 'password' && key !== 'newPassword') }
+        });
+
         res.json({
             status: true,
             message: "Profile updated successfully",
@@ -518,6 +677,14 @@ export const adminUpdateUser = async (req, res) => {
             location_id
         });
 
+        await auditLog(req, {
+            userId: req.user.user_id,
+            action: AuditActions.USER_UPDATED,
+            entity: 'UserMgmt',
+            entityId: userId,
+            metadata: { role_id, department_id, location_id }
+        });
+
         res.json({
             status: true,
             message: "User profile updated successfully by admin.",
@@ -544,6 +711,14 @@ export const deactivateAccount = async (req, res) => {
         // This will also clear their tokens to force logout.
         await User.setUserStatus(userId, 0);
 
+        await auditLog(req, {
+            userId: req.user.user_id,
+            action: AuditActions.USER_DEACTIVATED,
+            entity: 'UserMgmt',
+            entityId: userId,
+            status: AuditStatus.WARNING
+        });
+
         res.status(200).json({ 
             status: true, 
             message: 'User account has been successfully deactivated.' 
@@ -568,6 +743,14 @@ export const activateAccount = async (req, res) => {
 
         // Activate the user by setting is_active to 1
         await User.setUserStatus(userId, 1);
+
+        await auditLog(req, {
+            userId: req.user.user_id,
+            action: AuditActions.USER_UPDATED,
+            entity: 'UserMgmt',
+            entityId: userId,
+            metadata: { status: 'activated' }
+        });
 
         res.status(200).json({ 
             status: true, 
@@ -669,6 +852,14 @@ export const adminResetPassword = async (req, res) => {
             to: targetUser.email,
             subject: 'Administrative Password Reset',
             html: tempPasswordTemplate(targetUser.lastname, tempPassword, process.env.APP_BASE_URL)
+        });
+
+        await auditLog(req, {
+            userId: req.user.user_id,
+            action: AuditActions.PASSWORD_RESET,
+            entity: 'UserMgmt',
+            entityId: userId,
+            status: AuditStatus.WARNING
         });
 
         res.json({

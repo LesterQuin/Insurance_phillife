@@ -355,8 +355,44 @@ export const validateFinancialApplication = [
     body('group_name')
         .notEmpty().withMessage('Group Name is required')
         .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
-    body('business_nature')
+    body('business_nature_id')
         .notEmpty().withMessage('Business Nature is required')
+        .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)')
+        .custom(async (value, { req }) => {
+            if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+            const topLevelIndustries = req.industryCache.filter(i => i.parent_id === null);
+            const item = topLevelIndustries.find(i => i.id === Number(value));
+            if (!item) {
+                const validOptions = topLevelIndustries.map(i => `${i.id} - ${i.name}`).join(', ');
+                throw new Error(`Invalid business_nature_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('sub_business_nature_id')
+        .optional({ nullable: true })
+        .isInt({ min: 1 }).withMessage('Sub-Business Nature ID must be a positive integer (no letters or special characters allowed)')
+        .custom(async (value, { req }) => {
+            if (value == null) return true;
+            
+            const parentId = Number(req.body.business_nature_id);
+            if (!parentId) throw new Error('business_nature_id is required to validate sub_business_nature_id');
+
+            const childId = Number(value);
+            if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+            
+            const validChildren = req.industryCache.filter(i => i.parent_id === parentId);
+            const item = validChildren.find(i => i.id === childId);
+
+            if (!item) {
+                const validOptions = validChildren.length > 0 
+                    ? validChildren.map(i => `${i.id} - ${i.name}`).join(', ')
+                    : 'none available';
+                throw new Error(`Invalid sub_business_nature_id (${childId}). Valid options for parent ID ${parentId}: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('business_nature')
+        .optional()
         .isLength({ max: 255 }).withMessage('Business Nature must not exceed 255 characters'),
     body('number_of_lives')
         .notEmpty().withMessage('Number of lives is required')
@@ -663,16 +699,18 @@ export const validateFinancialApplication = [
             return true;
         }),
     body('channel_name')
-        .if(body('channel_type_id').custom(val => [56, 57].includes(Number(val))))
-        .notEmpty().withMessage('Channel name is required for Booker and General Agency.')
+        .if(body('channel_type_id').custom(val => [56, 57, 58].includes(Number(val))))
+        .notEmpty().withMessage('Channel name is required for Agent, Booker and General Agency.')
         .isLength({ max: 255 }).withMessage('Channel name must not exceed 255 characters'),
 
-    // body('commission_rate')
-    //     .notEmpty().withMessage('Commission Rate is required')
-    //     .isLength({ max: 255 }).withMessage('Commission Rate must not exceed 255 characters'),
-    // body('service_fee')
-    //     .notEmpty().withMessage('Service Fee is required')
-    //     .isLength({ max: 255 }).withMessage('Service Fee must not exceed 255 characters'),
+    body('commission_rate')
+        .notEmpty().withMessage('Commission Rate is required')
+        .isFloat({ min: 0 }).withMessage('Commission Rate must be 0 or a positive number'),
+    body('service_fee')
+        .notEmpty().withMessage('Service Fee is required')
+        .isFloat({ min: 0 }).withMessage('Service Fee must be 0 or a positive number'),
+
+    body('total_annual_premium').optional().isFloat({ min: 0 }).withMessage('Total Annual Premium must be 0 or a positive number'),
 
     // ------------------------------------------
     // Prototype / Product Plan (Conditional)
@@ -933,13 +971,35 @@ body('basic_plan_id')
         .if(body('type_of_proposal_id').equals('31'))
         .optional({ nullable: true })
         .isInt({ min: 0 }).withMessage('Coverage Type ID must be a non-negative integer')
-        .custom(async (value) => {
+        .custom(async (value, { req }) => {
             if (value === null || value === undefined) return true;
             const lookups = await Financial.getLookupListByCategory('COVERAGE_TYPE');
             if (!lookups.some(l => l.id === Number(value))) {
                 const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
                 throw new Error(`Invalid coverage_type_id (${value}). Valid options: ${validOptions}`);
             }
+
+            const excelFile = req.files?.excel_file;
+
+            // 1. Mandatory ONLY for Salary Rank (ID: 34). Optional for 32 and 33.
+            if (Number(value) === 34 && !excelFile) {
+                throw new Error('An Excel file upload is required when "By Salary Rank" is selected.');
+            }
+
+            // 2. Validate file type if any file is uploaded
+            if (excelFile) {
+                const fileName = excelFile.originalFilename?.toLowerCase() || '';
+                const mimeType = excelFile.mimetype || '';
+                const isExcel = fileName.endsWith('.xlsx') || 
+                                fileName.endsWith('.xls') || 
+                                mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                                mimeType === 'application/vnd.ms-excel';
+
+                if (!isExcel) {
+                    throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) are allowed.');
+                }
+            }
+
             return true;
         }),
     body('uniform_coverage_amount')
@@ -1045,6 +1105,12 @@ body('basic_plan_id')
 export const validateDraftFinancialApplication = [
     body('application_id').optional().isInt({ min: 1 }).withMessage('Valid Application ID is required for updating a draft'),
     body('group_name').optional().isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
+    body('business_nature_id')
+        .optional()
+        .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)'),
+    body('sub_business_nature_id')
+        .optional({ nullable: true })
+        .isInt({ min: 1 }).withMessage('Sub-Business Nature ID must be a positive integer (no letters or special characters allowed)'),
     body('business_nature').optional().isLength({ max: 255 }).withMessage('Business Nature must not exceed 255 characters'),
     body('number_of_lives').optional().isInt({ min: 1 }).withMessage('Number of lives must be at least 1'),
     body('business_address').optional().isLength({ max: 500 }).withMessage('Business Address must not exceed 500 characters'),
@@ -1073,7 +1139,32 @@ export const validateDraftFinancialApplication = [
     // Lookup ID validations (Optional but must be valid if provided)
     body('group_classification_id').optional().isInt({ min: 0 }).custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('GROUP_CLASSIFICATION');
-        if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid group_classification_id`);
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid group_classification_id (${value}). Valid options: ${validOptions}`);
+        }
+        return true;
+    }),
+    body('business_nature_id')
+        .optional()
+        .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer')
+        .custom(async (value, { req }) => {
+        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        const topLevel = req.industryCache.filter(i => i.parent_id === null);
+        if (!topLevel.some(i => i.id === Number(value))) {
+            const validOptions = topLevel.map(i => `${i.id} - ${i.name}`).join(', ');
+            throw new Error(`Invalid business_nature_id (${value}). Valid options: ${validOptions}`);
+        }
+        return true;
+    }),
+    body('sub_business_nature_id')
+        .optional({ nullable: true })
+        .isInt({ min: 1 }).withMessage('Sub-Business Nature ID must be a positive integer')
+        .custom(async (value, { req }) => {
+        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        if (!req.industryCache.some(i => i.id === Number(value) && i.parent_id !== null)) {
+            throw new Error(`Invalid sub_business_nature_id (${value}).`);
+        }
         return true;
     }),
     body('business_type_id').optional().isInt({ min: 0 }).custom(async (value) => {
@@ -1121,6 +1212,56 @@ export const validateSystemLookup = [
     body('name').notEmpty().withMessage('Name is required').isLength({ max: 100 }).withMessage('Name must not exceed 100 characters'),
     body('code').optional().isLength({ max: 50 }).withMessage('Code must not exceed 50 characters'),
     body('is_active').optional().isBoolean().withMessage('is_active must be a boolean'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
+// Total Premium validation
+// -----------------------------
+export const validateTotalPremium = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('total_annual_premium')
+        .exists().withMessage('Total Annual Premium is required')
+        .isFloat({ min: 0 }).withMessage('Total Annual Premium must be 0 or a positive number'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
+// Max Amounts validation
+// -----------------------------
+export const validateMaxAmounts = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body().custom(async (value, { req }) => {
+        const applicationId = req.params.id;
+        const app = await Financial.getApplicationById(applicationId);
+        
+        if (!app) {
+            throw new Error(`Application with ID ${applicationId} not found.`);
+        }
+
+        if (req.body.max_amount_66_70 && !app.borrower_age_66_70) {
+            throw new Error("Max Amount for 66-70 cannot be provided because this age bracket was not selected for this application.");
+        }
+        if (req.body.max_amount_71_75 && !app.borrower_age_71_75) {
+            throw new Error("Max Amount for 71-75 cannot be provided because this age bracket was not selected for this application.");
+        }
+        if (req.body.max_amount_76_80 && !app.borrower_age_76_80) {
+            throw new Error("Max Amount for 76-80 cannot be provided because this age bracket was not selected for this application.");
+        }
+        return true;
+    }),
+    body('max_amount_18_64').optional().isFloat({ min: 0 }).withMessage('Max Amount 18-64 must be 0 or positive'),
+    body('max_amount_66_70').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Max Amount 66-70 must be 0 or positive'),
+    body('max_amount_71_75').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Max Amount 71-75 must be 0 or positive'),
+    body('max_amount_76_80').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Max Amount 76-80 must be 0 or positive'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -1213,6 +1354,42 @@ export const validateUpdateFinancialApplication = [
 
     // All fields are optional for an update. If a field is present, its validation rules are applied.
     body('group_name').optional().isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
+    body('business_nature_id')
+        .optional()
+        .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)')
+        .custom(async (value, { req }) => {
+        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        const topLevelIndustries = req.industryCache.filter(i => i.parent_id === null);
+        const item = topLevelIndustries.find(i => i.id === Number(value));
+        if (!item) {
+            const validOptions = topLevelIndustries.map(i => `${i.id} - ${i.name}`).join(', ');
+            throw new Error(`Invalid business_nature_id (${value}). Valid options: ${validOptions}`);
+        }
+        return true;
+    }),
+    body('sub_business_nature_id')
+        .optional({ nullable: true })
+        .isInt({ min: 1 }).withMessage('Sub-Business Nature ID must be a positive integer (no letters or special characters allowed)')
+        .custom(async (value, { req }) => {
+        if (value == null) return true;
+        
+        const parentId = req.body.business_nature_id !== undefined 
+            ? Number(req.body.business_nature_id) 
+            : req.existingApplication?.business_nature_id;
+        
+        if (!parentId) throw new Error('business_nature_id is required');
+
+        const childId = Number(value);
+        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+
+        const validChildren = req.industryCache.filter(i => i.parent_id === parentId);
+        const item = validChildren.find(i => i.id === childId);
+        if (!item) {
+            const validOptions = validChildren.length > 0 ? validChildren.map(i => `${i.id} - ${i.name}`).join(', ') : 'none available';
+            throw new Error(`Invalid sub_business_nature_id (${childId}). Valid options for parent ID ${parentId}: ${validOptions}`);
+        }
+        return true;
+    }),
     body('business_nature').optional().isLength({ max: 255 }).withMessage('Business Nature must not exceed 255 characters'),
     body('number_of_lives').optional().isInt({ min: 1 }).withMessage('Number of lives must be at least 1'),
     body('business_address').optional().isLength({ max: 500 }).withMessage('Business Address must not exceed 500 characters'),
@@ -1304,14 +1481,15 @@ export const validateUpdateFinancialApplication = [
         .if(body('channel_type_id').exists())
         .custom((value, { req }) => {
             const channelId = Number(req.body.channel_type_id);
-            if ([56, 57].includes(channelId) && (!value || value.trim() === '')) {
-                throw new Error('Channel name is required for Booker and General Agency.');
+            if ([56, 57, 58].includes(channelId) && (!value || value.trim() === '')) {
+                throw new Error('Channel name is required for Agent, Booker and General Agency.');
             }
             return true;
         }),
 
-    body('commission_rate').optional().isLength({ max: 255 }).withMessage('Commission Rate must not exceed 255 characters'),
-    body('service_fee').optional().isLength({ max: 255 }).withMessage('Service Fee must not exceed 255 characters'),
+    body('commission_rate').optional().isFloat({ min: 0 }).withMessage('Commission Rate must be 0 or a positive number'),
+    body('service_fee').optional().isFloat({ min: 0 }).withMessage('Service Fee must be 0 or a positive number'),
+    body('total_annual_premium').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Total Annual Premium must be 0 or a positive number'),
 
     // Dependent field validations - sub_group_type_id can be array or string
     body('sub_group_type_id').optional().custom(async (value, { req }) => {
@@ -1528,13 +1706,36 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
             return true;
         }),
     body('coverage_type_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Coverage Type ID must be a non-negative integer')
-        .custom(async (value) => {
+        .custom(async (value, { req }) => {
             if (value === null || value === undefined) return true;
             const lookups = await Financial.getLookupListByCategory('COVERAGE_TYPE');
             if (!lookups.some(l => l.id === Number(value))) {
                 const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
                 throw new Error(`Invalid coverage_type_id (${value}). Valid options: ${validOptions}`);
             }
+
+        const excelFile = req.files?.excel_file;
+        const hasExistingFile = req.existingApplication?.excel_file_path;
+
+        // 1. Mandatory for Salary Rank (ID: 34) unless a file already exists in the database
+        if (Number(value) === 34 && !excelFile && !hasExistingFile) {
+            throw new Error('An Excel file upload is required when selecting "By Salary Rank".');
+        }
+
+        // 2. Validate file type if any file is uploaded
+        if (excelFile) {
+            const fileName = excelFile.originalFilename?.toLowerCase() || '';
+            const mimeType = excelFile.mimetype || '';
+            const isExcel = fileName.endsWith('.xlsx') || 
+                            fileName.endsWith('.xls') || 
+                            mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                            mimeType === 'application/vnd.ms-excel';
+
+            if (!isExcel) {
+                throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) are allowed.');
+            }
+        }
+
             return true;
         }),
 

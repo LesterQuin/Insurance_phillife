@@ -28,7 +28,9 @@ export const createApplication = async (data, userId) => {
         const appResult = await appRequest
             .input('user_id', sql.Int, userId)
             .input('group_name', sql.NVarChar, data.group_name)
-            .input('business_nature', sql.NVarChar, data.business_nature)
+            .input('business_nature', sql.NVarChar, data.business_nature || null)
+            .input('business_nature_id', sql.Int, data.business_nature_id || null)
+            .input('sub_business_nature_id', sql.Int, data.sub_business_nature_id ? Number(data.sub_business_nature_id) : null)
             .input('number_of_lives', sql.Int, data.number_of_lives)
             .input('business_address', sql.NVarChar, data.business_address)
             .input('contact_number', sql.NVarChar, data.contact_number)
@@ -67,22 +69,28 @@ export const createApplication = async (data, userId) => {
             .input('channel_name', sql.NVarChar, data.channel_name || null)
             .input('commission_rate', sql.NVarChar, data.commission_rate || null)
             .input('service_fee', sql.NVarChar, data.service_fee || null)
+            .input('total_annual_premium', sql.Decimal(18, 2), data.total_annual_premium || null)
+            .input('max_amount_18_64', sql.Decimal(18, 2), data.max_amount_18_64 || null)
+            .input('max_amount_66_70', sql.Decimal(18, 2), data.max_amount_66_70 || null)
+            .input('max_amount_71_75', sql.Decimal(18, 2), data.max_amount_71_75 || null)
+            .input('max_amount_76_80', sql.Decimal(18, 2), data.max_amount_76_80 || null)
             .input('notes', sql.NVarChar(sql.MAX), data.notes || null)
+            .input('excel_file_path', sql.NVarChar(sql.MAX), data.excel_file_path || null)
             .query(`
                 INSERT INTO DHUB.sg.financial_insurance_application (
-                    user_id, group_name, business_nature, number_of_lives, business_address, contact_number, fax_number, email,
+                    user_id, group_name, business_nature, business_nature_id, sub_business_nature_id, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
-                    other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type, 
+                    other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
-                    amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id,
-                    borrower_age_66_70, borrower_age_71_75, borrower_age_76_80, channel_type_id, channel_name, commission_rate, service_fee, notes
+                    amount_loans_id, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id, excel_file_path,
+                    borrower_age_66_70, borrower_age_71_75, borrower_age_76_80, channel_type_id, channel_name, commission_rate, service_fee, total_annual_premium, max_amount_18_64, max_amount_66_70, max_amount_71_75, max_amount_76_80, notes
                 ) VALUES (
-                    @user_id, @group_name, @business_nature, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
+                    @user_id, @group_name, @business_nature, @business_nature_id, @sub_business_nature_id, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
-                    @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type, 
+                    @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type,
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
-                    @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id,
-                    @borrower_age_66_70, @borrower_age_71_75, @borrower_age_76_80, @channel_type_id, @channel_name, @commission_rate, @service_fee, @notes
+                    @amount_loans_id, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id, @excel_file_path,
+                    @borrower_age_66_70, @borrower_age_71_75, @borrower_age_76_80, @channel_type_id, @channel_name, @commission_rate, @service_fee, @total_annual_premium, @max_amount_18_64, @max_amount_66_70, @max_amount_71_75, @max_amount_76_80, @notes
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -264,6 +272,8 @@ export const getAllApplications = async () => {
                 fia.user_id,
                 fia.group_name,
                 fia.business_nature,
+                fia.business_nature_id,
+                fia.sub_business_nature_id,
                 fia.number_of_lives,
                 fia.business_address,
                 fia.contact_number,
@@ -300,6 +310,11 @@ export const getAllApplications = async () => {
                 fia.channel_name,
                 fia.commission_rate,
                 fia.service_fee,
+                fia.total_annual_premium,
+                fia.max_amount_18_64,
+                fia.max_amount_66_70,
+                fia.max_amount_71_75,
+                fia.max_amount_76_80,
                 fia.notes,
                 fia.created_at,
                 fia.updated_at,
@@ -314,6 +329,8 @@ export const getAllApplications = async () => {
                 bp.basic_plan_name,
                 pp.name AS prototype_plan_name,
                 pp.acronym AS prototype_plan_acronym,
+                ind.name AS business_nature_name,
+                subind.name AS sub_business_nature_name,
                 al.name AS amount_loans_name,
                 ct.name AS coverage_type_name,
                 chant.name AS channel_type_name,
@@ -346,6 +363,10 @@ export const getAllApplications = async () => {
                 ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
+            LEFT JOIN DHUB.sg.financial_insurance_industries ind
+                ON fia.business_nature_id = ind.id
+            LEFT JOIN DHUB.sg.financial_insurance_industries subind
+                ON fia.sub_business_nature_id = subind.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             ORDER BY fia.created_at DESC;
@@ -376,6 +397,11 @@ export const getPrototypes = async () => {
                 fia.channel_name,
                 fia.commission_rate,
                 fia.service_fee,
+                fia.total_annual_premium,
+                fia.max_amount_18_64,
+                fia.max_amount_66_70,
+                fia.max_amount_71_75,
+                fia.max_amount_76_80,
                 fia.notes,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
@@ -436,6 +462,8 @@ export const getApplicationById = async (id) => {
                 bp.basic_plan_name,
                 pp.name as prototype_plan_name,
                 pp.acronym AS prototype_plan_acronym,
+                ind.name AS business_nature_name,
+                subind.name AS sub_business_nature_name,
                 al.name as amount_loans_name,
                 ct.name AS coverage_type_name,
                 chant.name AS channel_type_name,
@@ -468,6 +496,10 @@ export const getApplicationById = async (id) => {
                 ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
+            LEFT JOIN DHUB.sg.financial_insurance_industries ind
+                ON fia.business_nature_id = ind.id
+            LEFT JOIN DHUB.sg.financial_insurance_industries subind
+                ON fia.sub_business_nature_id = subind.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             WHERE fia.application_id = @id
@@ -655,6 +687,8 @@ export const updateApplication = async (id, data, userId) => {
 
         addClause('group_name', data.group_name);
         addClause('business_nature', data.business_nature);
+        addClause('business_nature_id', data.business_nature_id, sql.Int);
+        addClause('sub_business_nature_id', data.sub_business_nature_id, sql.Int);
         addClause('number_of_lives', data.number_of_lives, sql.Int);
         addClause('business_address', data.business_address);
         addClause('contact_number', data.contact_number);
@@ -700,7 +734,14 @@ export const updateApplication = async (id, data, userId) => {
         // New fields
         addClause('commission_rate', data.commission_rate);
         addClause('service_fee', data.service_fee);
+        addClause('total_annual_premium', data.total_annual_premium, sql.Decimal(18, 2));
+        addClause('max_amount_18_64', data.max_amount_18_64, sql.Decimal(18, 2));
+        addClause('max_amount_66_70', data.max_amount_66_70, sql.Decimal(18, 2));
+        addClause('max_amount_71_75', data.max_amount_71_75, sql.Decimal(18, 2));
+        addClause('max_amount_76_80', data.max_amount_76_80, sql.Decimal(18, 2));
 
+        // Add excel_file_path to update clause
+        addClause('excel_file_path', data.excel_file_path, sql.NVarChar(sql.MAX));
         if (data.payment !== undefined) {
             const paymentTerm = (Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;
             addClause('payment_term_id', paymentTerm ? paymentTerm.payment_term_id : null, sql.Int);
@@ -756,6 +797,18 @@ export const getLookupListByCategory = async (category) => {
             SELECT id, name, parent_id
             FROM sg.financial_insurance_group_lookups
             WHERE category=@category AND is_active=1
+        `);
+    return res.recordset ?? [];
+};
+
+// Industry/Business Nature list
+export const getIndustries = async () => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .query(`
+            SELECT id, category, name, parent_id
+            FROM sg.financial_insurance_industries
+            WHERE is_active = 1
         `);
     return res.recordset ?? [];
 };
@@ -1098,3 +1151,116 @@ export const getApplicationRates = async (applicationId) => {
         `);
     return result.recordset ?? [];
 };
+
+// Get list of applications that are pending rates (Status ID: 1)
+export const getApplicationsPendingRates = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT 
+                fia.application_id, 
+                fia.group_name, 
+                fia.created_at,
+                fia.borrower_age_66_70,
+                fia.borrower_age_71_75,
+                fia.borrower_age_76_80,
+                gl.name as proposal_type,
+                p.product_name as plan_name,
+                pp.name as prototype_name,
+                u.firstname + ' ' + u.lastname as creator_name,
+                fia.total_annual_premium,
+                fia.max_amount_18_64,
+                fia.max_amount_66_70,
+                fia.max_amount_71_75,
+                fia.max_amount_76_80
+            FROM DHUB.sg.financial_insurance_application fia
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gl 
+                ON fia.type_of_proposal_id = gl.id
+            LEFT JOIN DHUB.sg.financial_insurance_product p 
+                ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+                ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB.sg.financial_insurance_users u 
+                ON fia.user_id = u.user_id
+            WHERE fia.status_id = 1
+                AND fia.total_annual_premium IS NULL
+                AND fia.max_amount_18_64 IS NULL
+                AND fia.max_amount_66_70 IS NULL
+                AND fia.max_amount_71_75 IS NULL
+                AND fia.max_amount_76_80 IS NULL
+            ORDER BY fia.created_at ASC
+        `);
+    return result.recordset ?? [];
+};
+
+// Get list of applications that are pending total annual premium (Status ID: 2, total_annual_premium IS NULL)
+export const getApplicationsPendingTotalPremium = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`
+            SELECT
+                fia.application_id,
+                fia.group_name,
+                fia.created_at,
+                fia.borrower_age_66_70,
+                fia.borrower_age_71_75,
+                fia.borrower_age_76_80,
+                gl.name as proposal_type,
+                p.product_name as plan_name,
+                pp.name as prototype_name,
+                u.firstname + ' ' + u.lastname as creator_name,
+                fia.total_annual_premium
+            FROM DHUB.sg.financial_insurance_application fia
+            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gl
+                ON fia.type_of_proposal_id = gl.id
+            LEFT JOIN DHUB.sg.financial_insurance_product p
+                ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+                ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB.sg.financial_insurance_users u
+                ON fia.user_id = u.user_id
+            WHERE fia.status_id = 1 
+                AND fia.total_annual_premium IS NULL
+            ORDER BY fia.created_at ASC
+        `);
+    return result.recordset ?? [];
+};
+
+// Get list of applications that are pending max amounts (strictly where NO values have been input yet)
+// export const getApplicationsPendingMaxAmounts = async () => {
+//     const pool = await poolPromise;
+//     const result = await pool.request()
+//         .query(`
+//             SELECT
+//                 fia.application_id,
+//                 fia.group_name,
+//                 fia.created_at,
+//                 fia.borrower_age_66_70,
+//                 fia.borrower_age_71_75,
+//                 fia.borrower_age_76_80,
+//                 gl.name as proposal_type,
+//                 p.product_name as plan_name,
+//                 pp.name as prototype_name,
+//                 u.firstname + ' ' + u.lastname as creator_name,
+//                 fia.max_amount_18_64,
+//                 fia.max_amount_66_70,
+//                 fia.max_amount_71_75,
+//                 fia.max_amount_76_80
+//             FROM DHUB.sg.financial_insurance_application fia
+//             LEFT JOIN DHUB.sg.financial_insurance_group_lookups gl
+//                 ON fia.type_of_proposal_id = gl.id
+//             LEFT JOIN DHUB.sg.financial_insurance_product p
+//                 ON fia.plan_id = p.product_id
+//             LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+//                 ON fia.prototype_id = pp.id
+//             LEFT JOIN DHUB.sg.financial_insurance_users u
+//                 ON fia.user_id = u.user_id
+//             WHERE fia.status_id = 1 
+//                 AND fia.max_amount_18_64 IS NULL
+//                 AND fia.max_amount_66_70 IS NULL
+//                 AND fia.max_amount_71_75 IS NULL
+//                 AND fia.max_amount_76_80 IS NULL
+//             ORDER BY fia.created_at ASC
+//         `);
+//     return result.recordset ?? [];
+// };

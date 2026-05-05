@@ -95,7 +95,7 @@ export const generateSecurityGuardsPDFContent = (
         .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
         .page-break { page-break-before: always; }
         .logo { 
-            display: block; margin-left: auto; margin-right: -15mm; margin-top: -10mm; width: 180px; 
+            display: block; margin-left: auto; margin-right: -15mm; margin-top: -10mm; width: 200px; 
         }
         .center-photo { display: block; width: 100%; height: 550px; object-fit: cover; margin-bottom: 20px; margin-top: 20px; }
         .cover-proposal-title { text-align: left; width: calc(100% - 40mm); font-size: 24pt; font-weight: bold; margin: -5mm 20mm 30px 20mm; color: #2b333c; text-transform: uppercase; line-height: 1.2; }
@@ -128,9 +128,47 @@ export const generateSecurityGuardsPDFContent = (
         }
         .cover-page {
             display: flex; flex-direction: column; height: 297mm; padding: 15mm 0 0 0; box-sizing: border-box; background-color: white; position: relative; z-index: 2;
-        }
-        .cover-top {
-            flex-shrink: 0; padding: 0 20mm;
+        } 
+        .cover-top { 
+            position: relative; 
+            padding: 0 20mm; 
+        } 
+        .gradient-bar { 
+            position: absolute; 
+            top: -2mm; 
+            left: 20mm; 
+            width: 70mm; 
+            height: 13px; 
+            background: linear-gradient( 
+                90deg, 
+                #2b2a8c 0%, 
+                #253b97 15%, 
+                #1b5aa1 30%, 
+                #13728f 45%, 
+                #0f8b7b 60%, 
+                #0ca363 75%, 
+                #0db14b 100% 
+            ); 
+            border-radius: 1px; 
+        } 
+        .subsequent-header-gradient { 
+            position: absolute; 
+            top: 15mm; 
+            right: -1mm; 
+            width: 70mm; 
+            height: 13px; 
+            background: linear-gradient( 
+                90deg, 
+                #2b2a8c 0%, 
+                #253b97 15%, 
+                #1b5aa1 30%, 
+                #13728f 45%, 
+                #0f8b7b 60%, 
+                #0ca363 75%, 
+                #0db14b 100% 
+            ); 
+            border-radius: 1px; 
+            z-index: 5; 
         }
         .cover-middle {
             flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 10mm; 
@@ -150,7 +188,9 @@ export const generateSecurityGuardsPDFContent = (
             box-sizing: border-box;
             page-break-after: always;
         }
-        .content-logo { position: absolute; top: 10mm; left: 10mm; width: 150px; z-index: 10; }
+        .content-logo { 
+            position: absolute; top: 10mm; left: 10mm; width: 160px; z-index: 10; 
+        }
         .plan-details { 
             margin: 0;
             background-color: transparent;
@@ -220,6 +260,7 @@ export const generateSecurityGuardsPDFContent = (
 
     <div class="cover-page">
         <div class="cover-top">
+            <div class="gradient-bar"></div>
             ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ""}
         </div>
         <div class="cover-middle">
@@ -252,6 +293,7 @@ export const generateSecurityGuardsPDFContent = (
     <div class="page-break"></div>
     <div class="main-content">
     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+    <div class="subsequent-header-gradient"></div>
         <p>
             ${formatDate(proposalDate)} <br><br>
             ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
@@ -277,6 +319,7 @@ export const generateSecurityGuardsPDFContent = (
     <table class="layout-table">
         <thead><tr><td>
             ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+            <div class="subsequent-header-gradient"></div>
             <div class="spacer-top"></div>
         </td></tr></thead>
         <tbody><tr><td>

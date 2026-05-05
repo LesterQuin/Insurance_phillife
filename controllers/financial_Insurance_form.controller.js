@@ -5,6 +5,7 @@ import * as Model from '../models/financial_Insurance_form.model.js';
 import * as User from '../models/user/user_model.js';
 import puppeteer from 'puppeteer';
 import { success, error } from '../utils/response.js';
+import { auditLog, AuditStatus, AuditActions, normalizeIp } from '../utils/logger.js';
 import sanitizeHtml from 'sanitize-html';
 import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
 import { generateBarangayPDFContent } from '../templates/prototype_BarangayProtectPlan.js';
@@ -26,15 +27,6 @@ const sanitizeOptions = {
     allowedAttributes: {
         'span': ['style'],
     }
-};
-
-// Helper to normalize IP addresses for readable logging
-const normalizeIp = (ip) => {
-    if (!ip) return null;
-    // Convert IPv4-mapped IPv6 (e.g. ::ffff:127.0.0.1) to standard IPv4
-    if (ip.startsWith('::ffff:')) return ip.replace('::ffff:', '');
-    // Convert IPv6 loopback to IPv4 loopback for consistency
-    return ip === '::1' ? '127.0.0.1' : ip;
 };
 
 // Helper to clean "other" fields based on selected IDs
@@ -268,7 +260,14 @@ const buildApplicationResponse = async (app) => {
         user_id: app.user_id,
         user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
         group_name: app.group_name,
-        business_nature: app.business_nature,
+        business_nature: app.business_nature_id ? {
+            id: app.business_nature_id,
+            name: app.business_nature_name,
+            sub_nature: app.sub_business_nature_id ? {
+                id: app.sub_business_nature_id,
+                name: app.sub_business_nature_name
+            } : null
+        } : app.business_nature,
         number_of_lives: app.number_of_lives,
         business_address: app.business_address,
         contact_number: app.contact_number,
@@ -316,6 +315,11 @@ const buildApplicationResponse = async (app) => {
         },
         commission_rate: app.commission_rate || null,
         service_fee: app.service_fee || null,
+        total_annual_premium: app.total_annual_premium || 0,
+        max_amount_18_64: app.max_amount_18_64 || 0,
+        max_amount_66_70: app.max_amount_66_70 || 0,
+        max_amount_71_75: app.max_amount_71_75 || 0,
+        max_amount_76_80: app.max_amount_76_80 || 0,
         payment: paymentTerms,
         type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
         prototype_plan: { 
@@ -367,6 +371,33 @@ export const createApplication = async (req, res) => {
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
         }
 
+        // Handle Excel file if provided (Required for Salary Ranking via Validator)
+        const excelFile = req.files?.excel_file; // Assuming req.files is populated by formidable
+        if (excelFile) {
+            const tempFilePath = excelFile.filepath;
+            const originalFilename = excelFile.originalFilename;
+            
+            // Define the target directory (e.g., 'uploads' in your project root)
+            // This assumes your 'uploads' folder is one level up from the 'controllers' folder
+            const uploadDir = path.join(__dirname, '..', 'uploads'); 
+            
+            // Ensure the upload directory exists
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            // Create a new file path for the permanent storage
+            const uniqueFilename = `${Date.now()}-${originalFilename}`;
+            const newFilePath = path.join(uploadDir, uniqueFilename);
+
+            // Move the file from the temporary location to the permanent location
+            await fs.promises.rename(tempFilePath, newFilePath);
+            console.log(`File saved permanently to: ${newFilePath}`);
+            
+            // Store the path in the data object so the Model can save it (if column exists)
+            processedData.excel_file_path = newFilePath; 
+        }
+
         const newRecord = await Model.createApplication(processedData, userId);
 
         if (!newRecord || !newRecord.application_id) {
@@ -381,6 +412,12 @@ export const createApplication = async (req, res) => {
 
         return success(res, response, 'Application submitted successfully', 201);
     } catch (err) {
+        await auditLog(req, {
+            action: AuditActions.CREATE_APPLICATION,
+            entity: 'FinancialApplication',
+            status: AuditStatus.ERROR,
+            metadata: { error: err.message }
+        });
         console.error('Service Error:', err);
         return error(res, err.message);
     }
@@ -405,6 +442,7 @@ export const saveDraft = async (req, res) => {
         processedData.ip_address = normalizeIp(req.ip);
 
         if (processedData.notes) {
+            // Sanitize notes if they exist
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
         }
 
@@ -444,6 +482,17 @@ export const saveDraft = async (req, res) => {
         return success(res, response, 'Application saved as draft successfully', applicationId ? 200 : 201);
     } catch (err) {
         console.error('Draft Save Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Get List of Industries (Business Nature)
+export const getIndustries = async (req, res) => {
+    try {
+        const list = await Model.getIndustries();
+        return success(res, list, 'Industries fetched successfully.');
+    } catch (err) {
+        console.error('Get Industries Error:', err);
         return error(res, err.message);
     }
 };
@@ -521,7 +570,11 @@ const generateProposalHtml = async (id) => {
     };
 
     const details = {
-        totalAnnualPremium: 0, 
+        totalAnnualPremium: appData.total_annual_premium || 0, 
+        maxAmount18_64: appData.max_amount_18_64 || 0,
+        maxAmount66_70: appData.max_amount_66_70 || 0,
+        maxAmount71_75: appData.max_amount_71_75 || 0,
+        maxAmount76_80: appData.max_amount_76_80 || 0,
         contactLocal: '123',
         rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
         rates66_70: formatDbRatesForTemplate(ratesRows, '66_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
@@ -961,7 +1014,14 @@ export const getAllApplications = async (req, res) => {
                 user_id: app.user_id,
                 user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
                 group_name: app.group_name,
-                business_nature: app.business_nature,
+                business_nature: app.business_nature_id ? {
+                    id: app.business_nature_id,
+                    name: app.business_nature_name,
+                    sub_nature: app.sub_business_nature_id ? {
+                        id: app.sub_business_nature_id,
+                        name: app.sub_business_nature_name
+                    } : null
+                } : app.business_nature,
                 number_of_lives: app.number_of_lives,
                 business_address: app.business_address,
                 contact_number: app.contact_number,
@@ -1033,6 +1093,7 @@ export const getAllApplications = async (req, res) => {
                 borrower_age_76_80: app.borrower_age_76_80,
                 coverage_totals: coverage_totals,
                 riders: appRiders,
+        excel_file_path: app.excel_file_path || null,
                 notes: app.notes,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
@@ -1082,6 +1143,139 @@ export const saveRates = async (req, res) => {
         return error(res, err.message);
     }
 };
+
+// Save/Update Total Annual Premium for Application
+export const saveTotalAnnualPremium = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const id = req.params.id;
+        const { total_annual_premium } = req.body;
+
+        // Department Check: Only Actuarial (ID 18) can input or update total premium
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+
+        if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+            return error(res, 'Access Denied: Only users from the Actuarial department are authorized to input the total annual premium.', 403);
+        }
+
+        const existingApplication = await Model.getApplicationById(id);
+        if (!existingApplication) {
+            return error(res, 'Application not found', 404);
+        }
+
+        // Validation: If total annual premium is already set, POST should fail
+        if (req.method === 'POST' && existingApplication.total_annual_premium !== null) {
+            return error(res, 'Total annual premium already exists for this application. Please use PUT to update existing data.', 400);
+        }
+
+        await Model.updateApplication(id, { total_annual_premium }, userId);
+
+        const updatedApp = await Model.getApplicationById(id);
+        const response = await buildApplicationResponse(updatedApp);
+        return success(res, response, 'Total Annual Premium saved successfully.');
+    } catch (err) {
+        console.error('Save Total Premium Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Save/Update Max Loan Amounts for Application
+// export const saveMaxAmounts = async (req, res) => {
+//     try {
+//         const userId = req.user.user_id;
+//         const id = req.params.id;
+//         const { max_amount_18_64, max_amount_66_70, max_amount_71_75, max_amount_76_80 } = req.body;
+
+//         const loggedInUser = await User.getUserById(userId);
+//         const DEPT_ACTUARIAL_ID = 18;
+
+//         if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+//             return error(res, 'Access Denied: Only users from the Actuarial department are authorized to input maximum amounts.', 403);
+//         }
+
+//         const existingApplication = await Model.getApplicationById(id);
+//         if (!existingApplication) {
+//             return error(res, 'Application not found', 404);
+//         }
+
+//         // Validation: If any max amount is already set, POST should fail
+//         const hasExistingMaxAmounts = [
+//             existingApplication.max_amount_18_64, existingApplication.max_amount_66_70,
+//             existingApplication.max_amount_71_75, existingApplication.max_amount_76_80
+//         ].some(val => val !== null);
+
+//         if (req.method === 'POST' && hasExistingMaxAmounts) {
+//             return error(res, 'Maximum amounts already exist for this application. Please use PUT to update existing data.', 400);
+//         }
+
+//         await Model.updateApplication(id, { max_amount_18_64, max_amount_66_70, max_amount_71_75, max_amount_76_80 }, userId);
+
+//         const updatedApp = await Model.getApplicationById(id);
+//         const response = await buildApplicationResponse(updatedApp);
+//         return success(res, response, 'Maximum amounts saved successfully.');
+//     } catch (err) {
+//         console.error('Save Max Amounts Error:', err);
+//         return error(res, err.message);
+//     }
+// };
+
+// Get applications pending actuarial rate input
+export const getApplicationsPendingRates = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+
+        if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+            return error(res, 'Access Denied: Only users from the Actuarial department can view the rate input queue.', 403);
+        }
+
+        const list = await Model.getApplicationsPendingRates();
+        return success(res, list, 'Applications pending rates fetched successfully.');
+    } catch (err) {
+        console.error('Pending Rates Queue Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Get applications pending total annual premium input
+export const getApplicationsPendingTotalPremium = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+
+        if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+            return error(res, 'Access Denied: Only users from the Actuarial department can view the total annual premium input queue.', 403);
+        }
+
+        const list = await Model.getApplicationsPendingTotalPremium();
+        return success(res, list, 'Applications pending total annual premium fetched successfully.');
+    } catch (err) {
+        console.error('Pending Total Premium Queue Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Get applications pending max amounts input
+// export const getApplicationsPendingMaxAmounts = async (req, res) => {
+//     try {
+//         const userId = req.user.user_id;
+//         const loggedInUser = await User.getUserById(userId);
+//         const DEPT_ACTUARIAL_ID = 18;
+
+//         if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+//             return error(res, 'Access Denied: Only users from the Actuarial department can view the maximum amounts input queue.', 403);
+//         }
+
+//         const list = await Model.getApplicationsPendingMaxAmounts();
+//         return success(res, list, 'Applications pending maximum amounts fetched successfully.');
+//     } catch (err) {
+//         console.error('Pending Max Amounts Queue Error:', err);
+//         return error(res, err.message);
+//     }
+// };
 
 // Get Application History Logs
 export const getApplicationHistory = async (req, res) => {
@@ -1171,10 +1365,51 @@ export const updateApplication = async (req, res) => {
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
         }
 
+        // Handle Excel file during update
+        const excelFile = req.files?.excel_file; // Assuming req.files is populated by formidable
+        if (excelFile) {
+            const tempFilePath = excelFile.filepath;
+            const originalFilename = excelFile.originalFilename;
+            
+            // Define the target directory (e.g., 'uploads' in your project root)
+            const uploadDir = path.join(__dirname, '..', 'uploads'); 
+            
+            // Ensure the upload directory exists
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            // Create a new file path for the permanent storage
+            const uniqueFilename = `${Date.now()}-${originalFilename}`;
+            const newFilePath = path.join(uploadDir, uniqueFilename);
+
+            // Move the file from the temporary location to the permanent location
+            await fs.promises.rename(tempFilePath, newFilePath);
+            console.log(`File saved permanently to: ${newFilePath}`);
+            
+            processedData.excel_file_path = newFilePath;
+        }
+
         const updated = await Model.updateApplication(req.params.id, processedData, userId);
         const response = await buildApplicationResponse(updated);
+
+        await auditLog(req, {
+            userId: userId,
+            action: AuditActions.UPDATE_APPLICATION,
+            entity: 'FinancialApplication',
+            entityId: req.params.id,
+            status: AuditStatus.INFO
+        });
+
         return success(res, response, 'Application updated successfully.');
     } catch (err) {
+        await auditLog(req, {
+            action: AuditActions.UPDATE_APPLICATION,
+            entity: 'FinancialApplication',
+            entityId: req.params.id,
+            status: AuditStatus.ERROR,
+            metadata: { error: err.message }
+        });
         console.error('Service Error:', err);
         return error(res, err.message);
     }

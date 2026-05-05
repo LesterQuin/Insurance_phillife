@@ -38,7 +38,7 @@ export const getUserByEmail = async (email) => {
         .query(`
             SELECT
                 u.user_id, u.firstname, u.middlename, u.lastname, u.suffix, u.email, u.agent_code, u.phoneNumber,
-                u.is_active, u.mustChangePassword, u.password_hash,
+                u.is_active, u.mustChangePassword, u.password_hash, u.otpExpiresAt, u.mustVerifyOtp,
                 u.role_id, r.name as roleName,
                 u.location_id, l.name as locationName,
                 u.department_id, d.name as departmentName, d.code as departmentCode
@@ -77,7 +77,7 @@ export const getUserById = async (userId) => {
         .query(`
             SELECT
                 u.user_id, u.firstname, u.middlename, u.lastname, u.suffix, u.email, u.agent_code, u.phoneNumber,
-                u.is_active, u.mustChangePassword, u.password_hash,
+                u.is_active, u.mustChangePassword, u.password_hash, u.otpExpiresAt, u.mustVerifyOtp,
                 u.role_id, r.name as roleName,
                 u.location_id, l.name as locationName,
                 u.department_id, d.name as departmentName, d.code as departmentCode

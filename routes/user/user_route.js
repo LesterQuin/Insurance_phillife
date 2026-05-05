@@ -1,7 +1,7 @@
 import express from 'express';
 import * as Controller from '../../controllers/user/user_controller.js';
 import { authenticate, isSuperAdmin } from '../../middlewares/authenticate.js';
-import rateLimit from 'express-rate-limit';
+import { authLimiter } from '../../middlewares/rateLimiter.js';
 import { 
     validateRegister, 
     validateLogin, 
@@ -15,13 +15,6 @@ import {
 } from '../../middlewares/validate.js';
 
 const router = express.Router();
-
-// Rate limiters
-const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Limit each IP to 10 requests per window
-    message: { status: false, message: "Too many attempts, please try again after 15 minutes" }
-});
 
 // Public routes
 router.post('/register', authLimiter, validateRegister, Controller.register);
