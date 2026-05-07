@@ -25,3 +25,12 @@ export const isSuperAdmin = (req, res, next) => {
         return res.status(403).json({ status: false, message: 'Forbidden: Super Admin access required.' });
     }
 };
+
+export const isActuarial = (req, res, next) => {
+    const DEPT_ACTUARIAL_ID = 18;
+    if (req.user && Number(req.user.department_id) === DEPT_ACTUARIAL_ID) {
+        next();
+    } else {
+        return res.status(403).json({ status: false, message: 'Forbidden: Actuarial department access required.' });
+    }
+};

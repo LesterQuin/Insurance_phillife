@@ -3,6 +3,7 @@ import validator from 'express-validator';
 const { body, param, validationResult } = validator;
 import * as User from '../models/user/user_model.js';
 import * as Financial from '../models/financial_Insurance_form.model.js'
+import * as Dropdown from '../models/insurance_dropdown/insurance_dropdown.model.js';
 
 // -----------------------------
 // User validation
@@ -359,7 +360,7 @@ export const validateFinancialApplication = [
         .notEmpty().withMessage('Business Nature is required')
         .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)')
         .custom(async (value, { req }) => {
-            if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+            if (!req.industryCache) req.industryCache = await Dropdown.getIndustries();
             const topLevelIndustries = req.industryCache.filter(i => i.parent_id === null);
             const item = topLevelIndustries.find(i => i.id === Number(value));
             if (!item) {
@@ -378,7 +379,7 @@ export const validateFinancialApplication = [
             if (!parentId) throw new Error('business_nature_id is required to validate sub_business_nature_id');
 
             const childId = Number(value);
-            if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+            if (!req.industryCache) req.industryCache = await Dropdown.getIndustries();
             
             const validChildren = req.industryCache.filter(i => i.parent_id === parentId);
             const item = validChildren.find(i => i.id === childId);
@@ -626,10 +627,10 @@ export const validateFinancialApplication = [
     // -----------------------------
     body('minimum_age')
         .notEmpty().withMessage('Minimum Age is required')
-        .isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be 18 '),
+        .isInt({ min: 18, max: 65 }).withMessage('Minimum Age must be between 18 and 65'),
     body('maximum_age')
         .notEmpty().withMessage('Maximum Age is required')
-        .isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be 64 ')
+        .isInt({ min: 18, max: 65 }).withMessage('Maximum Age must be between 18 and 65')
         .custom(async (value, { req }) => {
             const minAge = Number(req.body.minimum_age);
             const maxAge = Number(value);
@@ -914,10 +915,14 @@ body('basic_plan_id')
     // Optional validation for new product-specific fields
     body('amount_loans_id')
         .if(body('type_of_proposal_id').equals('31'))
-        .optional({ nullable: true })
+        .if(body('plan_id').equals('1'))
+        .notEmpty().withMessage('Loan Amount Type is required for GCLI products'),
+    body('amount_loans_id')
+        .if(body('type_of_proposal_id').equals('31'))
+        .optional({ nullable: true, checkFalsy: true })
         .isInt({ min: 0 }).withMessage('Amount Loans ID must be a non-negative integer')
         .custom(async (value) => {
-            if (value === null || value === undefined) return true;
+            if (value === null || value === undefined || value === '') return true;
             const lookups = await Financial.getLookupListByCategory('LOAN_AMOUNT_TYPE');
             if (!lookups.some(l => l.id === Number(value))) {
                 const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -925,7 +930,108 @@ body('basic_plan_id')
             }
             return true;
         }),
-    body('loans_amount').if(body('type_of_proposal_id').equals('31')).optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Loans Amount must be a non-negative number'),
+    body('loans_amount')
+        .if(body('type_of_proposal_id').equals('31'))
+        .if(body('plan_id').equals('1'))
+        .notEmpty().withMessage('Loans Amount is required for GCLI products')
+        .isFloat({ min: 0 }).withMessage('Loans Amount must be a non-negative number'),
+    body('max_loan_amount')
+        .if(body('plan_id').equals('1'))
+        .notEmpty().withMessage('Maximum Loan Amount is required for GCLI products')
+        .isFloat({ min: 0 }).withMessage('Maximum Loan Amount must be a non-negative number'),
+    body('min_loan_amount')
+        .if(body('plan_id').equals('1'))
+        .notEmpty().withMessage('Minimum Loan Amount is required for GCLI products')
+        .isFloat({ min: 0 }).withMessage('Minimum Loan Amount must be a non-negative number')
+        .custom((value, { req }) => {
+            const max = req.body.max_loan_amount;
+            if (max != null && value != null && Number(value) > Number(max)) {
+                throw new Error('Minimum Loan Amount cannot be greater than Maximum Loan Amount');
+            }
+            return true;
+        }),
+    body('loan_portfolio_amount')
+        .if(body('plan_id').equals('1'))
+        .notEmpty().withMessage('Loan Portfolio Amount is required for GCLI products')
+        .isFloat({ min: 0 }).withMessage('Loan Portfolio Amount must be a non-negative number'),
+
+    // GCLI Age Bracket Amount Validations
+    body('borrower_amount_18_64') // Base age range amount (e.g., 18-64)
+        .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
+        .notEmpty().withMessage((value, { req }) => {
+            const min = req.body.minimum_age || 18;
+            const max = req.body.maximum_age || 65;
+            return `Borrower Amount for age ${min}-${max} is required for this product type`;
+        })
+        .isFloat({ min: 0 }).withMessage((value, { req }) => {
+            const min = req.body.minimum_age || 18;
+            const max = req.body.maximum_age || 65;
+            return `Borrower Amount for age ${min}-${max} must be a non-negative number`; // Message is fine
+        }),
+    body('borrower_amount_66_70') // Conditional age bracket amount
+        .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
+        .custom((value, { req }) => {
+            const isEnabled = String(req.body.borrower_age_66_70) === 'true';
+            if (isEnabled) {
+                if (value === null || value === undefined || value === '') {
+                    throw new Error('Borrower Amount for 66-70 is required when this age bracket is selected');
+                }
+                if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
+                    throw new Error('Borrower Amount 66-70 must be a non-negative number');
+                }
+            } else if (value !== undefined && value !== null && value !== '') {
+                throw new Error('Borrower Amount for 66-70 should not be provided when this age bracket is not selected');
+            }
+            return true;
+        }),
+    body('borrower_amount_71_75') // Conditional age bracket amount
+        .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
+        .custom((value, { req }) => {
+            const isEnabled = String(req.body.borrower_age_71_75) === 'true';
+            if (isEnabled) {
+                if (value === null || value === undefined || value === '') {
+                    throw new Error('Borrower Amount for 71-75 is required when this age bracket is selected');
+                }
+                if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
+                    throw new Error('Borrower Amount 71-75 must be a non-negative number');
+                }
+            } else if (value !== undefined && value !== null && value !== '') {
+                throw new Error('Borrower Amount for 71-75 should not be provided when this age bracket is not selected');
+            }
+            return true;
+        }),
+    body('borrower_amount_76_80') // Conditional age bracket amount
+        .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
+        .custom((value, { req }) => {
+            const isEnabled = String(req.body.borrower_age_76_80) === 'true';
+            if (isEnabled) {
+                if (value === null || value === undefined || value === '') {
+                    throw new Error('Borrower Amount for 76-80 is required when this age bracket is selected');
+                }
+                if (isNaN(parseFloat(value)) || parseFloat(value) < 0) {
+                    throw new Error('Borrower Amount 76-80 must be a non-negative number');
+                }
+            } else if (value !== undefined && value !== null && value !== '') {
+                throw new Error('Borrower Amount for 76-80 should not be provided when this age bracket is not selected');
+            }
+            return true;
+        }),
+
+    // Reject these fields for non-GCLI plans
+    body(['max_loan_amount', 'min_loan_amount', 'loan_portfolio_amount', 'loans_amount'])
+        .if(body('plan_id').not().equals('1'))
+        .custom(val => {
+            if (val != null && val !== '') throw new Error('Loan-specific amounts are only applicable for GCLI products.');
+            return true;
+        }),
+    // Reject age bracket amounts for plans other than GCLI, GPA, GYRT
+    body(['borrower_amount_18_64', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80'])
+        .if(body('plan_id').not().isIn(['1', '2', '3']))
+        .custom(val => {
+            if (val != null && val !== '') throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT).');
+            return true;
+        }),
+
     body('payment')
         .if(body('plan_id').equals('1'))
         .notEmpty().withMessage('Payment terms are required for GCLI plan.')
@@ -953,14 +1059,9 @@ body('basic_plan_id')
                 if (value == null) {
                     throw new Error('sub_payment_term_id is required when Payment Term is Single Pay, Annual, or Monthly.');
                 }
-                if (isNaN(Number(value)) || Number(value) < 0) {
-                    throw new Error('sub_payment_term_id must be a non-negative integer.');
-                }
-                const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
-                const selectableYears = lookups.filter(l => l.parent_id === 44);
-                if (!selectableYears.some(l => l.id === Number(value))) {
-                    const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
-                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options: ${validOptions}`);
+                const numValue = Number(value);
+                if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 1 || numValue > 60) {
+                    throw new Error('sub_payment_term_id must be an integer between 1 and 60 only.');
                 }
             } else if (value != null) {
                 throw new Error('sub_payment_term_id must be null for this payment term.');
@@ -1149,7 +1250,7 @@ export const validateDraftFinancialApplication = [
         .optional()
         .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer')
         .custom(async (value, { req }) => {
-        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        if (!req.industryCache) req.industryCache = await Dropdown.getIndustries();
         const topLevel = req.industryCache.filter(i => i.parent_id === null);
         if (!topLevel.some(i => i.id === Number(value))) {
             const validOptions = topLevel.map(i => `${i.id} - ${i.name}`).join(', ');
@@ -1161,7 +1262,7 @@ export const validateDraftFinancialApplication = [
         .optional({ nullable: true })
         .isInt({ min: 1 }).withMessage('Sub-Business Nature ID must be a positive integer')
         .custom(async (value, { req }) => {
-        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        if (!req.industryCache) req.industryCache = await Dropdown.getIndustries();
         if (!req.industryCache.some(i => i.id === Number(value) && i.parent_id !== null)) {
             throw new Error(`Invalid sub_business_nature_id (${value}).`);
         }
@@ -1212,6 +1313,21 @@ export const validateSystemLookup = [
     body('name').notEmpty().withMessage('Name is required').isLength({ max: 100 }).withMessage('Name must not exceed 100 characters'),
     body('code').optional().isLength({ max: 50 }).withMessage('Code must not exceed 50 characters'),
     body('is_active').optional().isBoolean().withMessage('is_active must be a boolean'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
+// Evidence Notes validation
+// -----------------------------
+export const validateEvidenceNotes = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('evidence_notes')
+        .notEmpty().withMessage('Evidence of Insurability notes are required')
+        .isString().withMessage('Evidence of Insurability notes must be a string'),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -1358,7 +1474,7 @@ export const validateUpdateFinancialApplication = [
         .optional()
         .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)')
         .custom(async (value, { req }) => {
-        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        if (!req.industryCache) req.industryCache = await Dropdown.getIndustries();
         const topLevelIndustries = req.industryCache.filter(i => i.parent_id === null);
         const item = topLevelIndustries.find(i => i.id === Number(value));
         if (!item) {
@@ -1380,7 +1496,7 @@ export const validateUpdateFinancialApplication = [
         if (!parentId) throw new Error('business_nature_id is required');
 
         const childId = Number(value);
-        if (!req.industryCache) req.industryCache = await Financial.getIndustries();
+        if (!req.industryCache) req.industryCache = await Dropdown.getIndustries();
 
         const validChildren = req.industryCache.filter(i => i.parent_id === parentId);
         const item = validChildren.find(i => i.id === childId);
@@ -1405,8 +1521,8 @@ export const validateUpdateFinancialApplication = [
     body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
 
     // Age validation for update - Minimum 18, Maximum 64
-    body('minimum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be 18 '),
-    body('maximum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be 64 ')
+    body('minimum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Minimum Age must be between 18 and 65'),
+    body('maximum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Maximum Age must be between 18 and 65')
         .custom(async (value, { req }) => {
             const minAge = Number(req.body.minimum_age);
             const maxAge = Number(value);
@@ -1656,8 +1772,12 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 
     // Optional validation for new product-specific fields on update
     body('amount_loans_id').optional({ nullable: true }).isInt({ min: 0 }).withMessage('Amount Loans ID must be a non-negative integer')
-        .custom(async (value) => {
-            if (value === null || value === undefined) return true;
+        .custom(async (value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            if (planId === 1 && (value === null || value === '')) {
+                throw new Error('Loan Amount Type is required for GCLI products and cannot be empty.');
+            }
+            if (value === null || value === undefined || value === '') return true;
             const lookups = await Financial.getLookupListByCategory('LOAN_AMOUNT_TYPE');
             if (!lookups.some(l => l.id === Number(value))) {
                 const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
@@ -1665,7 +1785,93 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
             }
             return true;
         }),
-    body('loans_amount').optional({ nullable: true }).isFloat({ min: 0 }),
+    body('loans_amount').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Loans Amount must be a non-negative number')
+        .custom((value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            const proposalId = req.body.type_of_proposal_id !== undefined ? Number(req.body.type_of_proposal_id) : req.existingApplication?.type_of_proposal_id;
+
+            if (planId === 1 && proposalId === 31 && (value === null || value === '')) {
+                throw new Error('Loans Amount is required for GCLI products and cannot be empty.');
+            }
+
+            if (planId !== 1 && value != null) {
+                throw new Error('Loans Amount is only applicable for GCLI products.');
+            }
+            return true;
+        }),
+
+    // GCLI Age Bracket Amount Validations (Update)
+    body('borrower_amount_18_64').optional({ nullable: true }).isFloat({ min: 0 })
+        .custom((value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            if (planId === 1 && (value === null || value === '')) throw new Error('Borrower Amount for base age range is required for GCLI.');
+            return true;
+        }),
+    
+    // Ensure amounts are provided if the bracket is enabled (either in body or existing record)
+    ...['66_70', '71_75', '76_80'].map(suffix => 
+        body(`borrower_amount_${suffix}`).optional({ nullable: true }).isFloat({ min: 0 })
+            .custom((value, { req }) => {
+                const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+                const isEnabled = req.body[`borrower_age_${suffix}`] !== undefined 
+                    ? String(req.body[`borrower_age_${suffix}`]) === 'true'
+                    : !!req.existingApplication?.[`borrower_age_${suffix}`];
+
+                if ([1, 2, 3].includes(planId)) {
+                    if (isEnabled && (value === null || value === '')) {
+                        throw new Error(`Borrower Amount for ${suffix.replace('_', '-')} is required when this bracket is active.`);
+                    }
+                    if (!isEnabled && value != null && value !== '') {
+                        throw new Error(`Borrower Amount for ${suffix.replace('_', '-')} should not be provided when this age bracket is not selected.`);
+                    }
+                }
+                return true;
+            })
+    ),
+    // Reject age bracket amounts for plans other than GCLI, GPA, GYRT
+    body(['borrower_amount_18_64', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80']).optional({ nullable: true })
+        .custom((value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            if (value != null && ![1, 2, 3].includes(planId)) {
+                throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT).');
+            }
+            return true;
+        }),
+
+    // GCLI Specific Loan Amount Validations (Update)
+    body('max_loan_amount').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Maximum Loan Amount must be a non-negative number')
+        .custom((value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            if (planId !== 1 && value != null) {
+                throw new Error('Maximum Loan Amount is only applicable for GCLI products.');
+            }
+            return true;
+        }),
+    body('min_loan_amount').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Minimum Loan Amount must be a non-negative number')
+        .custom((value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            if (planId !== 1 && value != null) {
+                throw new Error('Minimum Loan Amount is only applicable for GCLI products.');
+            }
+            
+            const currentMax = req.body.max_loan_amount !== undefined 
+                ? req.body.max_loan_amount 
+                : req.existingApplication?.max_loan_amount;
+
+            if (currentMax != null && value != null && Number(value) > Number(currentMax)) {
+                throw new Error('Minimum Loan Amount cannot be greater than Maximum Loan Amount');
+            }
+            return true;
+        }),
+    body('loan_portfolio_amount').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Loan Portfolio Amount must be a non-negative number')
+        .custom((value, { req }) => {
+            const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
+            if (planId !== 1 && value != null) {
+                throw new Error('Loan Portfolio Amount is only applicable for GCLI products.');
+            }
+            return true;
+        }),
+
     body('payment')
         .optional({ nullable: true })
         .isArray({ max: 1 }).withMessage('Payment must be an array with at most one term.'),
@@ -1691,14 +1897,9 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
                 if (value == null) {
                     throw new Error('sub_payment_term_id is required when Payment Term is Single Pay, Annual, or Monthly.');
                 }
-                if (isNaN(Number(value)) || Number(value) < 0) {
-                    throw new Error('sub_payment_term_id must be a non-negative integer.');
-                }
-                const lookups = await Financial.getLookupListByCategory('PAYMENT_YEAR');
-                const selectableYears = lookups.filter(l => l.parent_id === 44);
-                if (!selectableYears.some(l => l.id === Number(value))) {
-                    const validOptions = selectableYears.map(l => `${l.id} - ${l.name}`).join(', ');
-                    throw new Error(`Invalid sub_payment_term_id (${value}). Valid options: ${validOptions}`);
+                const numValue = Number(value);
+                if (isNaN(numValue) || !Number.isInteger(numValue) || numValue < 1 || numValue > 60) {
+                    throw new Error('sub_payment_term_id must be an integer between 1 and 60 only.');
                 }
             } else if (value != null) {
                 throw new Error('sub_payment_term_id must be null for this payment term.');

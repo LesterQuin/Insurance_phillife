@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as Model from '../models/financial_Insurance_form.model.js';
+import * as ActuarialModel from '../models/actuarial_api/actuarial.model.js';
 import * as User from '../models/user/user_model.js';
 import puppeteer from 'puppeteer';
 import { success, error } from '../utils/response.js';
@@ -22,7 +23,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Configuration for rich-text sanitization
-const sanitizeOptions = {
+export const sanitizeOptions = {
     allowedTags: ['h1', 'h2', 'h3', 'p', 'strong', 'em', 'u', 'ol', 'ul', 'li', 'br', 'span', 'div'],
     allowedAttributes: {
         'span': ['style'],
@@ -69,7 +70,14 @@ const cleanProposalFields = (data) => {
         mutableData.basic_plan_id = null;
         mutableData.riders = [];
         mutableData.amount_loans_id = null;
+        mutableData.max_loan_amount = null;
+        mutableData.min_loan_amount = null;
+        mutableData.loan_portfolio_amount = null;
         mutableData.loans_amount = null;
+        mutableData.borrower_amount_18_64 = null;
+        mutableData.borrower_amount_66_70 = null;
+        mutableData.borrower_amount_71_75 = null;
+        mutableData.borrower_amount_76_80 = null;
         mutableData.payment = [];
         mutableData.coverage_type_id = null;
         mutableData.level_ranking = null;
@@ -88,6 +96,30 @@ const cleanProposalFields = (data) => {
     ['borrower_age_66_70', 'borrower_age_71_75', 'borrower_age_76_80'].forEach(field => {
         if (mutableData[field] !== undefined) {
             mutableData[field] = mutableData[field] ? 1 : 0;
+        }
+    });
+
+    // Strict check: Only GCLI (Plan 1) can have these fields
+    if (mutableData.plan_id && Number(mutableData.plan_id) !== 1) {
+        mutableData.amount_loans_id = null;
+        mutableData.max_loan_amount = null;
+        mutableData.min_loan_amount = null;
+        mutableData.loan_portfolio_amount = null;
+        mutableData.loans_amount = null;
+    }
+
+    // Strict check: Only GCLI (Plan 1), GPA (Plan 2), GYRT (Plan 3) can have these fields
+    if (mutableData.plan_id && ![1, 2, 3].includes(Number(mutableData.plan_id))) {
+        mutableData.borrower_amount_18_64 = null;
+        mutableData.borrower_amount_66_70 = null;
+        mutableData.borrower_amount_71_75 = null;
+        mutableData.borrower_amount_76_80 = null;
+    }
+
+    // Nullify amount fields if the corresponding age bracket is not selected
+    ['66_70', '71_75', '76_80'].forEach(suffix => {
+        if (mutableData[`borrower_age_${suffix}`] === 0) {
+            mutableData[`borrower_amount_${suffix}`] = null;
         }
     });
 
@@ -210,12 +242,15 @@ const formatDbRatesForTemplate = (dbRows, category) => {
 };
 
 // Helper to build structured response for a single application
-const buildApplicationResponse = async (app) => {
+export const buildApplicationResponse = async (app) => {
     const subGroupTypes = await Model.getApplicationSubGroups(app.application_id);
     const paymentTermsRaw = await Model.getApplicationPaymentTerms(app.application_id);
     const paymentTerms = paymentTermsRaw.map(p => ({
         payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-        sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+        sub_payment_term: { 
+            id: p.sub_payment_term_id, 
+            name: p.sub_payment_term_name || (p.sub_payment_term_id ? p.sub_payment_term_id.toString() : null)
+        }
     }));
     const riders = await Model.getApplicationRiders(app.application_id);
     const rankings = await Model.getCoverageRankingsByAppId(app.application_id);
@@ -316,10 +351,6 @@ const buildApplicationResponse = async (app) => {
         commission_rate: app.commission_rate || null,
         service_fee: app.service_fee || null,
         total_annual_premium: app.total_annual_premium || 0,
-        max_amount_18_64: app.max_amount_18_64 || 0,
-        max_amount_66_70: app.max_amount_66_70 || 0,
-        max_amount_71_75: app.max_amount_71_75 || 0,
-        max_amount_76_80: app.max_amount_76_80 || 0,
         payment: paymentTerms,
         type_of_proposal: { id: app.type_of_proposal_id, name: app.type_of_proposal_name },
         prototype_plan: { 
@@ -335,16 +366,24 @@ const buildApplicationResponse = async (app) => {
             id: app.amount_loans_id,
             name: app.amount_loans_name
         } : null,
+        max_loan_amount: app.max_loan_amount,
+        min_loan_amount: app.min_loan_amount,
+        loan_portfolio_amount: app.loan_portfolio_amount,
         loans_amount: app.loans_amount,
         borrower_age_66_70: app.borrower_age_66_70,
+        borrower_amount_66_70: app.borrower_amount_66_70,
         borrower_age_71_75: app.borrower_age_71_75,
+        borrower_amount_71_75: app.borrower_amount_71_75,
         borrower_age_76_80: app.borrower_age_76_80,
+        borrower_amount_76_80: app.borrower_amount_76_80,
+        borrower_amount_18_64: app.borrower_amount_18_64,
         riders: riders,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
         uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
         coverage_totals: coverage_totals,
         notes: app.notes,
+        evidence_notes: app.evidence_notes,
         created_at: app.created_at,
         updated_at: app.updated_at
     };
@@ -369,6 +408,9 @@ export const createApplication = async (req, res) => {
         // Sanitize notes if they exist
         if (processedData.notes) {
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
+        }
+        if (processedData.evidence_notes) {
+            processedData.evidence_notes = sanitizeHtml(processedData.evidence_notes, sanitizeOptions);
         }
 
         // Handle Excel file if provided (Required for Salary Ranking via Validator)
@@ -445,6 +487,9 @@ export const saveDraft = async (req, res) => {
             // Sanitize notes if they exist
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
         }
+        if (processedData.evidence_notes) {
+            processedData.evidence_notes = sanitizeHtml(processedData.evidence_notes, sanitizeOptions);
+        }
 
         let app;
         if (applicationId) {
@@ -486,23 +531,12 @@ export const saveDraft = async (req, res) => {
     }
 };
 
-// Get List of Industries (Business Nature)
-export const getIndustries = async (req, res) => {
-    try {
-        const list = await Model.getIndustries();
-        return success(res, list, 'Industries fetched successfully.');
-    } catch (err) {
-        console.error('Get Industries Error:', err);
-        return error(res, err.message);
-    }
-};
-
 // Helper to generate HTML for a proposal (Internal use only)
 const generateProposalHtml = async (id) => {
     const appData = await Model.getApplicationById(id);
     if (!appData) throw new Error("Application not found.");
-
-    const ratesRows = await Model.getApplicationRates(id);
+    // Correctly call getApplicationRates from ActuarialModel
+    const ratesRows = await ActuarialModel.getApplicationRates(id);
     let user = appData.user_id ? await User.getUserById(appData.user_id) : null;
     if (!user) {
         user = { firstname: 'Phillife', lastname: 'Representative', departmentName: 'Head Office', locationName: 'Main Office' };
@@ -571,20 +605,15 @@ const generateProposalHtml = async (id) => {
 
     const details = {
         totalAnnualPremium: appData.total_annual_premium || 0, 
-        maxAmount18_64: appData.max_amount_18_64 || 0,
-        maxAmount66_70: appData.max_amount_66_70 || 0,
-        maxAmount71_75: appData.max_amount_71_75 || 0,
-        maxAmount76_80: appData.max_amount_76_80 || 0,
+        maxAmount18_64: appData.borrower_amount_18_64 || 0,
+        maxAmount66_70: appData.borrower_amount_66_70 || 0,
+        maxAmount71_75: appData.borrower_amount_71_75 || 0,
+        maxAmount76_80: appData.borrower_amount_76_80 || 0,
         contactLocal: '123',
         rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
         rates66_70: formatDbRatesForTemplate(ratesRows, '66_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
         rates71_75: formatDbRatesForTemplate(ratesRows, '71_75') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
         rates76_80: formatDbRatesForTemplate(ratesRows, '76_80') || { 76: 'n/a', 77: 'n/a', 78: 'n/a', 79: 'n/a', 80: 'n/a' },
-        // ...maxAmountsMap, // Merges values like maxAmount18_64 into details
-        nelAmount: 500000,
-        nelAge: 65,
-        nmlAmount: 1000000,
-        nmlAge: 60,
         participationPercentage: 100,
         logoDataUri,
         centerPhotoUri,
@@ -805,7 +834,10 @@ export const getPrototypes = async (req, res) => {
         const paymentsByAppId = allPayments.reduce((acc, p) => {
             (acc[p.application_id] = acc[p.application_id] || []).push({
                 payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-                sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+                sub_payment_term: { 
+                    id: p.sub_payment_term_id, 
+                    name: p.sub_payment_term_name || (p.sub_payment_term_id ? p.sub_payment_term_id.toString() : null)
+                }
             });
             return acc;
         }, {});
@@ -902,6 +934,9 @@ export const getPrototypes = async (req, res) => {
                 uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
                 coverage_totals: coverage_totals,
                 amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
+                max_loan_amount: app.max_loan_amount,
+                min_loan_amount: app.min_loan_amount,
+                loan_portfolio_amount: app.loan_portfolio_amount,
                 loans_amount: app.loans_amount,
                 borrower_age_66_70: app.borrower_age_66_70,
                 borrower_age_71_75: app.borrower_age_71_75,
@@ -960,7 +995,10 @@ export const getAllApplications = async (req, res) => {
         const paymentsByAppId = allPayments.reduce((acc, p) => {
             (acc[p.application_id] = acc[p.application_id] || []).push({
                 payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-                sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name }
+                sub_payment_term: { 
+                    id: p.sub_payment_term_id, 
+                    name: p.sub_payment_term_name || (p.sub_payment_term_id ? p.sub_payment_term_id.toString() : null)
+                }
             });
             return acc;
         }, {});
@@ -1085,6 +1123,9 @@ export const getAllApplications = async (req, res) => {
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
                 loans_amount: app.loans_amount,
+                max_loan_amount: app.max_loan_amount,
+                min_loan_amount: app.min_loan_amount,
+                loan_portfolio_amount: app.loan_portfolio_amount,
                 level_ranking: levelRanking,
                 salary_ranking: salaryRanking,
                 uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
@@ -1140,6 +1181,41 @@ export const saveRates = async (req, res) => {
 
     } catch (err) {
         console.error('Save Rates Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Save/Update Evidence Notes for Application (Actuarial only)
+export const saveEvidenceNotes = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const id = req.params.id;
+        let { evidence_notes } = req.body;
+
+        // Department Check: Only Actuarial (ID 18) can input or update evidence notes
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+
+        if (!loggedInUser || Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+            return error(res, 'Access Denied: Only users from the Actuarial department are authorized to input the evidence of insurability notes.', 403);
+        }
+
+        const existingApplication = await Model.getApplicationById(id);
+        if (!existingApplication) {
+            return error(res, 'Application not found', 404);
+        }
+
+        if (evidence_notes) {
+            evidence_notes = sanitizeHtml(evidence_notes, sanitizeOptions);
+        }
+
+        await Model.updateApplication(id, { evidence_notes }, userId);
+
+        const updatedApp = await Model.getApplicationById(id);
+        const response = await buildApplicationResponse(updatedApp);
+        return success(res, response, 'Evidence of insurability notes saved successfully.');
+    } catch (err) {
+        console.error('Save Evidence Notes Error:', err);
         return error(res, err.message);
     }
 };
@@ -1341,6 +1417,14 @@ export const updateApplication = async (req, res) => {
         if (!isAuthorized) {
             return error(res, 'You are not authorized to update this application. Only the original agent can update it.', 403);
         }
+
+        // Prevent non-actuarial from updating evidence_notes via general update
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+        
+        if (Number(loggedInUser.department_id) !== DEPT_ACTUARIAL_ID) {
+            delete req.body.evidence_notes;
+        }
         
         const { agent_code, ...updateData } = req.body;
         
@@ -1363,6 +1447,9 @@ export const updateApplication = async (req, res) => {
         // Sanitize notes if they exist
         if (processedData.notes) {
             processedData.notes = sanitizeHtml(processedData.notes, sanitizeOptions);
+        }
+        if (processedData.evidence_notes) {
+            processedData.evidence_notes = sanitizeHtml(processedData.evidence_notes, sanitizeOptions);
         }
 
         // Handle Excel file during update

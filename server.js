@@ -9,6 +9,8 @@ import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
 import userRoutes from './routes/user/user_route.js'
 import groupLookupRoutes from './routes/financial_insurance_group_lookups/financial_insurance_group_lookups.routes.js'
 import systemLookupRoutes from './routes/financial_insurance_system_lookups/financial_insurance_system_lookups.routes.js'
+import insuranceDropdownRoutes from './routes/insurance_dropdown/insurance_dropdown.routes.js'
+import actuarialRoutes from './routes/actuarial_api/actuarial.routes.js';
 
 dotenv.config();
 const app = express();
@@ -46,6 +48,10 @@ app.use("/api/user", userRoutes)
 app.use("/api/group-lookup", groupLookupRoutes)
 // system lookup
 app.use("/api/system-lookup", systemLookupRoutes)
+// dropdown
+app.use('/api/dropdown', insuranceDropdownRoutes);
+// Actuarial API routes
+app.use('/api/actuarial', actuarialRoutes);
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

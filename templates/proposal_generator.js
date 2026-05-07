@@ -69,10 +69,6 @@ export const generateGCLIPDFContent = (application, user, details) => {
     rates71_75 = {},
     rates76_80 = {},
     participationPercentage = 75,
-    nelAmount = 0,
-    nelAge = 0,
-    nmlAmount = 0,
-    nmlAge = 0,
     logoDataUri = null,
     centerPhotoUri = null,
     footerPhotoUri = null,
@@ -551,19 +547,19 @@ ${
         <li>The date the loan matures</li>
     </ul>
 
-    <p>
+    <div style="margin-bottom: 12px;">
         4. <strong>Participation Requirements</strong><br>
         At least ${participationPercentage}% individuals within the policy year
-    </p>
+    </div>
 
-    <p>
-        5. <strong>Evidence of Insurability</strong><br>
-        Individual application - borrower,
-        <ul>
-            <li>No Evidence Limit (NEL): Php ${formatNumber(nelAmount)} provided eligible individual has not attained his ${nelAge} birthday<br></li>
-            <li>Non-Medical Limit (NML): Php ${formatNumber(nmlAmount)} provided eligible individual has not attained his ${nmlAge} birthday</li>
-        </ul>
-    </p>
+    <div style="margin-bottom: 12px;">
+        5. <strong>Evidence of Insurability</strong>
+        ${application.evidence_notes ? `
+        <div style="margin-left: 5mm; margin-top: 1px;">
+            ${application.evidence_notes}
+        </div>
+        ` : ""}
+    </div>
 
     <p>
         6. <strong>Payment of Benefits</strong><br>
