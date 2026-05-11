@@ -26,20 +26,81 @@ const formatDate = (date) => {
 
 // Helper to generate table rows dynamically for rates
 const generateRateRows = (rates, suffix = "") => {
-  const keys = Object.keys(rates)
-    .map(Number)
-    .filter((n) => !isNaN(n))
-    .sort((a, b) => a - b);
-  if (keys.length === 0) return '<tr><td colspan="2">N/A</td></tr>';
-  return keys
+  const keys = Object.keys(rates);
+  if (keys.length === 0) return '<tr><td colspan="2">No rates provided yet</td></tr>';
+
+  // Detect if keys are numeric (months/age) for sorting and suffix application
+  const isNumeric = keys.every(k => !isNaN(Number(k)) && k.trim() !== "");
+  const sortedKeys = isNumeric 
+    ? keys.map(Number).sort((a, b) => a - b)
+    : keys.sort();
+
+  return sortedKeys
     .map(
       (key) => `
 <tr>
-<td>${key}${suffix}</td>
+<td>${key}${isNumeric ? suffix : ""}</td>
 <td>${rates[key]}</td>
 </tr>`,
     )
     .join("");
+};
+
+// Helper to generate chunked tables for 18-64 GCLI rates
+const generateChunkedRateTables = (rates, maturity, header, suffix) => {
+    if (Object.keys(rates).length === 0) return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+
+    const maxMonthsPerTable = 10;
+    let tablesHtml = '';
+    let currentMonth = 1;
+
+    while (currentMonth <= maturity) {
+        const endMonth = Math.min(currentMonth + maxMonthsPerTable - 1, maturity);
+        const chunkRates = {};
+        for (let i = currentMonth; i <= endMonth; i++) {
+            if (rates[i]) {
+                chunkRates[i] = rates[i];
+            }
+        }
+
+        if (Object.keys(chunkRates).length > 0) {
+            tablesHtml += `
+                <div class="age-table-box">
+                    <h4 style="margin-top:10px; margin-bottom: 5px; font-size: 11pt; color: #0d47a1; border-bottom: 1px solid #ccc; padding-bottom: 2px;">Months ${currentMonth}-${endMonth}</h4>
+                    <table class="compact-table">
+                        <tr style="background-color: #f9f9f9;">
+                            <th style="font-size: 8.5pt;">${header}</th>
+                            <th style="font-size: 8.5pt;">Rate</th>
+                        </tr>
+                        ${generateRateRows(chunkRates, suffix)}
+                    </table>
+                </div>
+            `;
+        }
+        currentMonth = endMonth + 1;
+    }
+    return `<div class="age-tables-container">${tablesHtml}</div>`;
+};
+
+// Helper to generate nested age tables for seniors
+const generateAgeGroupTables = (ageGroups, header, suffix) => {
+    const ages = Object.keys(ageGroups).sort();
+    if (ages.length === 0) return '<p>N/A</p>';
+    
+    const tablesHtml = ages.map(age => `
+        <div class="age-table-box">
+            <h4 style="margin-top:10px; margin-bottom: 5px; font-size: 11pt; color: #0d47a1; border-bottom: 1px solid #ccc; padding-bottom: 2px;">${age}</h4>
+            <table class="compact-table">
+                <tr style="background-color: #f9f9f9;">
+                    <th style="font-size: 8.5pt;">${header}</th>
+                    <th style="font-size: 8.5pt;">Rate</th>
+                </tr>
+                ${generateRateRows(ageGroups[age], suffix)}
+            </table>
+        </div>
+    `).join("");
+
+    return `<div class="age-tables-container">${tablesHtml}</div>`;
 };
 
 /**
@@ -73,8 +134,14 @@ export const generateGCLIPDFContent = (application, user, details) => {
     centerPhotoUri = null,
     footerPhotoUri = null,
   } = details || {};
+  const maturity = details?.maturity || 0; // Get maturity from details
 
   const cfeFullName = `${user.firstname} ${user.lastname}`;
+
+  // Dynamic configuration based on Plan
+  const isGCLI = Number(application.plan_id) === 1;
+  const standardHeader = isGCLI ? "Term of Loan" : "Rider";
+  const standardSuffix = isGCLI ? " months" : "";
 
   const planName = (application.basic_plan?.name || "").trim();
   const lastSpaceIndex =
@@ -138,6 +205,20 @@ export const generateGCLIPDFContent = (application, user, details) => {
         th, td { 
             padding: 8px; text-align: center; 
         }
+        .age-tables-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 15px;
+            width: 100%;
+        }
+        .age-table-box {
+            flex: 0 0 calc(33.33% - 20px); /* 3 tables per row */
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .compact-table { width: 100%; font-size: 8.5pt; border: 1px solid #999; }
+        .compact-table th, .compact-table td { padding: 3px 5px; border: 1px solid #999; }
         .note { 
             font-size: 14px; margin-top: 10px; 
         }
@@ -454,30 +535,14 @@ export const generateGCLIPDFContent = (application, user, details) => {
 </div>
 
 <div class="section-group">
-    <h2>SINGLE RATE PER 1,000</h2>
-    <h4> Borrowers Age ${application.minimum_age}-${application.maximum_age}</h4>
-
-    <table>
-        <tr>
-        <th>Term of Loan</th>
-        <th>Rate</th>
-        </tr>
-
-        ${generateRateRows(rates18_64, " months")}
-    </table>
+    <h2 style="margin-top:40px;">SINGLE RATE PER 1,000 (Age ${application.minimum_age}-${application.maximum_age})</h2>
+    ${generateChunkedRateTables(rates18_64, maturity, standardHeader, standardSuffix)}
 
 ${
   application.borrower_age_66_70
     ? `
-    <h2>SINGLE RATE PER 1,000</h2>
-    <h4>Borrowers Age 66-70</h4>
-    <table>
-        <tr>
-            <th>Term of Loan</th>
-            <th>Rate</th>
-        </tr>
-        ${generateRateRows(rates66_70, " months")}
-    </table>
+    <h2 style="margin-top:40px;">SINGLE RATE PER 1,000 (Age 66-70)</h2>
+    ${generateAgeGroupTables(rates66_70, standardHeader, standardSuffix)}
 `
     : ""
 }
@@ -485,15 +550,8 @@ ${
 ${
   application.borrower_age_71_75
     ? `
-    <h2>SINGLE RATE PER 1,000</h2>
-    <h4>Borrowers Age 71-75</h4>
-    <table>
-        <tr>
-            <th>Term of Loan</th>
-            <th>Rate</th>
-        </tr>
-        ${generateRateRows(rates71_75, " months")}
-    </table>
+    <h2 style="margin-top:40px;">SINGLE RATE PER 1,000 (Age 71-75)</h2>
+    ${generateAgeGroupTables(rates71_75, standardHeader, standardSuffix)}
 `
     : ""
 }
@@ -501,13 +559,8 @@ ${
 ${
   application.borrower_age_76_80
     ? `
-    <table>
-        <tr>
-            <th>Attained Age</th>
-            <th>GCLIP - 12 months</th>
-        </tr>
-        ${generateRateRows(rates76_80, "")}
-    </table>
+    <h2 style="margin-top:40px;">SINGLE RATE PER 1,000 (Age 76-80)</h2>
+    ${generateAgeGroupTables(rates76_80, standardHeader, isGCLI ? " months" : "")}
 `
     : ""
 }

@@ -18,7 +18,8 @@ export const saveRates = async (req, res) => {
         await MainModel.updateApplication(application_id, { status_id: STATUS_APPROVED }, userId);
         
         const updatedApp = await MainModel.getApplicationById(application_id);
-        return success(res, updatedApp, 'Rates saved successfully.');
+        const response = await buildApplicationResponse(updatedApp);
+        return success(res, response, 'Rates saved successfully.');
     } catch (err) {
         console.error('Save Rates Error:', err);
         return error(res, err.message);

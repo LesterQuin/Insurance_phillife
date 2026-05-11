@@ -323,6 +323,7 @@ export const getAllApplications = async () => {
                 fia.service_fee,
                 fia.total_annual_premium,
                 fia.notes,
+                fia.excel_file_path,
                 fia.evidence_notes,
                 fia.created_at,
                 fia.updated_at,
@@ -341,6 +342,7 @@ export const getAllApplications = async () => {
                 subind.name AS sub_business_nature_name,
                 al.name AS amount_loans_name,
                 ct.name AS coverage_type_name,
+                ml.month_name AS loan_maturity_month_name,
                 chant.name AS channel_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
@@ -373,6 +375,8 @@ export const getAllApplications = async () => {
                 ON fia.channel_type_id = chant.id
             LEFT JOIN DHUB.sg.financial_insurance_industries ind
                 ON fia.business_nature_id = ind.id
+            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml
+                ON fia.sub_payment_term_id = ml.month_id
             LEFT JOIN DHUB.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
@@ -414,6 +418,7 @@ export const getPrototypes = async () => {
                 fia.service_fee,
                 fia.total_annual_premium,
                 fia.notes,
+                fia.excel_file_path,
                 fia.evidence_notes,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
@@ -428,6 +433,7 @@ export const getPrototypes = async () => {
                 pp.acronym AS prototype_plan_acronym,
                 al.name AS amount_loans_name,
                 ct.name AS coverage_type_name,
+                ml.month_name AS loan_maturity_month_name,
                 chant.name AS channel_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
@@ -443,6 +449,8 @@ export const getPrototypes = async () => {
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml
+                ON fia.sub_payment_term_id = ml.month_id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
             LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
@@ -478,6 +486,7 @@ export const getApplicationById = async (id) => {
                 subind.name AS sub_business_nature_name,
                 al.name as amount_loans_name,
                 ct.name AS coverage_type_name,
+                ml.month_name AS loan_maturity_month_name,
                 chant.name AS channel_type_name,
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
@@ -512,6 +521,8 @@ export const getApplicationById = async (id) => {
                 ON fia.business_nature_id = ind.id
             LEFT JOIN DHUB.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
+            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml
+                ON fia.sub_payment_term_id = ml.month_id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
             WHERE fia.application_id = @id
@@ -965,9 +976,11 @@ export const getApplicationPaymentTerms = async (applicationId) => {
             SELECT 
                 pt.id as payment_term_id, 
                 pt.name as payment_term_name,
-                p.sub_payment_term_id
+                p.sub_payment_term_id,
+                ml.month_name as loan_maturity_month_name
             FROM DHUB.sg.financial_insurance_application p
             JOIN DHUB.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
             WHERE p.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1043,9 +1056,11 @@ export const getBulkApplicationPaymentTerms = async (applicationIds) => {
             p.application_id,
             pt.id as payment_term_id, 
             pt.name as payment_term_name,
-                p.sub_payment_term_id
+            p.sub_payment_term_id,
+            ml.month_name as loan_maturity_month_name
         FROM DHUB.sg.financial_insurance_application p
         JOIN DHUB.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+        LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
         WHERE p.application_id IN (${idParams})
     `);
     return result.recordset ?? [];

@@ -481,6 +481,7 @@ export const validateFinancialApplication = [
     // -----------------------------
     // Business Type
     // -----------------------------
+    /*
     body('business_type_id')
         .notEmpty().withMessage('Business Type is required')
         .isInt({ min: 0 }).withMessage('business_type_id must be a non-negative integer')
@@ -523,6 +524,7 @@ export const validateFinancialApplication = [
             }
             return true;
         }),
+        */
     // -----------------------------
     // Type of Group
     // -----------------------------
@@ -659,6 +661,7 @@ export const validateFinancialApplication = [
             }
             return true;
         }),
+
 
     // -----------------------------
     // Type of Proposal
@@ -1082,10 +1085,8 @@ body('basic_plan_id')
 
             const excelFile = req.files?.excel_file;
 
-            // 1. Mandatory ONLY for Salary Rank (ID: 34). Optional for 32 and 33.
-            if (Number(value) === 34 && !excelFile) {
-                throw new Error('An Excel file upload is required when "By Salary Rank" is selected.');
-            }
+            // 1. Mandatory check removed here to allow separate upload via the /:id/upload-excel API.
+            // The file is now optional during the initial 'create' or 'draft' phase.
 
             // 2. Validate file type if any file is uploaded
             if (excelFile) {
@@ -1268,11 +1269,13 @@ export const validateDraftFinancialApplication = [
         }
         return true;
     }),
+    /*
     body('business_type_id').optional().isInt({ min: 0 }).custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('BUSINESS_TYPE');
         if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid business_type_id`);
         return true;
     }),
+    */
     body('group_type_id').optional().isInt({ min: 0 }).custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
         if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid group_type_id`);
@@ -1404,39 +1407,122 @@ export const validateRates = [
             const app = await Financial.getApplicationById(applicationId);
             if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
 
+            const planId = Number(app.plan_id);
             const keys = ['18-64', '66-70', '71-75', '76-80'];
             let hasData = false;
+            const ADDITIONAL_LIFE_RIDER_ID = 1; 
             
-            keys.forEach(key => {
-                if (req.body[key]) {
-                    hasData = true;
-                    if (!Array.isArray(req.body[key])) {
-                        throw new Error(`Data for ${key} must be an array.`);
-                    }
-                    
-                    // Validate against application boolean flags
-                    if (key === '66-70' && !app.borrower_age_66_70) {
-                        throw new Error(`Rates for '66-70' cannot be added because the age bracket is not selected for this application.`);
-                    }
-                    if (key === '71-75' && !app.borrower_age_71_75) {
-                        throw new Error(`Rates for '71-75' cannot be added because the age bracket is not selected for this application.`);
-                    }
-                    if (key === '76-80' && !app.borrower_age_76_80) {
-                        throw new Error(`Rates for '76-80' cannot be added because the age bracket is not selected for this application.`);
-                    }
+            // Fetch selected riders for GPA/GYRT validation
+            const selectedAppRiders = await Financial.getApplicationRiders(applicationId);
+            const selectedRiderIds = new Set(selectedAppRiders.map(r => r.rider_id));
 
-                    req.body[key].forEach((item, index) => {
-                        const termKey = key === '76-80' ? 'term_or_age' : 'term_or_months';
-                        if (!item[termKey]) {
-                            throw new Error(`Item ${index + 1} in ${key} is missing '${termKey}'.`);
-                        }
-                        if (item.rate === undefined || item.rate === null) {
-                            throw new Error(`Item ${index + 1} in ${key} is missing 'rate'.`);
-                        }
-                    });
+            // For GCLI (Plan 1), retrieve the loan maturity (months) to validate array lengths and sequences
+            let maturity = 0;
+            if (planId === 1) {
+                const payments = await Financial.getApplicationPaymentTerms(applicationId);
+                // Maturity is expected in sub_payment_term_id (months 1-60)
+                maturity = payments.length > 0 ? Number(payments[0].sub_payment_term_id) : 0;
+                if (!maturity) {
+                    throw new Error('Loan maturity is missing for this GCLI application. Please ensure payment terms are defined.');
                 }
-            });
+            }
 
+            for (const key of keys) {
+                const isSeniorBracket = key !== '18-64';
+                const bracketFlag = isSeniorBracket ? `borrower_age_${key.replace('-', '_')}` : null;
+                const isEnabledInApp = isSeniorBracket ? !!app[bracketFlag] : true;
+
+                const data = req.body[key];
+
+                // Check Requirement: If enabled in application, must be present in request body
+                if (isEnabledInApp && !data) {
+                    throw new Error(`Rates for age bracket '${key}' are required because it is active for this application.`);
+                }
+
+                // Check Restriction: If NOT enabled in application, must NOT be in request body
+                if (isSeniorBracket && !isEnabledInApp && data) {
+                    throw new Error(`Rates for '${key}' cannot be added because the age bracket was not selected in the application.`);
+                }
+
+                if (data) {
+                    hasData = true;
+
+                    // Branch A: Handle Nested Age Objects (Senior specific pricing)
+                    if (isSeniorBracket && !Array.isArray(data) && typeof data === 'object' && data !== null) {
+                        // Enforce that all specific ages within the bracket range are provided
+                        const [startAge, endAge] = key.split('-').map(Number);
+                        const missingAges = []; // This check is for the keys in the object, not the items within each age array.
+                        for (let age = startAge; age <= endAge; age++) {
+                            if (!data[`age_${age}`]) missingAges.push(`age_${age}`);
+                        }
+                        if (missingAges.length > 0) {
+                            throw new Error(`Data for bracket '${key}' is incomplete. Missing specific ages: ${missingAges.join(', ')}.`);
+                        }
+
+                        for (const ageKey in data) {
+                            const ageItems = data[ageKey];
+                            if (!Array.isArray(ageItems)) throw new Error(`${ageKey} in ${key} must be an array.`);
+
+                            if (planId === 1) { // GCLI Senior Nested
+                                const expectedLength = Math.min(maturity, 12);
+                                if (ageItems.length !== expectedLength) {
+                                    throw new Error(`GCLI ${ageKey} must have ${expectedLength} items (loan maturity: ${maturity}, capped at 12 months).`);
+                                }
+                                ageItems.forEach((item, idx) => {
+                                    if (item.term_or_months === undefined || item.rate === undefined) {
+                                        throw new Error(`Invalid format in GCLI ${ageKey}. Each item must contain 'term_or_months' and 'rate'.`);
+                                    }
+                                    if (Number(item.term_or_months) !== (idx + 1)) {
+                                        throw new Error(`GCLI ${ageKey} months must be sequential. Expected ${idx + 1} at position ${idx + 1}.`);
+                                    }
+                                });
+                            } else if (planId === 3) { // GYRT Senior Nested
+                                ageItems.forEach((item, idx) => {
+                                    if (item.rider_id === undefined || item.rate === undefined) {
+                                        throw new Error(`Invalid format in GYRT ${ageKey}, item ${idx + 1}. Must contain 'rider_id' and 'rate'.`);
+                                    }
+                                    if (Number(item.rider_id) !== ADDITIONAL_LIFE_RIDER_ID) {
+                                        throw new Error(`GYRT ${ageKey} only allows rider ID ${ADDITIONAL_LIFE_RIDER_ID} (Additional Life), but received ID: ${item.rider_id}.`);
+                                    }
+                                });
+                            } else if (planId === 2) { // GPA Senior (Should be disabled)
+                                throw new Error(`Rates for age bracket ${key} are disabled for GPA products.`);
+                            }
+                        }
+                    } else { // Branch B: Standard Flat Array Logic (18-64 or legacy senior input)
+                        if (!Array.isArray(data)) throw new Error(`Data for ${key} must be an array (for 18-64) or a nested age object (for seniors).`);
+
+                        if (planId === 1) { // GCLI Flat (18-64)
+                            const expectedLength = isSeniorBracket ? Math.min(maturity, 12) : maturity;
+                            if (data.length !== expectedLength) {
+                                throw new Error(`GCLI ${key} requires exactly ${expectedLength} items (loan maturity: ${maturity}).`);
+                            }
+                            data.forEach((item, index) => {
+                                if (Number(item.term_or_months) !== (index + 1)) {
+                                    throw new Error(`GCLI ${key} months must be sequential. Expected ${index + 1} at position ${index + 1}.`);
+                                }
+                            });
+                        } else if (planId === 2) { // GPA
+                            if (isSeniorBracket) throw new Error(`Rates for ${key} are disabled for GPA.`);
+                            data.forEach((item, index) => {
+                                if (!selectedRiderIds.has(Number(item.rider_id))) {
+                                    throw new Error(`GPA rates for ${key}, item ${index + 1}: Invalid or unselected rider_id (${item.rider_id || 'missing'}).`);
+                                }
+                            });
+                        } else if (planId === 3) { // GYRT
+                            data.forEach((item, index) => {
+                                if (isSeniorBracket) {
+                                    if (Number(item.rider_id) !== ADDITIONAL_LIFE_RIDER_ID) {
+                                        throw new Error(`GYRT rates for ${key}: Only Additional Life (ID: ${ADDITIONAL_LIFE_RIDER_ID}) is allowed for seniors, but received ID: ${item.rider_id}.`);
+                                    }
+                                } else if (!selectedRiderIds.has(Number(item.rider_id))) {
+                                    throw new Error(`GYRT rates for ${key}, item ${index + 1}: Invalid or unselected rider_id (${item.rider_id || 'missing'}).`);
+                                }
+                            });
+                        }
+                    }
+                }
+            }
             if (!hasData) {
                 throw new Error('At least one rate group (18-64, 66-70, 71-75, 76-80) is required.');
             }
@@ -1541,6 +1627,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
+    /*
     body('business_type_id').optional().isInt({ min: 0 }).withMessage('business_type_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('BUSINESS_TYPE');
         if (!lookups.some(l => l.id === Number(value))) {
@@ -1549,6 +1636,7 @@ export const validateUpdateFinancialApplication = [
         }
         return true;
     }),
+    */
     body('group_type_id').optional().isInt({ min: 0 }).withMessage('group_type_id must be a non-negative integer').custom(async (value) => {
         const lookups = await Financial.getLookupListByCategory('TYPE_OF_GROUP');
         if (!lookups.some(l => l.id === Number(value))) {
@@ -1918,10 +2006,12 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
         const excelFile = req.files?.excel_file;
         const hasExistingFile = req.existingApplication?.excel_file_path;
 
-        // 1. Mandatory for Salary Rank (ID: 34) unless a file already exists in the database
+        // 1. Mandatory check removed here to allow separate upload via the /:id/upload-excel API.
+        /*
         if (Number(value) === 34 && !excelFile && !hasExistingFile) {
             throw new Error('An Excel file upload is required when selecting "By Salary Rank".');
         }
+        */
 
         // 2. Validate file type if any file is uploaded
         if (excelFile) {
@@ -1965,6 +2055,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
         }
         return true;
     }),
+    /*
     body('other_business_type').optional({ nullable: true }).isLength({ max: 255 }).withMessage('other_business_type must not exceed 255 characters').custom(async (value, { req }) => {
         const id = req.body.business_type_id !== undefined
             ? req.body.business_type_id
@@ -2013,6 +2104,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
         }
         return true;
     }),
+    */
 
     // Optional status
     body('status_id').optional().isInt({ min: 0 }),
@@ -2025,6 +2117,31 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
+// Excel Upload validation
+// -----------------------------
+export const validateExcelUpload = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    (req, res, next) => {
+        const excelFile = req.files?.excel_file;
+        if (!excelFile) {
+            return res.status(400).json({ status: false, errors: [{ msg: 'excel_file is required.' }] });
+        }
+
+        const fileName = excelFile.originalFilename?.toLowerCase() || '';
+        const mimeType = excelFile.mimetype || '';
+        const isExcel = fileName.endsWith('.xlsx') || 
+                        fileName.endsWith('.xls') || 
+                        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
+                        mimeType === 'application/vnd.ms-excel';
+
+        if (!isExcel) {
+            return res.status(400).json({ status: false, errors: [{ msg: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.' }] });
+        }
         next();
     }
 ];

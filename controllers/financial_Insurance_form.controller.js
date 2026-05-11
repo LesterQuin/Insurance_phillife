@@ -21,6 +21,19 @@ import { generateSmallGroupsPDFContent } from '../templates/prototype_PlanforSma
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+
+// Helper to generate a human-readable timestamp (DDMMYYYY-HHMMSS) for filenames
+const getFileTimestamp = () => {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const ss = String(now.getSeconds()).padStart(2, '0');
+    return `${dd}${mm}${yyyy}-${hh}${min}${ss}`;
+};
 
 // Configuration for rich-text sanitization
 export const sanitizeOptions = {
@@ -35,7 +48,7 @@ const cleanupOtherFields = async (data) => {
     const mutableData = { ...data };
     const idsToCheck = [];
     if (mutableData.group_classification_id !== undefined) idsToCheck.push(mutableData.group_classification_id);
-    if (mutableData.business_type_id !== undefined) idsToCheck.push(mutableData.business_type_id);
+    // if (mutableData.business_type_id !== undefined) idsToCheck.push(mutableData.business_type_id);
     if (mutableData.group_type_id !== undefined) idsToCheck.push(mutableData.group_type_id);
 
     if (idsToCheck.length === 0) return mutableData;
@@ -50,9 +63,11 @@ const cleanupOtherFields = async (data) => {
     if (mutableData.group_classification_id !== undefined && !isOther(mutableData.group_classification_id)) {
         mutableData.other_group_classification = null;
     }
+    /*
     if (mutableData.business_type_id !== undefined && !isOther(mutableData.business_type_id)) {
         mutableData.other_business_type = null;
     }
+    */
     if (mutableData.group_type_id !== undefined && !isOther(mutableData.group_type_id)) {
         mutableData.other_group_type = null;
     }
@@ -227,29 +242,50 @@ const formatRatesForTemplate = (ratesArray, keyField) => {
 };
 
 // Helper to transform DB rows (from new table) back to template format
-const formatDbRatesForTemplate = (dbRows, category) => {
-    if (!dbRows || dbRows.length === 0) return null;
+const formatDbRatesForTemplate = (dbRows, category, planId) => {
+    if (!dbRows || dbRows.length === 0) return {};
     
     // Filter by category (e.g., '18_64')
     const filtered = dbRows.filter(row => row.borrower_category === category);
-    if (filtered.length === 0) return null;
+    if (filtered.length === 0) return {};
 
-    return filtered.reduce((acc, row) => {
-        const key = category === '76_80' ? row.attained_age : row.term_months;
-        if (key) acc[key] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
-        return acc;
-    }, {});
+    const isGCLI = planId === 1;
+    const isSeniorBracket = category !== '18_64';
+
+    if (isSeniorBracket) {
+        // Group by Age for Seniors (GCLI & GYRT)
+        return filtered.reduce((acc, row) => {
+            const ageKey = `Age ${row.attained_age}`;
+            if (!acc[ageKey]) acc[ageKey] = {};
+            
+            const rateKey = isGCLI ? row.term_months : (row.rider_name || `Rider ${row.rider_id}`);
+            acc[ageKey][rateKey] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
+            return acc;
+        }, {});
+    } else {
+        // Flat list for Junior (18-64)
+        return filtered.reduce((acc, row) => {
+            const key = isGCLI ? row.term_months : (row.rider_name || `Rider ${row.rider_id}`);
+            if (key) acc[key] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
+            return acc;
+        }, {});
+    }
 };
 
 // Helper to build structured response for a single application
 export const buildApplicationResponse = async (app) => {
     const subGroupTypes = await Model.getApplicationSubGroups(app.application_id);
     const paymentTermsRaw = await Model.getApplicationPaymentTerms(app.application_id);
+    const planId = Number(app.plan_id);
     const paymentTerms = paymentTermsRaw.map(p => ({
         payment_term: { id: p.payment_term_id, name: p.payment_term_name },
         sub_payment_term: { 
             id: p.sub_payment_term_id, 
             name: p.sub_payment_term_name || (p.sub_payment_term_id ? p.sub_payment_term_id.toString() : null)
+        },
+        loan_maturity: {
+            id: p.sub_payment_term_id,
+            name: p.loan_maturity_month_name || null
         }
     }));
     const riders = await Model.getApplicationRiders(app.application_id);
@@ -324,11 +360,13 @@ export const buildApplicationResponse = async (app) => {
             name: app.group_classification_name,
             other_value: app.other_group_classification || null
         },
+        /*
         business_type: {
             id: app.business_type_id,
             name: app.business_type_name,
             other_value: app.other_business_type || null
         },
+        */
         group_type: {
             id: app.group_type_id,
             name: app.group_type_name,
@@ -366,6 +404,10 @@ export const buildApplicationResponse = async (app) => {
             id: app.amount_loans_id,
             name: app.amount_loans_name
         } : null,
+        loan_maturity: app.sub_payment_term_id ? {
+            id: app.sub_payment_term_id,
+            name: app.loan_maturity_month_name || null
+        } : null,
         max_loan_amount: app.max_loan_amount,
         min_loan_amount: app.min_loan_amount,
         loan_portfolio_amount: app.loan_portfolio_amount,
@@ -383,6 +425,7 @@ export const buildApplicationResponse = async (app) => {
         uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
         coverage_totals: coverage_totals,
         notes: app.notes,
+        excel_file_path: app.excel_file_path || null,
         evidence_notes: app.evidence_notes,
         created_at: app.created_at,
         updated_at: app.updated_at
@@ -413,37 +456,32 @@ export const createApplication = async (req, res) => {
             processedData.evidence_notes = sanitizeHtml(processedData.evidence_notes, sanitizeOptions);
         }
 
-        // Handle Excel file if provided (Required for Salary Ranking via Validator)
-        const excelFile = req.files?.excel_file; // Assuming req.files is populated by formidable
-        if (excelFile) {
-            const tempFilePath = excelFile.filepath;
-            const originalFilename = excelFile.originalFilename;
-            
-            // Define the target directory (e.g., 'uploads' in your project root)
-            // This assumes your 'uploads' folder is one level up from the 'controllers' folder
-            const uploadDir = path.join(__dirname, '..', 'uploads'); 
-            
-            // Ensure the upload directory exists
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
-
-            // Create a new file path for the permanent storage
-            const uniqueFilename = `${Date.now()}-${originalFilename}`;
-            const newFilePath = path.join(uploadDir, uniqueFilename);
-
-            // Move the file from the temporary location to the permanent location
-            await fs.promises.rename(tempFilePath, newFilePath);
-            console.log(`File saved permanently to: ${newFilePath}`);
-            
-            // Store the path in the data object so the Model can save it (if column exists)
-            processedData.excel_file_path = newFilePath; 
-        }
-
         const newRecord = await Model.createApplication(processedData, userId);
 
         if (!newRecord || !newRecord.application_id) {
             return error(res, 'Failed to create the application.', 500);
+        }
+
+        const appId = newRecord.application_id;
+
+        // Handle Excel file after ID is generated to include it in the filename
+        const excelFile = req.files?.excel_file; 
+        if (excelFile) {
+            const tempFilePath = excelFile.filepath;
+            const originalFilename = excelFile.originalFilename;
+            
+            if (!fs.existsSync(UPLOAD_DIR)) {
+                fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+            }
+
+            // Add application_id to the filename
+            const uniqueFilename = `APP-${appId}-v${getFileTimestamp()}-${originalFilename}`;
+            const newFilePath = path.join(uploadDir, uniqueFilename);
+
+            await fs.promises.rename(tempFilePath, newFilePath);
+            
+            // Update the record with the file path
+            await Model.updateApplication(appId, { excel_file_path: newFilePath }, userId);
         }
 
         // Fetch the raw application data
@@ -491,7 +529,7 @@ export const saveDraft = async (req, res) => {
             processedData.evidence_notes = sanitizeHtml(processedData.evidence_notes, sanitizeOptions);
         }
 
-        let app;
+        let app, finalAppId;
         if (applicationId) {
             // If an ID exists, we update the existing draft (Auto-save mode)
             const existingDraft = await Model.getApplicationById(applicationId);
@@ -515,13 +553,45 @@ export const saveDraft = async (req, res) => {
             }
 
             const { agent_code, ...finalData } = processedData;
+            finalAppId = applicationId;
+
+            // Handle Excel file for existing draft
+            const excelFile = req.files?.excel_file;
+            if (excelFile) {
+                if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+                const oldFilePath = existingDraft.excel_file_path;
+
+                // Added 'v' prefix to denote a version/revision during update
+                const uniqueFilename = `APP-${finalAppId}-v${getFileTimestamp()}-${excelFile.originalFilename}`;
+                const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
+                await fs.promises.rename(excelFile.filepath, newFilePath);
+                finalData.excel_file_path = newFilePath;
+
+                // Cleanup old file
+                if (oldFilePath && fs.existsSync(oldFilePath)) {
+                    fs.promises.unlink(oldFilePath).catch(e => console.error("Old file cleanup failed:", e));
+                }
+            }
+
             await Model.updateApplication(applicationId, finalData, userId);
-            app = await Model.getApplicationById(applicationId);
         } else {
             // If no ID exists, create a new draft entry
             const newRecord = await Model.createApplication(processedData, userId);
-            app = await Model.getApplicationById(newRecord.application_id);
+            finalAppId = newRecord.application_id;
+
+            // Handle Excel file for new draft
+            const excelFile = req.files?.excel_file;
+            if (excelFile) {
+                if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+                const uniqueFilename = `APP-${finalAppId}-${getFileTimestamp()}-${excelFile.originalFilename}`;
+                const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
+                await fs.promises.rename(excelFile.filepath, newFilePath);
+                
+                await Model.updateApplication(finalAppId, { excel_file_path: newFilePath }, userId);
+            }
         }
+
+        app = await Model.getApplicationById(finalAppId);
         
         const response = await buildApplicationResponse(app);
         return success(res, response, 'Application saved as draft successfully', applicationId ? 200 : 201);
@@ -537,6 +607,13 @@ const generateProposalHtml = async (id) => {
     if (!appData) throw new Error("Application not found.");
     // Correctly call getApplicationRates from ActuarialModel
     const ratesRows = await ActuarialModel.getApplicationRates(id);
+    const planId = Number(appData.plan_id);
+    let maturity = 0;
+    if (planId === 1) { // GCLI
+        const payments = await Model.getApplicationPaymentTerms(id); // Use application ID to get payment terms
+        maturity = payments.length > 0 ? Number(payments[0].sub_payment_term_id) : 0;
+    }
+
     let user = appData.user_id ? await User.getUserById(appData.user_id) : null;
     if (!user) {
         user = { firstname: 'Phillife', lastname: 'Representative', departmentName: 'Head Office', locationName: 'Main Office' };
@@ -610,10 +687,11 @@ const generateProposalHtml = async (id) => {
         maxAmount71_75: appData.borrower_amount_71_75 || 0,
         maxAmount76_80: appData.borrower_amount_76_80 || 0,
         contactLocal: '123',
-        rates18_64: formatDbRatesForTemplate(ratesRows, '18_64') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-        rates66_70: formatDbRatesForTemplate(ratesRows, '66_70') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-        rates71_75: formatDbRatesForTemplate(ratesRows, '71_75') || { 6: 'n/a', 12: 'n/a', 18: 'n/a', 24: 'n/a', 30: 'n/a', 36: 'n/a' },
-        rates76_80: formatDbRatesForTemplate(ratesRows, '76_80') || { 76: 'n/a', 77: 'n/a', 78: 'n/a', 79: 'n/a', 80: 'n/a' },
+        maturity: maturity, // Pass maturity to the template
+        rates18_64: formatDbRatesForTemplate(ratesRows, '18_64', planId),
+        rates66_70: formatDbRatesForTemplate(ratesRows, '66_70', planId),
+        rates71_75: formatDbRatesForTemplate(ratesRows, '71_75', planId),
+        rates76_80: formatDbRatesForTemplate(ratesRows, '76_80', planId),
         participationPercentage: 100,
         logoDataUri,
         centerPhotoUri,
@@ -903,11 +981,13 @@ export const getPrototypes = async (req, res) => {
                     name: app.group_classification_name,
                     other_value: app.other_group_classification
                 },
+                /*
                 business_type: {
                     id: app.business_type_id,
                     name: app.business_type_name,
                     other_value: app.other_business_type
                 },
+                */
                 group_type: { 
                     id: app.group_type_id, 
                     name: app.group_type_name,
@@ -955,6 +1035,7 @@ export const getPrototypes = async (req, res) => {
                 },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 riders: appRiders,
+                excel_file_path: app.excel_file_path || null,
                 notes: app.notes,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
@@ -1081,11 +1162,13 @@ export const getAllApplications = async (req, res) => {
                     name: app.group_classification_name,
                     other_value: app.other_group_classification
                 },
+                /*
                 business_type: {
                     id: app.business_type_id,
                     name: app.business_type_name,
                     other_value: app.other_business_type
                 },
+                */
                 group_type: { 
                     id: app.group_type_id, 
                     name: app.group_type_name,
@@ -1452,29 +1535,30 @@ export const updateApplication = async (req, res) => {
             processedData.evidence_notes = sanitizeHtml(processedData.evidence_notes, sanitizeOptions);
         }
 
-        // Handle Excel file during update
+        const appId = req.params.id;
+
+        // Handle Excel file during update with application_id in filename
         const excelFile = req.files?.excel_file; // Assuming req.files is populated by formidable
         if (excelFile) {
             const tempFilePath = excelFile.filepath;
             const originalFilename = excelFile.originalFilename;
+            const oldFilePath = existingApplication.excel_file_path;
             
-            // Define the target directory (e.g., 'uploads' in your project root)
-            const uploadDir = path.join(__dirname, '..', 'uploads'); 
-            
-            // Ensure the upload directory exists
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
+            if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-            // Create a new file path for the permanent storage
-            const uniqueFilename = `${Date.now()}-${originalFilename}`;
-            const newFilePath = path.join(uploadDir, uniqueFilename);
+            // Added 'v' prefix to denote a version/revision during update
+            const uniqueFilename = `APP-${appId}-v${getFileTimestamp()}-${originalFilename}`;
+            const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
 
-            // Move the file from the temporary location to the permanent location
             await fs.promises.rename(tempFilePath, newFilePath);
             console.log(`File saved permanently to: ${newFilePath}`);
             
             processedData.excel_file_path = newFilePath;
+
+            // Cleanup old file if it exists
+            if (oldFilePath && fs.existsSync(oldFilePath)) {
+                fs.promises.unlink(oldFilePath).catch(e => console.error("Old file cleanup failed:", e));
+            }
         }
 
         const updated = await Model.updateApplication(req.params.id, processedData, userId);
@@ -1498,6 +1582,69 @@ export const updateApplication = async (req, res) => {
             metadata: { error: err.message }
         });
         console.error('Service Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Upload Excel File separately
+export const uploadExcelFile = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const excelFile = req.files?.excel_file;
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const loggedInId = Number(userId);
+        const creatorId = Number(app.user_id);
+        const agentCodeFromBody = req.body.agent_code;
+        let isAuthorized = false;
+
+        if (loggedInId === creatorId) {
+            isAuthorized = true;
+        } else if (agentCodeFromBody) {
+            const creatorUser = await User.getUserById(app.user_id);
+            if (creatorUser && creatorUser.agent_code === agentCodeFromBody.trim()) {
+                isAuthorized = true;
+            }
+        }
+
+        if (!isAuthorized) {
+            return error(res, 'You are not authorized to upload files for this application.', 403);
+        }
+
+        if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+        const oldFilePath = app.excel_file_path;
+
+        const uniqueFilename = `APP-${appId}-v${getFileTimestamp()}-${excelFile.originalFilename}`;
+        const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
+
+        await fs.promises.rename(excelFile.filepath, newFilePath);
+
+        await Model.updateApplication(appId, { excel_file_path: newFilePath }, userId);
+
+        // Cleanup old file
+        if (oldFilePath && fs.existsSync(oldFilePath)) {
+            fs.promises.unlink(oldFilePath).catch(e => console.error("Old file cleanup failed:", e));
+        }
+
+        const updated = await Model.getApplicationById(appId);
+        const response = await buildApplicationResponse(updated);
+
+        await auditLog(req, {
+            userId: userId,
+            action: AuditActions.UPDATE_APPLICATION,
+            entity: 'FinancialApplication',
+            entityId: appId,
+            status: AuditStatus.INFO,
+            metadata: { info: 'Excel file uploaded separately' }
+        });
+
+        return success(res, response, 'Excel file uploaded successfully.');
+    } catch (err) {
+        console.error('File Upload Error:', err);
         return error(res, err.message);
     }
 };
