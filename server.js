@@ -1,8 +1,10 @@
 import express from "express";
+import http from "http";
 import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 //import path from "path";
+import { initWebSocketServer } from './websocket.js';
 
 import financialInsuranceRoutes from './routes/financial_Insurance_form.routes.js';
 import groupRiderRoutes from './routes/group_rider/group_rider.route.js'
@@ -11,9 +13,15 @@ import groupLookupRoutes from './routes/financial_insurance_group_lookups/financ
 import systemLookupRoutes from './routes/financial_insurance_system_lookups/financial_insurance_system_lookups.routes.js'
 import insuranceDropdownRoutes from './routes/insurance_dropdown/insurance_dropdown.routes.js'
 import actuarialRoutes from './routes/actuarial_api/actuarial.routes.js';
+import chatMessageRoutes from './routes/chat_message/chat_message.routes.js';
 
 dotenv.config();
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io server
+initWebSocketServer(server);
+
 // app.use(cors());
 // 03-24-2026 Mar; Line 16-23
 const corsOptions = {
@@ -52,6 +60,8 @@ app.use("/api/system-lookup", systemLookupRoutes)
 app.use('/api/dropdown', insuranceDropdownRoutes);
 // Actuarial API routes
 app.use('/api/actuarial', actuarialRoutes);
+// Chat message routes
+app.use('/api/chat-messages', chatMessageRoutes);
 
 const PORT = process.env.LOCAL_SERVER_PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

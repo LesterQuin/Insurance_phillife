@@ -43,6 +43,43 @@ export const sanitizeOptions = {
     }
 };
 
+// Helper to determine and update status based on actuarial input completion
+export const updateActuarialStatus = async (applicationId, userId) => {
+    const app = await Model.getApplicationById(applicationId);
+    
+    if (!app) return;
+
+    const user = await User.getUserById(userId);
+    const isSuperAdmin = user && user.roleName === 'Super Admin';
+
+    // Do not automate status for Drafts (4) or Released (6) applications.
+    // For Rejected (3) status, allow automation ONLY if the user is a Super Admin.
+    if (app.status_id === 4 || app.status_id === 6 || (app.status_id === 3 && !isSuperAdmin)) return;
+
+    const rates = await ActuarialModel.getApplicationRates(applicationId);
+    
+    const hasRates = rates && rates.length > 0;
+    const hasPremium = app.total_annual_premium !== null && app.total_annual_premium !== undefined;
+    const hasNotes = app.evidence_notes !== null && app.evidence_notes !== '' && app.evidence_notes !== undefined;
+
+    let newStatusId = app.status_id;
+
+    if (hasRates && hasPremium && hasNotes) {
+        // All three actuarial requirements met
+        newStatusId = 2;
+    } else if (hasRates || hasPremium || hasNotes) {
+        // At least one but not all requirements met
+        newStatusId = 1; // Pending
+    } else {
+        // No actuarial data exists
+        newStatusId = 5; // Checking
+    }
+
+    if (newStatusId !== app.status_id) {
+        await Model.updateApplication(applicationId, { status_id: newStatusId }, userId);
+    }
+};
+
 // Helper to clean "other" fields based on selected IDs
 const cleanupOtherFields = async (data) => {
     const mutableData = { ...data };
@@ -425,7 +462,7 @@ export const buildApplicationResponse = async (app) => {
         uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
         coverage_totals: coverage_totals,
         notes: app.notes,
-        excel_file_path: app.excel_file_path || null,
+        excel_file_path: app.excel_file_path ? path.basename(app.excel_file_path) : null,
         evidence_notes: app.evidence_notes,
         created_at: app.created_at,
         updated_at: app.updated_at
@@ -438,9 +475,9 @@ export const createApplication = async (req, res) => {
         const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
-        // Set status to Pending (ID: 1) since validateFinancialApplication middleware passed
-        const STATUS_PENDING = 1;
-        dataToSave.status_id = STATUS_PENDING;
+        // Set status to Checking (ID: 5) for new submissions
+        const STATUS_CHECKING = 5;
+        dataToSave.status_id = STATUS_CHECKING;
 
         dataToSave = cleanProposalFields(dataToSave);
         const cleanedData = await cleanupOtherFields(dataToSave);
@@ -476,7 +513,7 @@ export const createApplication = async (req, res) => {
 
             // Add application_id to the filename
             const uniqueFilename = `APP-${appId}-v${getFileTimestamp()}-${originalFilename}`;
-            const newFilePath = path.join(uploadDir, uniqueFilename);
+            const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
 
             await fs.promises.rename(tempFilePath, newFilePath);
             
@@ -499,6 +536,54 @@ export const createApplication = async (req, res) => {
             metadata: { error: err.message }
         });
         console.error('Service Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Download Excel File
+export const downloadExcelFile = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const agentCode = req.body?.agent_code || req.query?.agent_code;
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        if (!app.excel_file_path) {
+            return error(res, 'No Excel file associated with this application.', 404);
+        }
+
+        const loggedInId = Number(userId);
+        const creatorId = Number(app.user_id);
+        
+        // Authorization check: Only Creator, matching agent code, Actuarial Dept, or Super Admin
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+
+        const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+        const isSuperAdmin = loggedInUser && loggedInUser.roleName === 'Super Admin';
+
+        let isAuthorized = isSuperAdmin || isActuarial || (loggedInId === creatorId);
+        if (!isAuthorized && agentCode) {
+            const creatorUser = await User.getUserById(app.user_id);
+            if (creatorUser && creatorUser.agent_code === agentCode.trim()) {
+                isAuthorized = true;
+            }
+        }
+
+        if (!isAuthorized) {
+            return error(res, 'You are not authorized to download files for this application.', 403);
+        }
+
+        if (!fs.existsSync(app.excel_file_path)) {
+            console.error(`[downloadExcelFile] File not found at: ${app.excel_file_path}`);
+            return error(res, 'Excel file not found on server.', 404);
+        }
+
+        return res.download(app.excel_file_path, path.basename(app.excel_file_path));
+    } catch (err) {
+        console.error('Excel Download Error:', err);
         return error(res, err.message);
     }
 };
@@ -1035,7 +1120,7 @@ export const getPrototypes = async (req, res) => {
                 },
                 basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
                 riders: appRiders,
-                excel_file_path: app.excel_file_path || null,
+                excel_file_path: app.excel_file_path ? path.basename(app.excel_file_path) : null,
                 notes: app.notes,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
@@ -1217,7 +1302,7 @@ export const getAllApplications = async (req, res) => {
                 borrower_age_76_80: app.borrower_age_76_80,
                 coverage_totals: coverage_totals,
                 riders: appRiders,
-        excel_file_path: app.excel_file_path || null,
+                excel_file_path: app.excel_file_path ? path.basename(app.excel_file_path) : null,
                 notes: app.notes,
                 created_at: app.created_at,
                 updated_at: app.updated_at,
@@ -1244,7 +1329,8 @@ export const saveRates = async (req, res) => {
             return error(res, 'Access Denied: Only users from the Actuarial department are authorized to input or update rates.', 403);
         }
 
-        const { application_id, ...ratesData } = req.body;
+        const application_id = req.params.id;
+        const ratesData = req.body;
 
         const existingApplication = await Model.getApplicationById(application_id);
         if (!existingApplication) {
@@ -1254,13 +1340,11 @@ export const saveRates = async (req, res) => {
         // 2. Save Rates to Normalized Table
         await Model.saveApplicationRates(application_id, ratesData);
 
-        // Automatically transition to Approved status (ID: 2) when rates are input
-        const STATUS_APPROVED = 2;
-        await Model.updateApplication(application_id, { status_id: STATUS_APPROVED }, userId);
-        
-        // Fetch updated application to return
+        await updateActuarialStatus(application_id, userId);
+
         const updatedApp = await Model.getApplicationById(application_id);
-        return success(res, updatedApp, 'Rates saved successfully.');
+        const response = await buildApplicationResponse(updatedApp);
+        return success(res, response, 'Rates saved successfully.');
 
     } catch (err) {
         console.error('Save Rates Error:', err);
@@ -1293,6 +1377,8 @@ export const saveEvidenceNotes = async (req, res) => {
         }
 
         await Model.updateApplication(id, { evidence_notes }, userId);
+
+        await updateActuarialStatus(id, userId);
 
         const updatedApp = await Model.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
@@ -1329,6 +1415,8 @@ export const saveTotalAnnualPremium = async (req, res) => {
         }
 
         await Model.updateApplication(id, { total_annual_premium }, userId);
+
+        await updateActuarialStatus(id, userId);
 
         const updatedApp = await Model.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
@@ -1511,11 +1599,11 @@ export const updateApplication = async (req, res) => {
         
         const { agent_code, ...updateData } = req.body;
         
-        // Automatically transition from Draft to Processing status
+        // Automatically transition from Draft to Checking status
         const STATUS_DRAFT = 4;
-        const STATUS_PENDING = 1;
+        const STATUS_CHECKING = 5;
         if (Number(existingApplication.status_id) === STATUS_DRAFT) {
-            updateData.status_id = STATUS_PENDING;
+            updateData.status_id = STATUS_CHECKING;
         }
 
         // const cleanedData = await cleanupOtherFields(updateData);

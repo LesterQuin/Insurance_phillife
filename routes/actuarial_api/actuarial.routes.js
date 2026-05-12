@@ -19,4 +19,10 @@ router.get('/total-premium/queue', authenticate, isActuarial, Controller.getAppl
 router.post('/total-premium/:id', authenticate, isActuarial, validateTotalPremium, Controller.saveTotalAnnualPremium);
 router.put('/total-premium/:id', authenticate, isActuarial, validateTotalPremium, Controller.saveTotalAnnualPremium);
 
+// API to finalize and release the application
+router.post('/release/:id', authenticate, isActuarial, Controller.releaseApplication);
+
+// API to reject the application
+router.post('/reject/:id', authenticate, isActuarial, Controller.rejectApplication);
+
 export default router;

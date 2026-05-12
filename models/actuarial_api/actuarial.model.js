@@ -113,7 +113,7 @@ export const getApplicationsPendingRates = async () => {
             LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
             LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
-            WHERE fia.status_id = 1 AND fia.total_annual_premium IS NULL
+            WHERE fia.status_id IN (1, 5)
             ORDER BY fia.created_at ASC
         `);
     return result.recordset ?? [];
@@ -133,7 +133,7 @@ export const getApplicationsPendingTotalPremium = async () => {
             LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
             LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
             LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
-            WHERE fia.status_id = 1 AND fia.total_annual_premium IS NULL
+            WHERE fia.status_id IN (1, 5) AND fia.total_annual_premium IS NULL
             ORDER BY fia.created_at ASC
         `);
     return result.recordset ?? [];

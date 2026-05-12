@@ -11,6 +11,7 @@ router.post('/create', authenticate, parseMultipartForm, validateFinancialApplic
 router.post('/draft', authenticate, parseMultipartForm, validateDraftFinancialApplication, Controller.saveDraft);
 router.put('/:id', authenticate, parseMultipartForm, validateUpdateFinancialApplication, Controller.updateApplication);
 router.post('/:id/upload-excel', authenticate, parseMultipartForm, validateExcelUpload, Controller.uploadExcelFile);
+router.post('/:id/download-excel', authenticate, Controller.downloadExcelFile);
 
 // Routes without validation
 router.get('/list', Controller.getAllApplications);
