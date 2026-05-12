@@ -20,9 +20,12 @@ router.post('/total-premium/:id', authenticate, isActuarial, validateTotalPremiu
 router.put('/total-premium/:id', authenticate, isActuarial, validateTotalPremium, Controller.saveTotalAnnualPremium);
 
 // API to finalize and release the application
-router.post('/release/:id', authenticate, isActuarial, Controller.releaseApplication);
+router.post('/release/:id', authenticate, isActuarial, Controller.releaseApplication); // new
 
-// API to reject the application
-router.post('/reject/:id', authenticate, isActuarial, Controller.rejectApplication);
+// API to reject the application(Super Admin only and actuarial)
+router.post('/reject/:id', authenticate, isActuarial, Controller.rejectApplication); // new
+
+// API to un-reject the application (Super Admin only)
+router.post('/unreject/:id', authenticate, Controller.unrejectApplication); // new
 
 export default router;

@@ -3,7 +3,7 @@ import * as ActuarialModel from '../../models/actuarial_api/actuarial.model.js';
 import * as User from '../../models/user/user_model.js';
 import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
-import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus } from '../financial_Insurance_form.controller.js';
+import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus } from '../../middlewares/helper.js';
 
 export const saveRates = async (req, res) => {
     try {
@@ -146,6 +146,39 @@ export const rejectApplication = async (req, res) => {
         return success(res, response, 'Application has been successfully rejected.');
     } catch (err) {
         console.error('Reject Application Error:', err);
+        return error(res, err.message);
+    }
+};
+
+export const unrejectApplication = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const id = req.params.id;
+
+        // 1. Authorization check: Strictly Super Admin only for un-rejecting
+        const loggedInUser = await User.getUserById(userId);
+        const isSuperAdmin = loggedInUser && loggedInUser.roleName === 'Super Admin';
+
+        if (!isSuperAdmin) {
+            return error(res, 'Access Denied: Only Super Admins are authorized to un-reject applications.', 403);
+        }
+
+        const existingApplication = await MainModel.getApplicationById(id);
+        if (!existingApplication) return error(res, 'Application not found', 404);
+
+        // Check if the application is actually rejected
+        if (Number(existingApplication.status_id) !== 3) {
+            return error(res, 'Only applications with "Rejected" status can be un-rejected.', 400);
+        }
+
+        const STATUS_PENDING = 1;
+        await MainModel.updateApplication(id, { status_id: STATUS_PENDING }, userId);
+
+        const updatedApp = await MainModel.getApplicationById(id);
+        const response = await buildApplicationResponse(updatedApp);
+        return success(res, response, 'Application has been successfully un-rejected and set to Pending.');
+    } catch (err) {
+        console.error('Un-reject Application Error:', err);
         return error(res, err.message);
     }
 };
