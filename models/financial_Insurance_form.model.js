@@ -256,11 +256,14 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
         SELECT 
             cr.application_id,
             crr.rider_id,
+            r.rider_name,
+            r.acronym,
             cr.designation,
             crr.rider_amount,
             crr.rider_unit
         FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr
         JOIN DHUB.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
+        JOIN sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
         WHERE cr.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -869,7 +872,7 @@ export const getRidersByProductId = async (productId) => {
     const res = await pool.request()
         .input('productId', sql.Int, productId)
         .query(`
-            SELECT rider_id, rider_name, is_active
+            SELECT rider_id, rider_name, acronym, is_active
             FROM sg.financial_insurance_riders
             WHERE product_id = @productId AND is_active = 1
         `);
@@ -927,6 +930,7 @@ export const getApplicationRiders = async (applicationId) => {
                 r.rider_id,
                 r.rider_name,
                 r.input_type,
+                r.acronym,
                 r.unit_value,
                 ar.rider_amount as amount,
                 ar.rider_unit as unit
@@ -1010,6 +1014,7 @@ export const getCoverageRankingRiders = async (applicationId) => {
                 cr.designation,
                 crr.rider_id,
                 r.rider_name,
+                r.acronym,
                 crr.rider_amount,
                 crr.rider_unit
             FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr
@@ -1079,7 +1084,7 @@ export const getBulkApplicationRiders = async (applicationIds) => {
     }).join(',');
 
     const result = await request.query(`
-        SELECT ar.application_id, r.rider_id, r.rider_name, r.input_type, r.unit_value, ar.rider_amount as amount, ar.rider_unit as unit
+        SELECT ar.application_id, r.rider_id, r.rider_name, r.acronym, r.input_type, r.unit_value, ar.rider_amount as amount, ar.rider_unit as unit
         FROM sg.financial_insurance_application_rider ar
         JOIN sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
         WHERE ar.application_id IN (${idParams})

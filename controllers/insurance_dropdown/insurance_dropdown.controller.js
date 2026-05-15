@@ -5,7 +5,16 @@ import { success, error } from '../../utils/response.js';
 export const getIndustries = async (req, res) => {
     try {
         const list = await Model.getIndustries();
-        return success(res, list, 'Industries fetched successfully.');
+        const groupedIndustries = list.reduce((acc, item) => {
+
+            if (!acc[item.category]) {
+                acc[item.category] = [];
+            }
+            acc[item.category].push(item);
+            return acc;
+
+        }, {});
+        return success(res, groupedIndustries, 'Industries fetched successfully.');
     } catch (err) {
         console.error('Get Industries Error:', err);
         return error(res, err.message);

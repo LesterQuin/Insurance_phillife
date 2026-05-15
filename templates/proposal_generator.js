@@ -7,7 +7,7 @@ const capitalize = (str) => {
 
 const formatNumber = (num) => {
   if (num == null || isNaN(num)) return "0.00";
-  return num.toLocaleString("en-US", {
+  return Number(num).toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -129,7 +129,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
     rates66_70 = {},
     rates71_75 = {},
     rates76_80 = {},
-    participationPercentage = 75,
+    participationPercentage = 100,
     logoDataUri = null,
     centerPhotoUri = null,
     footerPhotoUri = null,
@@ -271,7 +271,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             margin-bottom: 0;
         }
         .cover-page {
-            display: flex; flex-direction: column; height: 297mm; padding: 15mm 0 0 0; box-sizing: border-box; background-color: white; position: relative; z-index: 2;
+            display: flex; flex-direction: column; height: 100vh; padding: 15mm 0 0 0; box-sizing: border-box; background-color: white; position: relative; z-index: 2;
         }
         .cover-top {
             position: relative; 
@@ -325,7 +325,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             position: relative;
             background-color: transparent;
             z-index: 1;
-            min-height: 297mm;
+            min-height: 260mm;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
@@ -643,31 +643,40 @@ ${
 
 </div>
 
-    <div class="signature">
-
-    <p><strong>Conforme (Policyholder):</strong></p>
-
-    <p>
-    ${application.contact_person_salutation} ${application.proposal_addressee}: <br>
-    ______________________________ <br>
-    </p>
-
-    <p>
-    ${application.addressee_designation}: <br>
-    ______________________________ <br>
-    </p>
-
-    <p>
-    Signature: <br>
-    ______________________________ <br>
-    </p>
-
-    <p>
-    Date Signed: <br>
-    ______________________________ <br>
-    </p>
-
-        </div>
+<div class="page-break"></div>
+<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
+    <p style="font-size: 10pt; margin-bottom: 20px;">I hereby acknowledge that I have read and understood the terms and conditions set forth in this proposal.</p>
+    
+    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized Representative</div>
+            </td>
+            <td style="border: none; width: 4%;"></td>
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${application.addressee_designation || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
+            </td>
+            <td style="border: none;"></td>
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Date Signed</div>
+            </td>
+        </tr>
+    </table>
+</div>
     </div>
         </td></tr></tbody>
         <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>

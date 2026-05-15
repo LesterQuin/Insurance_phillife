@@ -1228,8 +1228,8 @@ export const validateDraftFinancialApplication = [
     body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
 
     // Age Profile
-    body('minimum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Minimum Age must be at least 18'),
-    body('maximum_age').optional().isInt({ min: 18, max: 64 }).withMessage('Maximum Age must be within range')
+    body('minimum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Minimum Age must be between 18 and 65'),
+    body('maximum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Maximum Age must be between 18 and 65')
         .custom((value, { req }) => {
             const minAge = req.body.minimum_age ? Number(req.body.minimum_age) : null;
             if (minAge && value && Number(value) < minAge) {
@@ -1490,7 +1490,7 @@ export const validateRates = [
                             }
                         }
                     } else { // Branch B: Standard Flat Array Logic (18-64 or legacy senior input)
-                        if (!Array.isArray(data)) throw new Error(`Data for ${key} must be an array (for 18-64) or a nested age object (for seniors).`);
+                        if (!Array.isArray(data)) throw new Error(`Data for ${key} must be an array (for 18-65) or a nested age object (for seniors).`);
 
                         if (planId === 1) { // GCLI Flat (18-64)
                             const expectedLength = isSeniorBracket ? Math.min(maturity, 12) : maturity;
@@ -1524,7 +1524,7 @@ export const validateRates = [
                 }
             }
             if (!hasData) {
-                throw new Error('At least one rate group (18-64, 66-70, 71-75, 76-80) is required.');
+                throw new Error('At least one rate group (18-65, 66-70, 71-75, 76-80) is required.');
             }
             return true;
         }),

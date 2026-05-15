@@ -1,0 +1,90 @@
+import { poolPromise, sql } from '../../config/db.js';
+
+export const getCommentsByApplicationId = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('applicationId', sql.Int, applicationId)
+        .query(`
+            SELECT 
+                c.comment_id,
+                c.application_id,
+                c.user_id,
+                c.comment_text,
+                c.created_at,
+                c.updated_at,
+                u.firstname + ' ' + ISNULL(u.middlename + ' ', '') + u.lastname AS commenter_name
+            FROM DHUB.sg.financial_insurance_application_comments c
+            JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
+            WHERE c.application_id = @applicationId
+            ORDER BY c.created_at ASC
+        `);
+    return result.recordset;
+};
+
+export const isUserAuthorizedToView = async (applicationId, userId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('applicationId', sql.Int, applicationId)
+        .input('userId', sql.Int, userId)
+        .query(`
+            SELECT TOP 1 1 as authorized
+            FROM DHUB.sg.financial_insurance_application a
+            WHERE a.application_id = @applicationId 
+                AND (
+                    a.user_id = @userId 
+                    OR EXISTS (
+                        SELECT 1 FROM DHUB.sg.financial_insurance_application_comments 
+                        WHERE application_id = @applicationId AND user_id = @userId
+                    )
+                )
+        `);
+    return result.recordset.length > 0;
+};
+
+export const createComment = async (data) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('applicationId', sql.Int, data.application_id)
+        .input('userId', sql.Int, data.user_id)
+        .input('commentText', sql.NVarChar(sql.MAX), data.comment_text)
+        .query(`
+            INSERT INTO DHUB.sg.financial_insurance_application_comments (application_id, user_id, comment_text)
+            VALUES (@applicationId, @userId, @commentText);
+            SELECT SCOPE_IDENTITY() AS comment_id;
+        `);
+    return result.recordset[0];
+};
+
+export const getCommentById = async (commentId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('commentId', sql.Int, commentId)
+        .query(`
+            SELECT c.*, u.firstname + ' ' + u.lastname as commenter_name 
+            FROM DHUB.sg.financial_insurance_application_comments c
+            JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
+            WHERE c.comment_id = @commentId
+        `);
+    return result.recordset[0];
+};
+
+export const updateComment = async (commentId, text) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('commentId', sql.Int, commentId)
+        .input('commentText', sql.NVarChar(sql.MAX), text)
+        .query(`
+            UPDATE DHUB.sg.financial_insurance_application_comments 
+            SET comment_text = @commentText, updated_at = GETDATE()
+            WHERE comment_id = @commentId
+        `);
+    return getCommentById(commentId);
+};
+
+export const deleteComment = async (commentId) => {
+    const pool = await poolPromise;
+    await pool.request()
+        .input('commentId', sql.Int, commentId)
+        .query(`DELETE FROM DHUB.sg.financial_insurance_application_comments WHERE comment_id = @commentId`);
+    return true;
+};

@@ -393,7 +393,7 @@ export const getPrototypes = async (req, res) => {
                 appRiders.forEach(mainRider => {
                     const riderValues = appRankingRiders
                         .filter(rr => rr.rider_id === mainRider.rider_id)
-                        .map(rr => ({ designation: rr.designation, amount: rr.rider_amount, unit: rr.rider_unit }));
+                        .map(rr => ({ designation: rr.designation, acronym: rr.acronym, amount: rr.rider_amount, unit: rr.rider_unit }));
                     if (riderValues.length > 0) mainRider.values = riderValues;
                 });
             }
@@ -419,25 +419,35 @@ export const getPrototypes = async (req, res) => {
                 user_id: app.user_id,
                 user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
                 group_name: app.group_name,
+                business_nature_id: app.business_nature_id,
+                sub_business_nature_id: app.sub_business_nature_id,
+                business_nature: app.business_nature_id ? {
+                    id: app.business_nature_id,
+                    name: app.business_nature_name,
+                    sub_nature: app.sub_business_nature_id ? {
+                        id: app.sub_business_nature_id,
+                        name: app.sub_business_nature_name
+                    } : null
+                } : null,
                 number_of_lives: app.number_of_lives,
-                contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
-                contact_person_salutation: app.contact_person_salutation,
-                contact_person_firstname: app.contact_person_firstname,
-                contact_person_mi: app.contact_person_mi,
-                contact_person_lastname: app.contact_person_lastname,
+                contact_person: {
+                    full_name: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+                    salutation: app.contact_person_salutation,
+                    firstname: app.contact_person_firstname,
+                    mi: app.contact_person_mi,
+                    lastname: app.contact_person_lastname
+                },
                 status: { id: app.status_id, name: app.status_name },
                 group_classification: { 
                     id: app.group_classification_id, 
                     name: app.group_classification_name,
                     other_value: app.other_group_classification
                 },
-                /*
                 business_type: {
                     id: app.business_type_id,
                     name: app.business_type_name,
                     other_value: app.other_business_type
                 },
-                */
                 group_type: { 
                     id: app.group_type_id, 
                     name: app.group_type_name,
@@ -452,7 +462,7 @@ export const getPrototypes = async (req, res) => {
                             app.coverage_type_id === 34 ? salaryRanking :
                             app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
                 },
-                channel_type: {
+                channel_type: { 
                     id: app.channel_type_id,
                     name: app.channel_type_name,
                     channel_name: app.channel_name || null
@@ -557,7 +567,7 @@ export const getAllApplications = async (req, res) => {
                 appRiders.forEach(mainRider => {
                     const riderValues = appRankingRiders
                         .filter(rr => rr.rider_id === mainRider.rider_id)
-                        .map(rr => ({ designation: rr.designation, amount: rr.rider_amount, unit: rr.rider_unit }));
+                        .map(rr => ({ designation: rr.designation, acronym: rr.acronym, amount: rr.rider_amount, unit: rr.rider_unit }));
                     if (riderValues.length > 0) mainRider.values = riderValues;
                 });
             }
@@ -583,6 +593,8 @@ export const getAllApplications = async (req, res) => {
                 user_id: app.user_id,
                 user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
                 group_name: app.group_name,
+                business_nature_id: app.business_nature_id,
+                sub_business_nature_id: app.sub_business_nature_id,
                 business_nature: app.business_nature_id ? {
                     id: app.business_nature_id,
                     name: app.business_nature_name,
@@ -590,17 +602,19 @@ export const getAllApplications = async (req, res) => {
                         id: app.sub_business_nature_id,
                         name: app.sub_business_nature_name
                     } : null
-                } : app.business_nature,
+                } : null,
                 number_of_lives: app.number_of_lives,
                 business_address: app.business_address,
                 contact_number: app.contact_number,
                 fax_number: app.fax_number,
                 email: app.email,
-                contact_person: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
-                contact_person_salutation: app.contact_person_salutation,
-                contact_person_firstname: app.contact_person_firstname,
-                contact_person_mi: app.contact_person_mi,
-                contact_person_lastname: app.contact_person_lastname,
+                contact_person: {
+                    full_name: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
+                    salutation: app.contact_person_salutation,
+                    firstname: app.contact_person_firstname,
+                    mi: app.contact_person_mi,
+                    lastname: app.contact_person_lastname
+                },
                 designation: app.designation,
                 proposal_addressee: app.proposal_addressee,
                 addressee_designation: app.addressee_designation,
@@ -612,13 +626,11 @@ export const getAllApplications = async (req, res) => {
                     name: app.group_classification_name,
                     other_value: app.other_group_classification
                 },
-                /*
                 business_type: {
                     id: app.business_type_id,
                     name: app.business_type_name,
                     other_value: app.other_business_type
                 },
-                */
                 group_type: { 
                     id: app.group_type_id, 
                     name: app.group_type_name,
