@@ -17,9 +17,14 @@ export const createApplication = async (req, res) => {
         const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
-        // Set status to Checking (ID: 5) for new submissions
+        // Determine initial status: Approved (2) for Prototypes (30), Checking (5) otherwise
         const STATUS_CHECKING = 5;
-        dataToSave.status_id = STATUS_CHECKING;
+        const STATUS_APPROVED = 2;
+        const PROTOTYPE_TYPE_ID = 30;
+
+        dataToSave.status_id = Number(dataToSave.type_of_proposal_id) === PROTOTYPE_TYPE_ID 
+            ? STATUS_APPROVED 
+            : STATUS_CHECKING;
 
         dataToSave = Helper.cleanProposalFields(dataToSave);
         const cleanedData = await Helper.cleanupOtherFields(dataToSave);
@@ -976,11 +981,18 @@ export const updateApplication = async (req, res) => {
         
         const { agent_code, ...updateData } = req.body;
         
-        // Automatically transition from Draft to Checking status
+        // Automatically transition from Draft: Approved (2) for Prototypes (30), Checking (5) otherwise
         const STATUS_DRAFT = 4;
         const STATUS_CHECKING = 5;
+        const STATUS_APPROVED = 2;
+        const PROTOTYPE_TYPE_ID = 30;
+
         if (Number(existingApplication.status_id) === STATUS_DRAFT) {
-            updateData.status_id = STATUS_CHECKING;
+            const typeId = updateData.type_of_proposal_id !== undefined 
+                ? Number(updateData.type_of_proposal_id) 
+                : Number(existingApplication.type_of_proposal_id);
+            
+            updateData.status_id = typeId === PROTOTYPE_TYPE_ID ? STATUS_APPROVED : STATUS_CHECKING;
         }
 
         const cleanedProposal = Helper.cleanProposalFields(updateData);

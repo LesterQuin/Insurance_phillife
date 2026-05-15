@@ -117,6 +117,8 @@ export const cleanProposalFields = (data) => {
         mutableData.min_loan_amount = null;
         mutableData.loan_portfolio_amount = null;
         mutableData.loans_amount = null;
+        mutableData.commission_rate = null;
+        mutableData.service_fee = null;
         mutableData.borrower_amount_18_64 = null;
         mutableData.borrower_amount_66_70 = null;
         mutableData.borrower_amount_71_75 = null;

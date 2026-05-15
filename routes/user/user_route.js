@@ -34,6 +34,6 @@ router.put('/activate/:userId', authenticate, validateAdminIT, Controller.activa
 
 // Super admin routes to view users
 router.get('/', authenticate, isSuperAdmin, Controller.getAllUsers);
-router.get('/:userId', authenticate, isSuperAdmin, Controller.getUserById);
+router.get('/:userId', authenticate, Controller.getUserById);
 
 export default router;

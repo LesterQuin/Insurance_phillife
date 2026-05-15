@@ -708,9 +708,11 @@ export const validateFinancialApplication = [
         .isLength({ max: 255 }).withMessage('Channel name must not exceed 255 characters'),
 
     body('commission_rate')
+        .if(body('type_of_proposal_id').equals('31'))
         .notEmpty().withMessage('Commission Rate is required')
         .isFloat({ min: 0 }).withMessage('Commission Rate must be 0 or a positive number'),
     body('service_fee')
+        .if(body('type_of_proposal_id').equals('31'))
         .notEmpty().withMessage('Service Fee is required')
         .isFloat({ min: 0 }).withMessage('Service Fee must be 0 or a positive number'),
 
@@ -1406,6 +1408,11 @@ export const validateRates = [
 
             const app = await Financial.getApplicationById(applicationId);
             if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
+
+            // Allow computation for Checking (5), Pending (1), and Approved (2)
+            if (![1, 2, 5].includes(Number(app.status_id))) {
+                throw new Error('Only proposals with a status of Checking or Pending can be computed.');
+            }
 
             const planId = Number(app.plan_id);
             const keys = ['18-64', '66-70', '71-75', '76-80'];
