@@ -26,6 +26,32 @@ export const isSuperAdmin = (req, res, next) => {
     }
 };
 
+export const isMarketing = (req, res, next) => {
+    const allowedRoles = [
+        'Group Sales & Marketing Head',
+        'Team Leader',
+        'Corporate Financial Executive',
+        'Marketing Officer',
+        'Marketing Assistant',
+        'Assistant Vice President',
+        'Super Admin'
+    ];
+    if (req.user && allowedRoles.includes(req.user.roleName)) {
+        next();
+    } else {
+        return res.status(403).json({ status: false, message: 'Forbidden: Marketing or Sales access required.' });
+    }
+};
+
+export const isCFE = (req, res, next) => {
+    const allowedRoles = ['Corporate Financial Executive', 'Super Admin'];
+    if (req.user && allowedRoles.includes(req.user.roleName)) {
+        next();
+    } else {
+        return res.status(403).json({ status: false, message: 'Forbidden: Corporate Financial Executive access required.' });
+    }
+};
+
 export const isActuarial = (req, res, next) => {
     const DEPT_ACTUARIAL_ID = 18;
     if (req.user && Number(req.user.department_id) === DEPT_ACTUARIAL_ID) {
@@ -34,3 +60,14 @@ export const isActuarial = (req, res, next) => {
         return res.status(403).json({ status: false, message: 'Forbidden: Actuarial department access required.' });
     }
 };
+
+
+// Group Sales & Marketing Head
+// Team Leader
+// Corporate Financial Executive
+// Marketing Officer
+// Accounts Management & Servicing
+// Marketing Assistant
+// Super Admin
+// Analyst
+// Assistant Vice President

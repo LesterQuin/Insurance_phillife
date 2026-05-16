@@ -102,8 +102,11 @@ export const deleteComment = async (req, res) => {
             return error(res, 'You are not authorized to delete this comment.', 403);
         }
 
-        await Model.deleteComment(commentId);
-        return success(res, null, 'Comment deleted successfully.');
+        const isDeleted = await Model.deleteComment(commentId);
+        return success(res, { 
+            is_deleted: isDeleted,
+            deleted_at: isDeleted ? new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : null
+        }, isDeleted ? 'Comment deleted successfully.' : 'Comment could not be deleted.');
     } catch (err) {
         console.error('Delete Comment Error:', err);
         return error(res, err.message);

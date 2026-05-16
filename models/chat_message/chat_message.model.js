@@ -12,9 +12,13 @@ export const getCommentsByApplicationId = async (applicationId) => {
                 c.comment_text,
                 c.created_at,
                 c.updated_at,
-                u.firstname + ' ' + ISNULL(u.middlename + ' ', '') + u.lastname AS commenter_name
+                u.firstname + ISNULL(' ' + NULLIF(u.middlename, '') + '.', '') + ' ' + u.lastname AS commenter_name,
+                d.name AS department_name,
+                r.name AS role_name
             FROM DHUB.sg.financial_insurance_application_comments c
             JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
             WHERE c.application_id = @applicationId
             ORDER BY c.created_at ASC
         `);
@@ -60,9 +64,15 @@ export const getCommentById = async (commentId) => {
     const result = await pool.request()
         .input('commentId', sql.Int, commentId)
         .query(`
-            SELECT c.*, u.firstname + ' ' + u.lastname as commenter_name 
+            SELECT 
+                c.*, 
+                u.firstname + ISNULL(' ' + NULLIF(u.middlename, '') + '.', '') + ' ' + u.lastname AS commenter_name,
+                d.name AS department_name,
+                r.name AS role_name
             FROM DHUB.sg.financial_insurance_application_comments c
             JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
             WHERE c.comment_id = @commentId
         `);
     return result.recordset[0];
@@ -83,8 +93,8 @@ export const updateComment = async (commentId, text) => {
 
 export const deleteComment = async (commentId) => {
     const pool = await poolPromise;
-    await pool.request()
+    const result = await pool.request()
         .input('commentId', sql.Int, commentId)
         .query(`DELETE FROM DHUB.sg.financial_insurance_application_comments WHERE comment_id = @commentId`);
-    return true;
+    return result.rowsAffected[0] > 0;
 };

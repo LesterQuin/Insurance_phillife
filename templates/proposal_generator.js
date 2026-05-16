@@ -121,11 +121,11 @@ export const generateGCLIPDFContent = (application, user, details) => {
   // Defaulting details to avoid errors if they are not provided
   const {
     totalAnnualPremium = 0,
-    maxAmount18_64 = 0,
+    maxAmount18_65 = 0,
     maxAmount66_70 = 0,
     maxAmount71_75 = 0,
     maxAmount76_80 = 0,
-    rates18_64 = {},
+    rates18_65 = {},
     rates66_70 = {},
     rates71_75 = {},
     rates76_80 = {},
@@ -493,8 +493,8 @@ export const generateGCLIPDFContent = (application, user, details) => {
         </tr>
 
         <tr>
-            <td>${application.minimum_age || 18}-${application.maximum_age || 64}</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_64)}</td>
+            <td>${application.minimum_age || 18}-${application.maximum_age || 65}</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_65)}</td>
         </tr>
 
         ${
@@ -536,7 +536,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
 
 <div class="section-group">
     <h2 style="margin-top:40px;">SINGLE RATE PER 1,000 (Age ${application.minimum_age}-${application.maximum_age})</h2>
-    ${generateChunkedRateTables(rates18_64, maturity, standardHeader, standardSuffix)}
+    ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix)}
 
 ${
   application.borrower_age_66_70

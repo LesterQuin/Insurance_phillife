@@ -18,7 +18,7 @@ export const saveApplicationRates = async (applicationId, ratesData) => {
             .query('DELETE FROM DHUB.sg.financial_insurance_application_rates WHERE application_id = @appId');
 
         const categories = {
-            '18-64': '18_64',
+            '18-65': '18_65',
             '66-70': '66_70',
             '71-75': '71_75',
             '76-80': '76_80'

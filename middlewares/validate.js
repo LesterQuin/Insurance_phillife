@@ -961,7 +961,7 @@ body('basic_plan_id')
         .isFloat({ min: 0 }).withMessage('Loan Portfolio Amount must be a non-negative number'),
 
     // GCLI Age Bracket Amount Validations
-    body('borrower_amount_18_64') // Base age range amount (e.g., 18-64)
+    body('borrower_amount_18_65') // Base age range amount (e.g., 18-65)
         .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
         .notEmpty().withMessage((value, { req }) => {
             const min = req.body.minimum_age || 18;
@@ -1030,7 +1030,7 @@ body('basic_plan_id')
             return true;
         }),
     // Reject age bracket amounts for plans other than GCLI, GPA, GYRT
-    body(['borrower_amount_18_64', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80'])
+    body(['borrower_amount_18_65', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80'])
         .if(body('plan_id').not().isIn(['1', '2', '3']))
         .custom(val => {
             if (val != null && val !== '') throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT).');
@@ -1379,7 +1379,7 @@ export const validateMaxAmounts = [
         }
         return true;
     }),
-    body('max_amount_18_64').optional().isFloat({ min: 0 }).withMessage('Max Amount 18-64 must be 0 or positive'),
+    body('max_amount_18_65').optional().isFloat({ min: 0 }).withMessage('Max Amount 18-65 must be 0 or positive'),
     body('max_amount_66_70').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Max Amount 66-70 must be 0 or positive'),
     body('max_amount_71_75').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Max Amount 71-75 must be 0 or positive'),
     body('max_amount_76_80').optional({ nullable: true }).isFloat({ min: 0 }).withMessage('Max Amount 76-80 must be 0 or positive'),
@@ -1415,7 +1415,7 @@ export const validateRates = [
             }
 
             const planId = Number(app.plan_id);
-            const keys = ['18-64', '66-70', '71-75', '76-80'];
+            const keys = ['18-65', '66-70', '71-75', '76-80'];
             let hasData = false;
             const ADDITIONAL_LIFE_RIDER_ID = 1; 
             
@@ -1435,7 +1435,7 @@ export const validateRates = [
             }
 
             for (const key of keys) {
-                const isSeniorBracket = key !== '18-64';
+                const isSeniorBracket = key !== '18-65';
                 const bracketFlag = isSeniorBracket ? `borrower_age_${key.replace('-', '_')}` : null;
                 const isEnabledInApp = isSeniorBracket ? !!app[bracketFlag] : true;
 
@@ -1896,7 +1896,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
         }),
 
     // GCLI Age Bracket Amount Validations (Update)
-    body('borrower_amount_18_64').optional({ nullable: true }).isFloat({ min: 0 })
+    body('borrower_amount_18_65').optional({ nullable: true }).isFloat({ min: 0 })
         .custom((value, { req }) => {
             const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
             if (planId === 1 && (value === null || value === '')) throw new Error('Borrower Amount for base age range is required for GCLI.');
@@ -1924,7 +1924,7 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
             })
     ),
     // Reject age bracket amounts for plans other than GCLI, GPA, GYRT
-    body(['borrower_amount_18_64', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80']).optional({ nullable: true })
+    body(['borrower_amount_18_65', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80']).optional({ nullable: true })
         .custom((value, { req }) => {
             const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
             if (value != null && ![1, 2, 3].includes(planId)) {

@@ -71,7 +71,7 @@ export const createApplication = async (data, userId) => {
             .input('borrower_amount_71_75', sql.Decimal(18, 2), data.borrower_amount_71_75 || null)
             .input('borrower_age_76_80', sql.Bit, data.borrower_age_76_80 || false)
             .input('borrower_amount_76_80', sql.Decimal(18, 2), data.borrower_amount_76_80 || null)
-            .input('borrower_amount_18_64', sql.Decimal(18, 2), data.borrower_amount_18_64 || null)
+            .input('borrower_amount_18_65', sql.Decimal(18, 2), data.borrower_amount_18_65 || null)
             .input('channel_type_id', sql.Int, data.channel_type_id || null)
             .input('channel_name', sql.NVarChar, data.channel_name || null)
             .input('commission_rate', sql.NVarChar, data.commission_rate || null)
@@ -87,14 +87,14 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, max_loan_amount, min_loan_amount, loan_portfolio_amount, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id, excel_file_path,
-                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_64, channel_type_id, channel_name, commission_rate, service_fee, total_annual_premium, notes, evidence_notes
+                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, channel_type_id, channel_name, commission_rate, service_fee, total_annual_premium, notes, evidence_notes
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @business_nature_id, @sub_business_nature_id, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type,
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @max_loan_amount, @min_loan_amount, @loan_portfolio_amount, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id, @excel_file_path,
-                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_64, @channel_type_id, @channel_name, @commission_rate, @service_fee, @total_annual_premium, @notes, @evidence_notes
+                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @channel_type_id, @channel_name, @commission_rate, @service_fee, @total_annual_premium, @notes, @evidence_notes
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -319,7 +319,7 @@ export const getAllApplications = async () => {
                 fia.borrower_amount_71_75,
                 fia.borrower_age_76_80,
                 fia.borrower_amount_76_80,
-                fia.borrower_amount_18_64,
+                fia.borrower_amount_18_65,
                 fia.channel_type_id,
                 fia.channel_name,
                 fia.commission_rate,
@@ -414,7 +414,7 @@ export const getPrototypes = async () => {
                 fia.borrower_amount_71_75,
                 fia.borrower_age_76_80,
                 fia.borrower_amount_76_80,
-                fia.borrower_amount_18_64,
+                fia.borrower_amount_18_65,
                 fia.channel_type_id,
                 fia.channel_name,
                 fia.commission_rate,
@@ -757,7 +757,7 @@ export const updateApplication = async (id, data, userId) => {
         addClause('borrower_amount_71_75', data.borrower_amount_71_75, sql.Decimal(18, 2));
         addClause('borrower_age_76_80', data.borrower_age_76_80, sql.Bit);
         addClause('borrower_amount_76_80', data.borrower_amount_76_80, sql.Decimal(18, 2));
-        addClause('borrower_amount_18_64', data.borrower_amount_18_64, sql.Decimal(18, 2));
+        addClause('borrower_amount_18_65', data.borrower_amount_18_65, sql.Decimal(18, 2));
         addClause('notes', data.notes, sql.NVarChar(sql.MAX));
 
         // Channel fields

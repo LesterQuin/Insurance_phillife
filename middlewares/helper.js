@@ -119,7 +119,7 @@ export const cleanProposalFields = (data) => {
         mutableData.loans_amount = null;
         mutableData.commission_rate = null;
         mutableData.service_fee = null;
-        mutableData.borrower_amount_18_64 = null;
+        mutableData.borrower_amount_18_65 = null;
         mutableData.borrower_amount_66_70 = null;
         mutableData.borrower_amount_71_75 = null;
         mutableData.borrower_amount_76_80 = null;
@@ -148,7 +148,7 @@ export const cleanProposalFields = (data) => {
     }
 
     if (mutableData.plan_id && ![1, 2, 3].includes(Number(mutableData.plan_id))) {
-        ['18_64', '66_70', '71_75', '76_80'].forEach(s => mutableData[`borrower_amount_${s}`] = null);
+        ['18_65', '66_70', '71_75', '76_80'].forEach(s => mutableData[`borrower_amount_${s}`] = null);
     }
 
     ['66_70', '71_75', '76_80'].forEach(suffix => {
@@ -215,7 +215,7 @@ export const formatDbRatesForTemplate = (dbRows, category, planId) => {
     const filtered = dbRows.filter(row => row.borrower_category === category);
     if (filtered.length === 0) return {};
     const isGCLI = planId === 1;
-    if (category !== '18_64') {
+    if (category !== '18_65') {
         return filtered.reduce((acc, row) => {
             const ageKey = `Age ${row.attained_age}`;
             if (!acc[ageKey]) acc[ageKey] = {};
@@ -374,11 +374,11 @@ export const generateProposalHtml = async (id) => {
     const details = {
         totalAnnualPremium: appData.total_annual_premium || 0,
         maturity,
-        maxAmount18_64: appData.borrower_amount_18_64 || 0,
+        maxAmount18_65: appData.borrower_amount_18_65 || 0,
         maxAmount66_70: appData.borrower_amount_66_70 || 0,
         maxAmount71_75: appData.borrower_amount_71_75 || 0,
         maxAmount76_80: appData.borrower_amount_76_80 || 0,
-        rates18_64: formatDbRatesForTemplate(ratesRows, '18_64', planId),
+        rates18_65: formatDbRatesForTemplate(ratesRows, '18_65', planId),
         rates66_70: formatDbRatesForTemplate(ratesRows, '66_70', planId),
         rates71_75: formatDbRatesForTemplate(ratesRows, '71_75', planId),
         rates76_80: formatDbRatesForTemplate(ratesRows, '76_80', planId),
