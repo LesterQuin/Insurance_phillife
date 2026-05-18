@@ -55,13 +55,36 @@ export const initWebSocketServer = (server) => {
 };
 
 /**
- * Broadcasts a new comment to all subscribed clients for a given application ID.
+ * Broadcasts a deletion event to all subscribed clients in an application room.
  * @param {number} applicationId The ID of the application.
- * @param {object} comment The comment object to broadcast.
  */
-export const broadcastComment = (applicationId, comment) => {
+export const broadcastApplicationDelete = (applicationId) => {
     if (io) {
-        console.log(`Broadcasting new comment for application ${applicationId} to room app_${applicationId}`);
-        io.to(`app_${applicationId}`).emit('new_comment', comment);
+        console.log(`Broadcasting deletion for application ${applicationId} to room app_${applicationId}`);
+        io.to(`app_${applicationId}`).emit('applicationDeleted', { application_id: applicationId });
+    }
+};
+
+/**
+ * Broadcasts the updated comments list to all subscribed clients in an application room.
+ * @param {number} applicationId The ID of the application.
+ * @param {Array} comments The array of comments to broadcast.
+ */
+export const broadcastComment = (applicationId, comments) => {
+    if (io) {
+        console.log(`Broadcasting updated comments for application ${applicationId} to room app_${applicationId}`);
+        io.to(`app_${applicationId}`).emit('addNewComment', comments);
+    }
+};
+
+/**
+ * Broadcasts the updated application data to all subscribed clients in an application room.
+ * @param {number} applicationId The ID of the application.
+ * @param {object} applicationData The updated application object.
+ */
+export const broadcastApplicationUpdate = (applicationId, applicationData) => {
+    if (io) {
+        console.log(`Broadcasting updated application data for ID ${applicationId} to room app_${applicationId}`);
+        io.to(`app_${applicationId}`).emit('applicationUpdated', applicationData);
     }
 };

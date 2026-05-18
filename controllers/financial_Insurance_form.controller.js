@@ -7,6 +7,7 @@ import { success, error } from '../utils/response.js';
 import { auditLog, AuditStatus, AuditActions, normalizeIp } from '../utils/logger.js';
 import sanitizeHtml from 'sanitize-html';
 import * as Helper from '../middlewares/helper.js';
+import { broadcastApplicationUpdate, broadcastApplicationDelete } from '../websocket.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -73,6 +74,9 @@ export const createApplication = async (req, res) => {
         
         // Format it to match the standard response structure
         const response = await Helper.buildApplicationResponse(app);
+
+        // Real-time sync: Notify any listeners that a new application was created
+        broadcastApplicationUpdate(appId, response);
 
         return success(res, response, 'Application submitted successfully', 201);
     } catch (err) {
@@ -226,6 +230,10 @@ export const saveDraft = async (req, res) => {
         app = await Model.getApplicationById(finalAppId);
         
         const response = await Helper.buildApplicationResponse(app);
+
+        // Real-time sync: Update UI for anyone viewing this draft
+        broadcastApplicationUpdate(finalAppId, response);
+
         return success(res, response, 'Application saved as draft successfully', applicationId ? 200 : 201);
     } catch (err) {
         console.error('Draft Save Error:', err);
@@ -1038,6 +1046,9 @@ export const updateApplication = async (req, res) => {
         const updated = await Model.updateApplication(req.params.id, processedData, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
+        // Real-time sync: Critical for the UI to show the updated data (status, amounts, etc.) immediately
+        broadcastApplicationUpdate(req.params.id, response);
+
         await auditLog(req, {
             userId: userId,
             action: AuditActions.UPDATE_APPLICATION,
@@ -1107,6 +1118,9 @@ export const uploadExcelFile = async (req, res) => {
         const updated = await Model.getApplicationById(appId);
         const response = await Helper.buildApplicationResponse(updated);
 
+        // Real-time sync: Notify that the Excel file is now available for download
+        broadcastApplicationUpdate(appId, response);
+
         await auditLog(req, {
             userId: userId,
             action: AuditActions.UPDATE_APPLICATION,
@@ -1126,7 +1140,12 @@ export const uploadExcelFile = async (req, res) => {
 // Delete Application
 export const deleteApplication = async (req, res) => {
     try {
-        await Model.deleteApplication(req.params.id);
+        const appId = req.params.id;
+        await Model.deleteApplication(appId);
+
+        // Real-time sync: Notify users that this application no longer exists
+        broadcastApplicationDelete(appId);
+
         return success(res, null, 'Application deleted successfully.');
     } catch (err) {
         console.error('Service Error:', err);
