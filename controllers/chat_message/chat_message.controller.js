@@ -47,11 +47,12 @@ export const createComment = async (req, res) => {
             comment_text
         });
 
-        // Retrieve full comment details (including name) for immediate UI update
-        const created = await Model.getCommentById(newComment.comment_id);
+        // Real-time broadcast: Fetch the entire updated list and sync all clients
+        const comments = await Model.getCommentsByApplicationId(applicationId);
+        broadcastComment(applicationId, comments);
 
-        // Broadcast the new comment to all subscribed clients
-        broadcastComment(applicationId, created);
+        // Return the single created item to the requester
+        const created = await Model.getCommentById(newComment.comment_id);
 
         return success(res, created, 'Comment added successfully.', 201);
     } catch (err) {
@@ -76,6 +77,11 @@ export const updateComment = async (req, res) => {
 
         comment_text = sanitizeHtml(comment_text, sanitizeOptions);
         const updated = await Model.updateComment(commentId, comment_text);
+
+        // Real-time broadcast: Fetch updated list after edit
+        const applicationId = existing.application_id;
+        const comments = await Model.getCommentsByApplicationId(applicationId);
+        broadcastComment(applicationId, comments);
 
         return success(res, updated, 'Comment updated successfully.');
     } catch (err) {
@@ -103,6 +109,12 @@ export const deleteComment = async (req, res) => {
         }
 
         const isDeleted = await Model.deleteComment(commentId);
+
+        // Real-time broadcast: Fetch remaining comments after deletion
+        const applicationId = existing.application_id;
+        const comments = await Model.getCommentsByApplicationId(applicationId);
+        broadcastComment(applicationId, comments);
+
         return success(res, { 
             is_deleted: isDeleted,
             deleted_at: isDeleted ? new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : null
