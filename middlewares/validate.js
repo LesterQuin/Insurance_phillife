@@ -1483,16 +1483,16 @@ export const validateRates = [
                                         throw new Error(`GCLI ${ageKey} months must be sequential. Expected ${idx + 1} at position ${idx + 1}.`);
                                     }
                                 });
-                            } else if (planId === 3) { // GYRT Senior Nested
+                            } else if (planId === 2) { // GYRT Senior Nested
                                 ageItems.forEach((item, idx) => {
                                     if (item.rider_id === undefined || item.rate === undefined) {
                                         throw new Error(`Invalid format in GYRT ${ageKey}, item ${idx + 1}. Must contain 'rider_id' and 'rate'.`);
                                     }
-                                    if (Number(item.rider_id) !== ADDITIONAL_LIFE_RIDER_ID) {
-                                        throw new Error(`GYRT ${ageKey} only allows rider ID ${ADDITIONAL_LIFE_RIDER_ID} (Additional Life), but received ID: ${item.rider_id}.`);
+                                    if (!selectedRiderIds.has(Number(item.rider_id))) {
+                                        throw new Error(`GYRT ${ageKey} received rider ID ${item.rider_id}, which is not selected for this application.`);
                                     }
                                 });
-                            } else if (planId === 2) { // GPA Senior (Should be disabled)
+                            } else if (planId === 3) { // GPA Senior (Should be disabled)
                                 throw new Error(`Rates for age bracket ${key} are disabled for GPA products.`);
                             }
                         }
@@ -1509,18 +1509,18 @@ export const validateRates = [
                                     throw new Error(`GCLI ${key} months must be sequential. Expected ${index + 1} at position ${index + 1}.`);
                                 }
                             });
-                        } else if (planId === 2) { // GPA
-                            if (isSeniorBracket) throw new Error(`Rates for ${key} are disabled for GPA.`);
+                        } else if (planId === 3) { // GPA
+                            if (isSeniorBracket) throw new Error(`Rates for ${key} are disabled for GPA products.`);
                             data.forEach((item, index) => {
                                 if (!selectedRiderIds.has(Number(item.rider_id))) {
                                     throw new Error(`GPA rates for ${key}, item ${index + 1}: Invalid or unselected rider_id (${item.rider_id || 'missing'}).`);
                                 }
                             });
-                        } else if (planId === 3) { // GYRT
+                        } else if (planId === 2) { // GYRT
                             data.forEach((item, index) => {
                                 if (isSeniorBracket) {
-                                    if (Number(item.rider_id) !== ADDITIONAL_LIFE_RIDER_ID) {
-                                        throw new Error(`GYRT rates for ${key}: Only Additional Life (ID: ${ADDITIONAL_LIFE_RIDER_ID}) is allowed for seniors, but received ID: ${item.rider_id}.`);
+                                    if (!selectedRiderIds.has(Number(item.rider_id))) {
+                                        throw new Error(`GYRT rates for ${key}: Rider ID ${item.rider_id} was not selected for this application.`);
                                     }
                                 } else if (!selectedRiderIds.has(Number(item.rider_id))) {
                                     throw new Error(`GYRT rates for ${key}, item ${index + 1}: Invalid or unselected rider_id (${item.rider_id || 'missing'}).`);

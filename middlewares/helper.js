@@ -212,19 +212,42 @@ export const preprocessRiders = (data) => {
 // Helper to transform DB rows back to template format
 export const formatDbRatesForTemplate = (dbRows, category, planId) => {
     if (!dbRows || dbRows.length === 0) return {};
-    const filtered = dbRows.filter(row => row.borrower_category === category);
+
+    // Normalize category comparison to handle underscores/hyphens and bracket inconsistencies (18-64 vs 18-65)
+    const normalizedCategory = category.replace('-', '_');
+    const isBaseBracket = (cat) => cat === '18_65' || cat === '18_64';
+
+    const filtered = dbRows.filter(row => {
+        const rowCat = (row.borrower_category || '').replace('-', '_');
+        
+        // Treat 18_64 and 18_65 as synonymous for the base age bracket
+        if (isBaseBracket(normalizedCategory) && isBaseBracket(rowCat)) return true;
+
+        return rowCat === normalizedCategory;
+    });
+
     if (filtered.length === 0) return {};
-    const isGCLI = planId === 1;
-    if (category !== '18_65') {
+
+    // Helper to determine key for each row: term_months if it exists, otherwise rider name/ID
+    const getRowKey = (row) => {
+        if (row.term_months !== null && row.term_months !== undefined && Number(row.term_months) !== 0) {
+            return Number(row.term_months);
+        }
+        return row.rider_name || (row.rider_id ? `Rider ${row.rider_id}` : null);
+    };
+
+    if (!isBaseBracket(normalizedCategory)) {
         return filtered.reduce((acc, row) => {
-            const ageKey = `Age ${row.attained_age}`;
+            const ageKey = row.attained_age ? `Age ${row.attained_age}` : 'Standard';
             if (!acc[ageKey]) acc[ageKey] = {};
-            acc[ageKey][isGCLI ? row.term_months : (row.rider_name || `Rider ${row.rider_id}`)] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
+            const key = getRowKey(row);
+            if (key !== null) acc[ageKey][key] = (row.premium_amount !== null && row.premium_amount !== undefined) ? Number(row.premium_amount).toFixed(2) : '0.00';
             return acc;
         }, {});
     }
     return filtered.reduce((acc, row) => {
-        acc[isGCLI ? row.term_months : (row.rider_name || `Rider ${row.rider_id}`)] = row.premium_amount ? row.premium_amount.toFixed(2) : '0.00';
+        const key = getRowKey(row);
+        if (key !== null) acc[key] = (row.premium_amount !== null && row.premium_amount !== undefined) ? Number(row.premium_amount).toFixed(2) : '0.00';
         return acc;
     }, {});
 };

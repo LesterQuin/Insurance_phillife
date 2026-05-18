@@ -48,36 +48,55 @@ const generateRateRows = (rates, suffix = "") => {
 
 // Helper to generate chunked tables for 18-64 GCLI rates
 const generateChunkedRateTables = (rates, maturity, header, suffix) => {
-    if (Object.keys(rates).length === 0) return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+    const keys = Object.keys(rates);
+    if (!keys || keys.length === 0) return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+
+    const isNumeric = keys.every(k => !isNaN(Number(k)) && k.trim() !== "");
+    const isMonthly = isNumeric && keys.some(k => Number(k) > 0 && Number(k) <= 120);
+
+    const displayHeader = isMonthly ? "Term of Loan" : header;
+    const displaySuffix = isMonthly ? " months" : suffix;
+
+    // If not a GCLI-style monthly table, just show one flat table
+    if (!isMonthly) {
+        return `
+            <div class="age-tables-container">
+                <div class="age-table-box" style="flex: 0 0 100%;">
+                    <table class="compact-table">
+                        <tr style="background-color: #f9f9f9;">
+                            <th style="font-size: 8.5pt;">${displayHeader}</th>
+                            <th style="font-size: 8.5pt;">Rate</th>
+                        </tr>
+                        ${generateRateRows(rates, displaySuffix)}
+                    </table>
+                </div>
+            </div>
+        `;
+    }
 
     const maxMonthsPerTable = 10;
     let tablesHtml = '';
-    let currentMonth = 1;
-
-    while (currentMonth <= maturity) {
-        const endMonth = Math.min(currentMonth + maxMonthsPerTable - 1, maturity);
+    
+    // Sort numeric keys for sequential display
+    const sortedKeys = keys.map(Number).sort((a, b) => a - b);
+    
+    for (let i = 0; i < sortedKeys.length; i += maxMonthsPerTable) {
+        const chunkKeys = sortedKeys.slice(i, i + maxMonthsPerTable);
         const chunkRates = {};
-        for (let i = currentMonth; i <= endMonth; i++) {
-            if (rates[i]) {
-                chunkRates[i] = rates[i];
-            }
-        }
+        chunkKeys.forEach(k => chunkRates[k] = rates[k]);
 
-        if (Object.keys(chunkRates).length > 0) {
-            tablesHtml += `
-                <div class="age-table-box">
-                    <h4 style="margin-top:10px; margin-bottom: 5px; font-size: 11pt; color: #0d47a1; border-bottom: 1px solid #ccc; padding-bottom: 2px;">Months ${currentMonth}-${endMonth}</h4>
-                    <table class="compact-table">
-                        <tr style="background-color: #f9f9f9;">
-                            <th style="font-size: 8.5pt;">${header}</th>
-                            <th style="font-size: 8.5pt;">Rate</th>
-                        </tr>
-                        ${generateRateRows(chunkRates, suffix)}
-                    </table>
-                </div>
-            `;
-        }
-        currentMonth = endMonth + 1;
+        tablesHtml += `
+            <div class="age-table-box">
+                <h4 style="margin-top:10px; margin-bottom: 5px; font-size: 11pt; color: #0d47a1; border-bottom: 1px solid #ccc; padding-bottom: 2px;">Range ${chunkKeys[0]}-${chunkKeys[chunkKeys.length-1]}</h4>
+                <table class="compact-table">
+                    <tr style="background-color: #f9f9f9;">
+                        <th style="font-size: 8.5pt;">${displayHeader}</th>
+                        <th style="font-size: 8.5pt;">Rate</th>
+                    </tr>
+                    ${generateRateRows(chunkRates, displaySuffix)}
+                </table>
+            </div>
+        `;
     }
     return `<div class="age-tables-container">${tablesHtml}</div>`;
 };
@@ -87,18 +106,25 @@ const generateAgeGroupTables = (ageGroups, header, suffix) => {
     const ages = Object.keys(ageGroups).sort();
     if (ages.length === 0) return '<p>N/A</p>';
     
-    const tablesHtml = ages.map(age => `
+    const tablesHtml = ages.map(age => {
+        const rates = ageGroups[age];
+        const keys = Object.keys(rates);
+        const isNumeric = keys.every(k => !isNaN(Number(k)) && k.trim() !== "");
+        const displayHeader = isNumeric ? "Term of Loan" : header;
+        const displaySuffix = isNumeric ? " months" : suffix;
+
+        return `
         <div class="age-table-box">
             <h4 style="margin-top:10px; margin-bottom: 5px; font-size: 11pt; color: #0d47a1; border-bottom: 1px solid #ccc; padding-bottom: 2px;">${age}</h4>
             <table class="compact-table">
                 <tr style="background-color: #f9f9f9;">
-                    <th style="font-size: 8.5pt;">${header}</th>
+                    <th style="font-size: 8.5pt;">${displayHeader}</th>
                     <th style="font-size: 8.5pt;">Rate</th>
                 </tr>
-                ${generateRateRows(ageGroups[age], suffix)}
+                ${generateRateRows(rates, displaySuffix)}
             </table>
         </div>
-    `).join("");
+    `}).join("");
 
     return `<div class="age-tables-container">${tablesHtml}</div>`;
 };
