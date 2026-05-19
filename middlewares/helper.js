@@ -211,11 +211,11 @@ export const preprocessRiders = (data) => {
 
 // Helper to transform DB rows back to template format
 export const formatDbRatesForTemplate = (dbRows, category, planId) => {
-    if (!dbRows || dbRows.length === 0) return {};
-
     // Normalize category comparison to handle underscores/hyphens and bracket inconsistencies (18-64 vs 18-65)
     const normalizedCategory = category.replace('-', '_');
     const isBaseBracket = (cat) => cat === '18_65' || cat === '18_64';
+
+    if (!dbRows || dbRows.length === 0) return isBaseBracket(normalizedCategory) ? [] : {};
 
     const filtered = dbRows.filter(row => {
         const rowCat = (row.borrower_category || '').replace('-', '_');
@@ -226,30 +226,26 @@ export const formatDbRatesForTemplate = (dbRows, category, planId) => {
         return rowCat === normalizedCategory;
     });
 
-    if (filtered.length === 0) return {};
+    if (filtered.length === 0) return isBaseBracket(normalizedCategory) ? [] : {};
 
-    // Helper to determine key for each row: term_months if it exists, otherwise rider name/ID
-    const getRowKey = (row) => {
-        if (row.term_months !== null && row.term_months !== undefined && Number(row.term_months) !== 0) {
-            return Number(row.term_months);
-        }
-        return row.rider_name || (row.rider_id ? `Rider ${row.rider_id}` : null);
-    };
+    const transformRow = (row) => ({
+        rider_id: row.rider_id || null,
+        rider_name: row.rider_name || null,
+        acronym: row.acronym || null,
+        term_months: (row.term_months !== null && row.term_months !== undefined && Number(row.term_months) !== 0) ? Number(row.term_months) : null,
+        rate: (row.premium_amount !== null && row.premium_amount !== undefined) ? Number(row.premium_amount).toFixed(2) : '0.00'
+    });
 
     if (!isBaseBracket(normalizedCategory)) {
         return filtered.reduce((acc, row) => {
             const ageKey = row.attained_age ? `Age ${row.attained_age}` : 'Standard';
-            if (!acc[ageKey]) acc[ageKey] = {};
-            const key = getRowKey(row);
-            if (key !== null) acc[ageKey][key] = (row.premium_amount !== null && row.premium_amount !== undefined) ? Number(row.premium_amount).toFixed(2) : '0.00';
+            if (!acc[ageKey]) acc[ageKey] = [];
+            acc[ageKey].push(transformRow(row));
             return acc;
         }, {});
     }
-    return filtered.reduce((acc, row) => {
-        const key = getRowKey(row);
-        if (key !== null) acc[key] = (row.premium_amount !== null && row.premium_amount !== undefined) ? Number(row.premium_amount).toFixed(2) : '0.00';
-        return acc;
-    }, {});
+
+    return filtered.map(transformRow);
 };
 
 // Helper to build structured response for a single application
@@ -259,6 +255,8 @@ export const buildApplicationResponse = async (app) => {
     const riders = await Model.getApplicationRiders(app.application_id);
     const rankings = await Model.getCoverageRankingsByAppId(app.application_id);
     const rankingRiders = await Model.getCoverageRankingRiders(app.application_id);
+    const ratesRows = await ActuarialModel.getApplicationRates(app.application_id);
+    const planId = Number(app.plan_id);
 
     if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && rankingRiders.length > 0) {
         riders.forEach(mainRider => {
@@ -371,6 +369,12 @@ export const buildApplicationResponse = async (app) => {
         basic_plan: { id: basic_plan_id, name: basic_plan_name },
         amount_loans: amount_loans_id ? { id: amount_loans_id, name: amount_loans_name } : null,
         riders,
+        rates: {
+            "18-65": formatDbRatesForTemplate(ratesRows, '18_65', planId),
+            "66-70": formatDbRatesForTemplate(ratesRows, '66_70', planId),
+            "71-75": formatDbRatesForTemplate(ratesRows, '71_75', planId),
+            "76-80": formatDbRatesForTemplate(ratesRows, '76_80', planId)
+        },
         coverage_totals,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,

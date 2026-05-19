@@ -1096,11 +1096,13 @@ body('basic_plan_id')
                 const mimeType = excelFile.mimetype || '';
                 const isExcel = fileName.endsWith('.xlsx') || 
                                 fileName.endsWith('.xls') || 
+                                fileName.endsWith('.csv') || 
                                 mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                                mimeType === 'application/vnd.ms-excel';
+                                mimeType === 'application/vnd.ms-excel' ||
+                                mimeType === 'text/csv';
 
                 if (!isExcel) {
-                    throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) are allowed.');
+                    throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.');
                 }
             }
 
@@ -2026,11 +2028,13 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
             const mimeType = excelFile.mimetype || '';
             const isExcel = fileName.endsWith('.xlsx') || 
                             fileName.endsWith('.xls') || 
+                            fileName.endsWith('.csv') || 
                             mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                            mimeType === 'application/vnd.ms-excel';
+                            mimeType === 'application/vnd.ms-excel' ||
+                            mimeType === 'text/csv';
 
             if (!isExcel) {
-                throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) are allowed.');
+                throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.');
             }
         }
 
@@ -2143,11 +2147,13 @@ export const validateExcelUpload = [
         const mimeType = excelFile.mimetype || '';
         const isExcel = fileName.endsWith('.xlsx') || 
                         fileName.endsWith('.xls') || 
+                        fileName.endsWith('.csv') || 
                         mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                        mimeType === 'application/vnd.ms-excel';
+                        mimeType === 'application/vnd.ms-excel' ||
+                        mimeType === 'text/csv';
 
         if (!isExcel) {
-            return res.status(400).json({ status: false, errors: [{ msg: 'Invalid file type. Only Excel files (.xlsx, .xls) are allowed.' }] });
+            return res.status(400).json({ status: false, errors: [{ msg: 'Invalid file type. Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.' }] });
         }
         next();
     }

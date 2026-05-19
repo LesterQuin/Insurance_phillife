@@ -12,6 +12,8 @@ export const getCommentsByApplicationId = async (applicationId) => {
                 c.comment_text,
                 c.created_at,
                 c.updated_at,
+                c.is_deleted,
+                c.deleted_at,
                 u.firstname + ISNULL(' ' + NULLIF(u.middlename, '') + '.', '') + ' ' + u.lastname AS commenter_name,
                 d.name AS department_name,
                 r.name AS role_name
@@ -19,8 +21,7 @@ export const getCommentsByApplicationId = async (applicationId) => {
             JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
             LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
             LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
-            WHERE c.application_id = @applicationId AND (c.is_deleted = 0 OR c.is_deleted IS NULL)
-            ORDER BY c.created_at ASC
+            WHERE c.application_id = @applicationId
         `);
     return result.recordset;
 };

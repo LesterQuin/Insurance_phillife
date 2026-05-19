@@ -1,12 +1,24 @@
 import formidable from 'formidable';
 import fs from 'fs';
+import path from 'path';
 
 const parseMultipartForm = (req, res, next) => {
   if (!req.headers['content-type'] || !req.headers['content-type'].startsWith('multipart/form-data')) {
     return next();
   }
 
-  const form = formidable({ multiples: true }); 
+  // Ensure a local directory exists for temporary uploads.
+  // This prevents permission issues on IIS and cross-drive rename errors.
+  const uploadDir = path.join(process.cwd(), 'temp_uploads');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const form = formidable({ 
+    multiples: true,
+    uploadDir: uploadDir,
+    keepExtensions: true
+  }); 
 
   form.parse(req, (err, fields, files) => {
     if (err) {

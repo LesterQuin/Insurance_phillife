@@ -90,8 +90,10 @@ export const getApplicationRates = async (applicationId) => {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('application_id', sql.Int, applicationId)
-        .query(`
-            SELECT r.*, rider.rider_name 
+        .query(`SELECT
+                r.*,
+                rider.rider_name,
+                rider.acronym
             FROM DHUB.sg.financial_insurance_application_rates r
             LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
             WHERE r.application_id = @application_id
