@@ -18,6 +18,14 @@ export const createApplication = async (req, res) => {
         const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
+        // // Check if group name already exists to prevent duplicate registration
+        if (dataToSave.group_name) {
+            const existingGroup = await Model.getApplicationByGroupName(dataToSave.group_name);
+            if (existingGroup) {
+                return error(res, `An application for "${dataToSave.group_name}" (or a company with a similar name) already exists in the system.`, 400);
+            }
+        }
+        
         // Determine initial status: Approved (2) for Prototypes (30), Checking (5) otherwise
         const STATUS_CHECKING = 5;
         const STATUS_APPROVED = 2;
@@ -91,6 +99,30 @@ export const createApplication = async (req, res) => {
     }
 };
 
+// Check if Group Name exists
+export const checkGroupName = async (req, res) => {
+    try {
+        const groupName = req.query.group_name;
+        
+        if (!groupName) {
+            return error(res, 'Group name is required in the query parameters.', 400);
+        }
+
+        const existingGroup = await Model.getApplicationByGroupName(groupName);
+
+        return success(res, { 
+            exists: !!existingGroup,
+            group_name: groupName 
+        }, existingGroup 
+            ? `An application for "${groupName}" (or a company with a similar name) already have record in the system.` 
+            : `Group name "${groupName}" is available.`
+        );
+    } catch (err) {
+        console.error('Check Group Name Error:', err);
+        return error(res, err.message);
+    }
+};
+
 // Download Excel File
 export const downloadExcelFile = async (req, res) => {
     try {
@@ -111,11 +143,16 @@ export const downloadExcelFile = async (req, res) => {
         // Authorization check: Only Creator, matching agent code, Actuarial Dept, or Super Admin
         const loggedInUser = await User.getUserById(userId);
         const DEPT_ACTUARIAL_ID = 18;
+        const ROLE_TL_ID = 2;
+        const ROLE_SA_ID = 15;
+        const ROLE_CFE_ID = 3;
 
         const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
-        const isSuperAdmin = loggedInUser && loggedInUser.roleName === 'Super Admin';
+        const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+        const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+        const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
 
-        let isAuthorized = isSuperAdmin || isActuarial || (loggedInId === creatorId);
+        let isAuthorized = isSuperAdmin || isTeamLeader || isActuarial || (loggedInId === creatorId);
         if (!isAuthorized && agentCode) {
             const creatorUser = await User.getUserById(app.user_id);
             if (creatorUser && creatorUser.agent_code === agentCode.trim()) {
@@ -350,7 +387,22 @@ export const getPrototypePlans = async (req, res) => {
 // Get List of Prototypes
 export const getPrototypes = async (req, res) => {
     try {
-        const prototypes = await Model.getPrototypes();
+        const userId = req.user.user_id;
+        const loggedInUser = await User.getUserById(userId);
+        
+        const DEPT_ACTUARIAL_ID = 18;
+        const ROLE_TL_ID = 2;
+        const ROLE_SA_ID = 15;
+        const ROLE_CFE_ID = 3;
+
+        const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+        const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+        const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+        const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
+
+        const filterUserId = (isSuperAdmin || isTeamLeader || isActuarial) ? null : userId;
+
+        const prototypes = await Model.getPrototypes(filterUserId);
 
         if (prototypes.length === 0) {
             return success(res, [], 'No prototypes found.');
@@ -525,7 +577,22 @@ export const getPrototypes = async (req, res) => {
 // Get All Applications
 export const getAllApplications = async (req, res) => {
     try {
-        const rawApplications = await Model.getAllApplications();
+        const userId = req.user.user_id;
+        const loggedInUser = await User.getUserById(userId);
+        
+        const DEPT_ACTUARIAL_ID = 18;
+        const ROLE_TL_ID = 2;
+        const ROLE_SA_ID = 15;
+        const ROLE_CFE_ID = 3;
+
+        const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+        const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+        const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+        const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
+
+        const filterUserId = (isSuperAdmin || isTeamLeader || isActuarial) ? null : userId;
+
+        const rawApplications = await Model.getAllApplications(filterUserId);
         if (rawApplications.length === 0) {
             return success(res, [], 'Applications fetched successfully.');
         }
@@ -931,6 +998,23 @@ export const getApplicationById = async (req, res) => {
         const app = await Model.getApplicationById(req.params.id);
         if (!app) return error(res, 'Application not found', 404);
 
+        const userId = req.user.user_id;
+        const loggedInUser = await User.getUserById(userId);
+        const DEPT_ACTUARIAL_ID = 18;
+        const ROLE_TL_ID = 2;
+        const ROLE_SA_ID = 15;
+        const ROLE_CFE_ID = 3;
+        
+        const isOwner = Number(app.user_id) === Number(userId);
+        const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+        const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+        const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+        const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
+
+        if (!isOwner && !isActuarial && !isSuperAdmin && !isTeamLeader && !isCFE) {
+            return error(res, 'You are not authorized to view this application.', 403);
+        }
+
         const response = await Helper.buildApplicationResponse(app);
 
         return success(res, response);
@@ -1141,6 +1225,16 @@ export const uploadExcelFile = async (req, res) => {
 export const deleteApplication = async (req, res) => {
     try {
         const appId = req.params.id;
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const isOwner = Number(app.user_id) === Number(req.user.user_id);
+        const isSuperAdmin = req.user.roleName === 'Super Admin';
+
+        if (!isOwner && !isSuperAdmin) {
+            return error(res, 'You are not authorized to delete this application.', 403);
+        }
+
         await Model.deleteApplication(appId);
 
         // Real-time sync: Notify users that this application no longer exists

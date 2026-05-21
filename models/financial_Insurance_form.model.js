@@ -270,9 +270,11 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
 };
 
 // Get all applications
-export const getAllApplications = async () => {
+export const getAllApplications = async (userId = null) => {
     const pool = await poolPromise;
-    const res = await pool.request()
+    const request = pool.request();
+    const res = await request
+        .input('user_id', sql.Int, userId)
         .query(`
             SELECT
                 fia.application_id,
@@ -384,6 +386,7 @@ export const getAllApplications = async () => {
                 ON fia.sub_business_nature_id = subind.id
             LEFT JOIN DHUB.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
+            WHERE (@user_id IS NULL OR fia.user_id = @user_id)
             ORDER BY fia.created_at DESC;
         `);
 
@@ -391,9 +394,11 @@ export const getAllApplications = async () => {
 };
 
 // Get prototypes (type 30)
-export const getPrototypes = async () => {
+export const getPrototypes = async (userId = null) => {
     const pool = await poolPromise;
-    const res = await pool.request()
+    const request = pool.request();
+    const res = await request
+        .input('user_id', sql.Int, userId)
         .query(`
             SELECT
                 fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives,
@@ -458,7 +463,7 @@ export const getPrototypes = async () => {
             LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
             LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            WHERE fia.type_of_proposal_id = 30
+            WHERE fia.type_of_proposal_id = 30 AND (@user_id IS NULL OR fia.user_id = @user_id)
             ORDER BY fia.created_at DESC
         `);
 
@@ -532,6 +537,19 @@ export const getApplicationById = async (id) => {
         `);
 
     return res.recordset?.[0] ?? null;
+};
+
+// Check if group name exists
+export const getApplicationByGroupName = async (groupName) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('group_name', sql.NVarChar, groupName)
+        .query(`
+            SELECT TOP 1 application_id
+            FROM DHUB.sg.financial_insurance_application
+            WHERE REPLACE(UPPER(group_name), ' ', '') = REPLACE(UPPER(@group_name), ' ', '')
+        `);
+    return res.recordset[0] || null;
 };
 
 // Update application - handles partial updates

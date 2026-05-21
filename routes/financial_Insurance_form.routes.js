@@ -11,19 +11,20 @@ router.post('/create', authenticate, parseMultipartForm, validateFinancialApplic
 router.post('/draft', authenticate, parseMultipartForm, validateDraftFinancialApplication, Controller.saveDraft);
 router.put('/:id', authenticate, parseMultipartForm, validateUpdateFinancialApplication, Controller.updateApplication);
 router.post('/:id/upload-excel', authenticate, parseMultipartForm, validateExcelUpload, Controller.uploadExcelFile);
-router.post('/:id/download-excel', authenticate, Controller.downloadExcelFile);
+router.post('/:id/download-excel', authenticate, parseMultipartForm, Controller.downloadExcelFile);
 
 // Routes without validation
-router.get('/list', Controller.getAllApplications);
+router.get('/list', authenticate, Controller.getAllApplications);
+router.get('/check-group-name', authenticate, Controller.checkGroupName);
 router.get('/prototype-plans/:id/view', Controller.getPrototypePlanView);
-router.get('/prototype-plans', Controller.getPrototypePlans);
-router.get('/prototypes', Controller.getPrototypes);
-router.get('/:id', Controller.getApplicationById);
+router.get('/prototype-plans', authenticate, Controller.getPrototypePlans);
+router.get('/prototypes', authenticate, Controller.getPrototypes);
+router.get('/:id', authenticate, Controller.getApplicationById);
 // router.get('/:id(\\d+)', Controller.getApplicationById);
-router.delete('/:id', Controller.deleteApplication);
-router.get('/:id/history', validateGetHistory, Controller.getApplicationHistory);
+router.delete('/:id', authenticate, Controller.deleteApplication);
+router.get('/:id/history', authenticate, validateGetHistory, Controller.getApplicationHistory);
 
-router.get('/template/:id', Controller.getTemplateById);
+router.get('/template/:id', authenticate, Controller.getTemplateById);
 router.get('/template/:id/view-pdf',  Controller.viewTemplatePDF);
 router.get('/template/:id/download', Controller.downloadTemplatePDF);
 router.post('/template/:id/download', Controller.downloadTemplatePDF);
