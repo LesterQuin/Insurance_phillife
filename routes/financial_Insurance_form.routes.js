@@ -12,6 +12,9 @@ router.post('/draft', authenticate, parseMultipartForm, validateDraftFinancialAp
 router.put('/:id', authenticate, parseMultipartForm, validateUpdateFinancialApplication, Controller.updateApplication);
 router.post('/:id/upload-excel', authenticate, parseMultipartForm, validateExcelUpload, Controller.uploadExcelFile);
 router.post('/:id/download-excel', authenticate, parseMultipartForm, Controller.downloadExcelFile);
+//router.put('/:id/prototype-status', authenticate, parseMultipartForm, Controller.updatePrototypeStatus);
+router.put('/:id/status/checking', authenticate, Controller.setStatusChecking); // addtional with controller not tested
+router.put('/:id/status/approved', authenticate, Controller.setStatusApproved); // addtional  with controller not tested
 
 // Routes without validation
 router.get('/list', authenticate, Controller.getAllApplications);

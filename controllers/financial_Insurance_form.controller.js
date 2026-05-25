@@ -1246,3 +1246,114 @@ export const deleteApplication = async (req, res) => {
         return error(res, err.message);
     }
 };
+
+// Specialized API for Super Admins and Team Leaders to change Prototype application status
+// export const updatePrototypeStatus = async (req, res) => {
+//     try {
+//         const userId = req.user.user_id;
+//         const appId = req.params.id;
+
+//         if (!req.body || req.body.status_id === undefined) {
+//             return error(res, 'The "status_id" field is required in the request body.', 400);
+//         }
+//         const status_id = Number(req.body.status_id);
+
+//         // 1. Authorization: Super Admin or Team Leader
+//         const loggedInUser = await User.getUserById(userId);
+//         const ROLE_SA_ID = 15;
+//         const ROLE_TL_ID = 2;
+//         const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+//         const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+
+//         if (!isSuperAdmin && !isTeamLeader) {
+//             return error(res, 'Access Denied: Only Super Admins and Team Leaders are authorized to change prototype statuses.', 403);
+//         }
+
+//         const app = await Model.getApplicationById(appId);
+//         if (!app) return error(res, 'Application not found', 404);
+
+//         // 2. Validation: Ensure it is a Prototype (ID 30)
+//         const PROTOTYPE_TYPE_ID = 30;
+//         if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
+//             return error(res, 'Action Denied: This operation is strictly for Prototype applications.', 400);
+//         }
+
+//         const updated = await Model.updateApplication(appId, { status_id }, userId);
+//         const response = await Helper.buildApplicationResponse(updated);
+
+//         broadcastApplicationUpdate(appId, response);
+
+//         return success(res, response, `Prototype status successfully changed to "${response.status.name}".`);
+//     } catch (err) {
+//         console.error('Update Prototype Status Error:', err);
+//         return error(res, err.message);
+//     }
+// };
+
+// Change status to Checking (5) - No body required
+export const setStatusChecking = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const STATUS_CHECKING = 5;
+
+        const loggedInUser = await User.getUserById(userId);
+        const isAuthorized = loggedInUser && (Number(loggedInUser.role_id) === 15 || Number(loggedInUser.role_id) === 2);
+
+        if (!isAuthorized) {
+            return error(res, 'Access Denied: Unauthorized to change status. Only Super Admins and Team Leaders are authorized to change prototype statuses.', 403);
+        }
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const PROTOTYPE_TYPE_ID = 30;
+        if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
+            return error(res, 'Action Denied: This operation is strictly for Prototype applications.', 400);
+        }
+
+        const updated = await Model.updateApplication(appId, { status_id: STATUS_CHECKING }, userId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        broadcastApplicationUpdate(appId, response);
+
+        return success(res, response, 'Status successfully updated to Checking.');
+    } catch (err) {
+        console.error('Set Status Checking Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Change status to Approved (2) - No body required
+export const setStatusApproved = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const STATUS_APPROVED = 2;
+
+        const loggedInUser = await User.getUserById(userId);
+        const isAuthorized = loggedInUser && (Number(loggedInUser.role_id) === 15 || Number(loggedInUser.role_id) === 2);
+
+        if (!isAuthorized) {
+            return error(res, 'Access Denied: Unauthorized to change status.', 403);
+        }
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const PROTOTYPE_TYPE_ID = 30;
+        if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
+            return error(res, 'Action Denied: This operation is strictly for Prototype applications.', 400);
+        }
+
+        const updated = await Model.updateApplication(appId, { status_id: STATUS_APPROVED }, userId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        broadcastApplicationUpdate(appId, response);
+
+        return success(res, response, 'Status successfully updated to Approved.');
+    } catch (err) {
+        console.error('Set Status Approved Error:', err);
+        return error(res, err.message);
+    }
+};
