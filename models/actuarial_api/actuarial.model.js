@@ -1,7 +1,7 @@
 import { poolPromise, sql } from '../../config/db.js';
 
 // Save application rates to the normalized table
-export const saveApplicationRates = async (applicationId, ratesData) => {
+export const saveApplicationRates = async (applicationId, ratesData, userId) => {
     const pool = await poolPromise;
     const transaction = new sql.Transaction(pool);
     try {
@@ -9,13 +9,27 @@ export const saveApplicationRates = async (applicationId, ratesData) => {
 
         const appRes = await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
-            .query('SELECT plan_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @appId');
+            .query(`
+                SELECT fia.plan_id, bp.basic_plan_name 
+                FROM DHUB.sg.financial_insurance_application fia
+                LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+                WHERE fia.application_id = @appId
+            `);
         
         const planId = appRes.recordset[0]?.plan_id || 1; 
+        const basicPlanName = appRes.recordset[0]?.basic_plan_name || 'Basic Plan';
+
+        const tableName = planId === 1
+            ? 'DHUB.sg.financial_insurance_actuarial_rates_gcli'
+            : planId === 2 
+                ? 'DHUB.sg.financial_insurance_actuarial_rates_gyrt' 
+                : planId === 3 
+                    ? 'DHUB.sg.financial_insurance_actuarial_rates_gpa' 
+                    : 'DHUB.sg.financial_insurance_application_rates';
 
         await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
-            .query('DELETE FROM DHUB.sg.financial_insurance_application_rates WHERE application_id = @appId');
+            .query(`DELETE FROM ${tableName} WHERE application_id = @appId`);
 
         const categories = {
             '18-65': '18_65',
@@ -25,15 +39,17 @@ export const saveApplicationRates = async (applicationId, ratesData) => {
         };
 
         for (const [jsonKey, dbCategory] of Object.entries(categories)) {
-            const data = ratesData[jsonKey];
+            const data = ratesData[jsonKey] || (jsonKey === '18-65' ? ratesData['18-64'] : null);
             if (!data) continue;
 
             // Helper to save individual rate row
-            const saveRow = async (item, ageOverride = null) => {
+            const saveRow = async (item, ageOverride = null, bandOverride = null, basicPlanIdOverride = null, rateOverride = null) => {
                     let term = null;
                     let age = ageOverride;
-                    const riderId = item.rider_id ? parseInt(item.rider_id, 10) : null;
-
+                    const riderId = item.rider_id !== undefined ? item.rider_id.toString() : '0';
+                    const basicPlanId = basicPlanIdOverride || (item.basic_plan_id !== undefined && item.basic_plan_id !== null ? Number(item.basic_plan_id) : null);
+                    const inputRate = rateOverride || item.basic_rate || item.rider_rate || item.rate;
+                    
                     if (item.term_or_months) {
                         const match = item.term_or_months.toString().match(/\d+/);
                         if (match) term = parseInt(match[0], 10);
@@ -43,35 +59,62 @@ export const saveApplicationRates = async (applicationId, ratesData) => {
                         if (match) age = parseInt(match[0], 10);
                     }
 
-                    const rateValue = typeof item.rate === 'string' 
-                        ? parseFloat(item.rate.replace(/,/g, '')) 
-                        : parseFloat(item.rate);
+                    const rateValue = (inputRate !== undefined && inputRate !== null) ? String(inputRate).trim() : '0';
 
-                    await new sql.Request(transaction)
-                        .input('plan_id', sql.Int, planId)
+                    const request = new sql.Request(transaction)
                         .input('application_id', sql.Int, applicationId)
                         .input('borrower_category', sql.VarChar(20), dbCategory)
-                        .input('term_months', sql.Int, term)
                         .input('attained_age', sql.Int, age)
-                        .input('rider_id', sql.Int, riderId)
-                        .input('premium_amount', sql.Decimal(18, 2), rateValue)
-                        .query(`
-                            INSERT INTO DHUB.sg.financial_insurance_application_rates 
-                            (plan_id, application_id, borrower_category, term_months, attained_age, rider_id, premium_amount, updated_at)
-                            VALUES (@plan_id, @application_id, @borrower_category, @term_months, @attained_age, @rider_id, @premium_amount, GETDATE())
-                        `);
+                        .input('basic_plan_id', sql.Int, basicPlanId)
+                        .input('age_band', sql.VarChar(100), bandOverride) // Matches the DB change
+                        .input('rider_id', sql.VarChar(50), riderId)
+                        .input('premium_rate', sql.VarChar(50), rateValue)
+                        .input('created_by', sql.Int, userId);
+
+                    if ([2, 3].includes(planId)) {
+                        await request.query(`INSERT INTO ${tableName} (application_id, basic_plan_id, rider_id, borrower_category, attained_age, age_band, premium_rate, created_by) 
+                            VALUES (@application_id, @basic_plan_id, @rider_id, @borrower_category, @attained_age, @age_band, @premium_rate, @created_by)`);
+                    } else {
+                        await request
+                            .input('plan_id', sql.Int, planId)
+                            .input('term_months', sql.Int, term)
+                            .query(`INSERT INTO ${tableName} (plan_id, application_id, borrower_category, term_months, attained_age, rider_id, basic_plan_id, premium_amount, updated_at, created_by)
+                                VALUES (@plan_id, @application_id, @borrower_category, @term_months, @attained_age, @rider_id, @basic_plan_id, @premium_rate, GETDATE(), @created_by)`);
+                    }
             };
 
             if (Array.isArray(data)) {
-                // Standard flat array (usually 18-64)
                 for (const item of data) await saveRow(item);
             } else if (typeof data === 'object') {
-                // New nested structure (Senior age groups)
+                const bracketBasicPlanId = data.basic_plan_id;
                 for (const [ageKey, ageItems] of Object.entries(data)) {
-                    const numericAgeMatch = ageKey.match(/\d+/);
-                    const numericAge = numericAgeMatch ? parseInt(numericAgeMatch[0], 10) : null;
+                    if (!Array.isArray(ageItems)) continue;
+
+                    if (ageKey === 'basic_plan') {
+                        for (const item of ageItems) {
+                            // 1. Save the basic rate for this month
+                            await saveRow(item, null, basicPlanName, bracketBasicPlanId);
+
+                            // 2. Save nested riders for this specific month (GCLI Nested Format)
+                            if (planId === 1 && item.riders && Array.isArray(item.riders)) {
+                                for (const rider of item.riders) {
+                                    await saveRow({
+                                        ...rider,
+                                        term_or_months: item.term_or_months
+                                    }, null, basicPlanName, bracketBasicPlanId);
+                        }
+                            }
+                        }
+                        continue;
+                    }
+
+                    const isBand = ageKey.includes('_to_') || ageKey.split('_').length > 2;
+                    const numericAgeMatch = ageKey.match(/\d+/g);
+                    const numericAge = !isBand && numericAgeMatch ? parseInt(numericAgeMatch[0], 10) : null;
+                    const bandLabel = isBand ? ageKey.replace('age_', '').replace('_', '-') : null;
+
                     if (Array.isArray(ageItems)) {
-                        for (const item of ageItems) await saveRow(item, numericAge);
+                        for (const item of ageItems) await saveRow(item, numericAge, bandLabel);
                     }
                 }
             }
@@ -88,16 +131,38 @@ export const saveApplicationRates = async (applicationId, ratesData) => {
 // Get application rates from normalized table
 export const getApplicationRates = async (applicationId) => {
     const pool = await poolPromise;
+    
+    const appRes = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query('SELECT plan_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @application_id');
+    
+    const planId = appRes.recordset[0]?.plan_id;
+    if (!planId) return [];
+
+    let query = '';
+    if (planId === 2 || planId === 3) {
+        const targetTable = planId === 2 ? 'DHUB.sg.financial_insurance_actuarial_rates_gyrt' : 'DHUB.sg.financial_insurance_actuarial_rates_gpa';
+        // Query for product specific table
+        query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name
+                 FROM ${targetTable} r
+                 LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
+                 WHERE r.application_id = @application_id`;
+    } else {
+        // Standard rates table
+        const targetTable = planId === 1 
+            ? 'DHUB.sg.financial_insurance_actuarial_rates_gcli' 
+            : 'DHUB.sg.financial_insurance_application_rates';
+        query = `SELECT r.*, rider.rider_name, rider.acronym
+                 FROM ${targetTable} r
+                 LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 WHERE r.application_id = @application_id`;
+    }
+
     const result = await pool.request()
         .input('application_id', sql.Int, applicationId)
-        .query(`SELECT
-                r.*,
-                rider.rider_name,
-                rider.acronym
-            FROM DHUB.sg.financial_insurance_application_rates r
-            LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
-            WHERE r.application_id = @application_id
-        `);
+        .query(query);
+
     return result.recordset ?? [];
 };
 

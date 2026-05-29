@@ -15,7 +15,15 @@ export const saveRates = async (req, res) => {
         const existingApplication = await MainModel.getApplicationById(application_id);
         if (!existingApplication) return error(res, 'Application not found', 404);
 
-        await ActuarialModel.saveApplicationRates(application_id, ratesData);
+        // Prevent multiple POST submissions if rates already exist
+        if (req.method === 'POST') {
+            const existingRates = await ActuarialModel.getApplicationRates(application_id);
+            if (existingRates && existingRates.length > 0) {
+                return error(res, 'Rates have already been defined for this application. Please use the PUT method to update existing rates.', 400);
+            }
+        }
+
+        await ActuarialModel.saveApplicationRates(application_id, ratesData, userId);
 
         await updateActuarialStatus(application_id, userId);
         

@@ -103,7 +103,7 @@ export const cleanupOtherFields = async (data) => {
     return mutableData;
 };
 
-// Helper to nullify fields based on proposal type (Prototype vs Product)
+// Helper to nullify fields based on proposal type
 export const cleanProposalFields = (data) => {
     const mutableData = { ...data };
     const PROTOTYPE_TYPE_ID = 30;
@@ -210,8 +210,7 @@ export const preprocessRiders = (data) => {
 };
 
 // Helper to transform DB rows back to template format
-export const formatDbRatesForTemplate = (dbRows, category, planId) => {
-    // Normalize category comparison to handle underscores/hyphens and bracket inconsistencies (18-64 vs 18-65)
+export const formatDbRatesForTemplate = (dbRows, category, planId, app) => {
     const normalizedCategory = category.replace('-', '_');
     const isBaseBracket = (cat) => cat === '18_65' || cat === '18_64';
 
@@ -220,7 +219,6 @@ export const formatDbRatesForTemplate = (dbRows, category, planId) => {
     const filtered = dbRows.filter(row => {
         const rowCat = (row.borrower_category || '').replace('-', '_');
         
-        // Treat 18_64 and 18_65 as synonymous for the base age bracket
         if (isBaseBracket(normalizedCategory) && isBaseBracket(rowCat)) return true;
 
         return rowCat === normalizedCategory;
@@ -228,24 +226,103 @@ export const formatDbRatesForTemplate = (dbRows, category, planId) => {
 
     if (filtered.length === 0) return isBaseBracket(normalizedCategory) ? [] : {};
 
-    const transformRow = (row) => ({
-        rider_id: row.rider_id || null,
-        rider_name: row.rider_name || null,
-        acronym: row.acronym || null,
-        term_months: (row.term_months !== null && row.term_months !== undefined && Number(row.term_months) !== 0) ? Number(row.term_months) : null,
-        rate: (row.premium_amount !== null && row.premium_amount !== undefined) ? Number(row.premium_amount).toFixed(2) : '0.00'
-    });
+    const transformRow = (row) => {
+        const rawRate = row.premium_rate !== null && row.premium_rate !== undefined 
+            ? row.premium_rate 
+            : row.premium_amount;
+        
+        let displayRate = '0.000';
+        if (rawRate !== null && rawRate !== undefined) {
+            const num = parseFloat(String(rawRate).replace(/,/g, ''));
+            displayRate = isNaN(num) ? String(rawRate) : num.toFixed(3);
+        }
 
-    if (!isBaseBracket(normalizedCategory)) {
-        return filtered.reduce((acc, row) => {
-            const ageKey = row.attained_age ? `Age ${row.attained_age}` : 'Standard';
-            if (!acc[ageKey]) acc[ageKey] = [];
-            acc[ageKey].push(transformRow(row));
-            return acc;
-        }, {});
+        return {
+            id: row.id,
+            rider_id: row.rider_id || null,
+            rider_name: row.rider_name || null,
+            acronym: row.acronym || null,
+            basic_plan_id: row.basic_plan_id || null,
+            basic_plan_name: row.basic_plan_name || null,
+            term_months: (row.term_months !== null && row.term_months !== undefined && Number(row.term_months) !== 0) ? Number(row.term_months) : null,
+            rate: displayRate
+        };
+    };
+
+    if ([1, 2, 3].includes(planId)) {
+        if (planId === 1) {
+            const result = { basic_plan_id: app?.basic_plan_id };
+            const termRatesMap = new Map();
+
+            filtered.forEach(row => {
+                const term = row.term_months || 0;
+                // For GCLI, if a rider was saved with term_months=0, it means it's a flat rate for the bracket.
+                // We'll attach it to the first month for display if no specific term is found.
+                const effectiveTerm = (term === 0 && row.rider_id && row.rider_id !== '0') ? 1 : term;
+
+                if (!termRatesMap.has(effectiveTerm)) {
+                    termRatesMap.set(effectiveTerm, { term_or_months: effectiveTerm, basic_rate: null, riders: [] });
+                }
+                const termEntry = termRatesMap.get(effectiveTerm);
+                
+                const rId = row.rider_id ? row.rider_id.toString() : '0';
+                if (rId === '0') {
+                    termEntry.basic_rate = transformRow(row).rate;
+                } else {
+                    // Check if this rider for this month already exists to avoid duplicates
+                    const existingRider = termEntry.riders.find(r => r.rider_id === rId);
+                    if (!existingRider) {
+                        termEntry.riders.push({
+                            rider_id: rId,
+                            rider_rate: transformRow(row).rate
+                        });
+                    }
+                }
+            });
+
+            const sortedTermRates = Array.from(termRatesMap.values()).sort((a, b) => Number(a.term_or_months) - Number(b.term_or_months));
+
+            if (isBaseBracket(normalizedCategory)) {
+                result.basic_plan = sortedTermRates;
+            } else {
+                const [startAge] = category.split(/[_-]/).map(Number);
+                result[`age_${startAge}`] = sortedTermRates;
+            }
+            return result;
+        }
+
+        // Group the remaining rates by age
+        const result = { basic_plan_id: app?.basic_plan_id };
+        filtered.forEach(row => {
+            const isBasic = row.age_band === 'BASIC_PLAN' || (row.basic_plan_id && row.age_band === row.basic_plan_id.toString()) || (row.basic_plan_name && row.age_band === row.basic_plan_name);
+
+            let keyName = '';
+            if (isBasic) {
+                keyName = 'basic_plan';
+            } else if (row.age_band) {
+                keyName = `age_${row.age_band.replace('-', '_')}`;
+            } else if (row.attained_age !== null) {
+                keyName = `age_${row.attained_age}`;
+            } else {
+                keyName = 'rates'; 
+            }
+
+            if (!result[keyName]) result[keyName] = [];
+            result[keyName].push(transformRow(row));
+        });
+
+        return result;
+    } else {
+        if (!isBaseBracket(normalizedCategory)) {
+            return filtered.reduce((acc, row) => {
+                const ageKey = row.attained_age ? `${row.attained_age}` : 'Standard'; //const ageKey = row.attained_age ? `age_${row.attained_age}` : 'Standard';
+                if (!acc[ageKey]) acc[ageKey] = [];
+                acc[ageKey].push(transformRow(row));
+                return acc;
+            }, {});
+        }
+        return filtered.map(transformRow);
     }
-
-    return filtered.map(transformRow);
 };
 
 // Helper to build structured response for a single application
@@ -370,10 +447,10 @@ export const buildApplicationResponse = async (app) => {
         amount_loans: amount_loans_id ? { id: amount_loans_id, name: amount_loans_name } : null,
         riders,
         rates: {
-            "18-65": formatDbRatesForTemplate(ratesRows, '18_65', planId),
-            "66-70": formatDbRatesForTemplate(ratesRows, '66_70', planId),
-            "71-75": formatDbRatesForTemplate(ratesRows, '71_75', planId),
-            "76-80": formatDbRatesForTemplate(ratesRows, '76_80', planId)
+            "18-65": formatDbRatesForTemplate(ratesRows, '18_65', planId, app),
+            "66-70": formatDbRatesForTemplate(ratesRows, '66_70', planId, app),
+            "71-75": formatDbRatesForTemplate(ratesRows, '71_75', planId, app),
+            "76-80": formatDbRatesForTemplate(ratesRows, '76_80', planId, app)
         },
         coverage_totals,
         level_ranking: levelRanking,
@@ -405,10 +482,10 @@ export const generateProposalHtml = async (id) => {
         maxAmount66_70: appData.borrower_amount_66_70 || 0,
         maxAmount71_75: appData.borrower_amount_71_75 || 0,
         maxAmount76_80: appData.borrower_amount_76_80 || 0,
-        rates18_65: formatDbRatesForTemplate(ratesRows, '18_65', planId),
-        rates66_70: formatDbRatesForTemplate(ratesRows, '66_70', planId),
-        rates71_75: formatDbRatesForTemplate(ratesRows, '71_75', planId),
-        rates76_80: formatDbRatesForTemplate(ratesRows, '76_80', planId),
+        rates18_65: formatDbRatesForTemplate(ratesRows, '18_65', planId, application),
+        rates66_70: formatDbRatesForTemplate(ratesRows, '66_70', planId, application),
+        rates71_75: formatDbRatesForTemplate(ratesRows, '71_75', planId, application),
+        rates76_80: formatDbRatesForTemplate(ratesRows, '76_80', planId, application),
         logoDataUri: getImageDataUri('img/phillife-logo-hd.jpg'), 
         centerPhotoUri: getImageDataUri('img/cover.png'), 
         footerPhotoUri: getImageDataUri('img/footer.png') 
@@ -451,13 +528,11 @@ export const generatePDFBuffer = async (htmlContent) => {
         });
 
         const page = await browser.newPage();
-        // Standard A4 dimensions at 96 DPI helps accurate pagination calculation
         await page.setViewport({ width: 794, height: 1122, deviceScaleFactor: 1 });
 
         await page.setContent(htmlContent, { waitUntil: 'load' });
         await page.evaluateHandle('document.fonts.ready');
 
-        // Small delay to allow layout engine to stabilize for counter(page) calculations
         await new Promise(resolve => setTimeout(resolve, 500));
 
         return await page.pdf({ 
@@ -483,7 +558,6 @@ export const generatePDFBuffer = async (htmlContent) => {
             }
         });
     } finally {
-        // Ensure browser is always closed to prevent memory leaks
         if (browser) await browser.close();
     }
 };
