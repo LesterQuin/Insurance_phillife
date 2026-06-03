@@ -46,12 +46,12 @@ export const saveApplicationRates = async (applicationId, ratesData, userId) => 
             const saveRow = async (item, ageOverride = null, bandOverride = null, basicPlanIdOverride = null, rateOverride = null) => {
                     let term = null;
                     let age = ageOverride;
-                    const riderId = item.rider_id !== undefined ? item.rider_id.toString() : '0';
+                    const riderId = (item.rider_id !== undefined && item.rider_id !== null) ? item.rider_id.toString() : '0';
                     const basicPlanId = basicPlanIdOverride || (item.basic_plan_id !== undefined && item.basic_plan_id !== null ? Number(item.basic_plan_id) : null);
-                    const inputRate = rateOverride || item.basic_rate || item.rider_rate || item.rate;
+                    const inputRate = rateOverride || item.basic_rate || item.rider_rate || (riderId === '0' ? item.rate : null) || (riderId !== '0' ? item.rate : null);
                     
-                    if (item.term_or_months) {
-                        const match = item.term_or_months.toString().match(/\d+/);
+                    if (item.term_of_months) {
+                        const match = item.term_of_months.toString().match(/\d+/);
                         if (match) term = parseInt(match[0], 10);
                     }
                     if (!age && item.term_or_age) {
@@ -88,33 +88,34 @@ export const saveApplicationRates = async (applicationId, ratesData, userId) => 
             } else if (typeof data === 'object') {
                 const bracketBasicPlanId = data.basic_plan_id;
                 for (const [ageKey, ageItems] of Object.entries(data)) {
-                    if (!Array.isArray(ageItems)) continue;
+                    if (ageKey === 'basic_plan_id') continue;
+                    const itemsArray = Array.isArray(ageItems) ? ageItems : [ageItems];
+
+                    let numericAge = null;
+                    let bandLabel = null;
 
                     if (ageKey === 'basic_plan') {
-                        for (const item of ageItems) {
-                            // 1. Save the basic rate for this month
-                            await saveRow(item, null, basicPlanName, bracketBasicPlanId);
-
-                            // 2. Save nested riders for this specific month (GCLI Nested Format)
-                            if (planId === 1 && item.riders && Array.isArray(item.riders)) {
-                                for (const rider of item.riders) {
-                                    await saveRow({
-                                        ...rider,
-                                        term_or_months: item.term_or_months
-                                    }, null, basicPlanName, bracketBasicPlanId);
-                        }
-                            }
-                        }
-                        continue;
+                        bandLabel = 'BASIC';
+                    } else {
+                        const isBand = ageKey.includes('_to_') || ageKey.split('_').length > 2;
+                        const numericAgeMatch = ageKey.match(/\d+/g);
+                        numericAge = !isBand && numericAgeMatch ? parseInt(numericAgeMatch[0], 10) : null;
+                        bandLabel = isBand ? ageKey.replace('age_', '').replace('_', '-') : null;
                     }
 
-                    const isBand = ageKey.includes('_to_') || ageKey.split('_').length > 2;
-                    const numericAgeMatch = ageKey.match(/\d+/g);
-                    const numericAge = !isBand && numericAgeMatch ? parseInt(numericAgeMatch[0], 10) : null;
-                    const bandLabel = isBand ? ageKey.replace('age_', '').replace('_', '-') : null;
+                    for (const item of itemsArray) {
+                        // 1. Save the basic rate entry. Pass bracketBasicPlanId to ensure consistency with the application.
+                        await saveRow(item, numericAge, bandLabel, bracketBasicPlanId || item.basic_plan_id);
 
-                    if (Array.isArray(ageItems)) {
-                        for (const item of ageItems) await saveRow(item, numericAge, bandLabel);
+                        // 2. Save nested riders if present (identifies as their actual rider_id)
+                        if (item.riders && Array.isArray(item.riders)) {
+                            for (const rider of item.riders) {
+                                await saveRow({
+                                    ...rider,
+                                    term_of_months: item.term_of_months 
+                                }, numericAge, bandLabel, bracketBasicPlanId);
+                            }
+                        }
                     }
                 }
             }
@@ -143,7 +144,7 @@ export const getApplicationRates = async (applicationId) => {
     if (planId === 2 || planId === 3) {
         const targetTable = planId === 2 ? 'DHUB.sg.financial_insurance_actuarial_rates_gyrt' : 'DHUB.sg.financial_insurance_actuarial_rates_gpa';
         // Query for product specific table
-        query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name
+        query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
                  LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
                  LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
@@ -153,9 +154,10 @@ export const getApplicationRates = async (applicationId) => {
         const targetTable = planId === 1 
             ? 'DHUB.sg.financial_insurance_actuarial_rates_gcli' 
             : 'DHUB.sg.financial_insurance_application_rates';
-        query = `SELECT r.*, rider.rider_name, rider.acronym
+        query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
                  LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
     }
 

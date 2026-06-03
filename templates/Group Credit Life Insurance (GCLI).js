@@ -34,19 +34,16 @@ const generateRateRows = (items, suffix = "") => {
     if (a.attained_age !== null) return 1;
     if (b.attained_age !== null) return -1;
     if (a.age_band !== null && b.age_band !== null) return a.age_band.localeCompare(b.age_band);
-    const aTerm = a.term_of_months || a.term_months;
-    const bTerm = b.term_of_months || b.term_months;
-    if (aTerm != null && bTerm != null) return aTerm - bTerm;
-    if (aTerm != null) return -1;
-    if (bTerm != null) return 1;
+    if (a.term_months !== null && b.term_months !== null) return a.term_months - b.term_months;
+    if (a.term_months !== null) return -1;
+    if (b.term_months !== null) return 1;
     if (a.rider_id !== null && b.rider_id !== null) return a.rider_id - b.rider_id;
     return (a.rider_name || "").localeCompare(b.rider_name || "");
   });
 
   return sorted.map((item) => {
     const ageLabel = item.attained_age || (item.age_band === 'BASIC_PLAN' || item.age_band === 'BASIC' ? 'Standard' : item.age_band) || "-";
-    const termVal = item.term_of_months || item.term_months;
-    const termLabel = termVal ? `${termVal}${suffix}` : "-";
+    const termLabel = item.term_months ? `${item.term_months}${suffix}` : "-";
     const riderLabel = item.rider_name || item.basic_plan_name || "Basic Plan";
     
     return `
@@ -64,10 +61,7 @@ const generateChunkedRateTables = (rates, maturity, header, suffix, minAge = 18,
     if (!Array.isArray(rates) || rates.length === 0) return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
 
     // Detect if we are dealing with monthly term rates
-    const isMonthly = rates.some(r => {
-        const t = r.term_of_months || r.term_months;
-        return t !== null && t !== undefined && t > 0 && t <= 120;
-    });
+    const isMonthly = rates.some(r => r.term_months !== null && r.term_months > 0 && r.term_months <= 120);
     const displaySuffix = isMonthly ? " months" : suffix;
 
     return `
@@ -463,7 +457,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             </p>
 
             <p>
-            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
+            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433 loc. ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
             </p>
 
             <p>
@@ -648,62 +642,6 @@ ${
 </div>
 
 <div class="page-break"></div>
-<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
-    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
-    <p style="font-size: 10pt; margin-bottom: 10px;">
-        Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
-    </p>
-    <ul style="font-size: 10pt; margin-left: 20px; line-height: 1.4;">
-        <li>SIGNED PROPOSAL/CONFORME</li>
-        <li>APPLICATION FOR GROUP INSURANCE</li>
-        <li>DTI(FOR SOLE PROPRIETORSHIP)</li>
-        <li>SEC CERTIFICATE OF REGISTRATION</li>
-        <li>ARTICLES OF INCORPORATION</li>
-        <li>BY-LAWS</li>
-        <li>BUSINESS PERMIT</li>
-        <li>MASTERLIST - Declaration with Certified by and Authorized Signatory (PDF & Excel Copy)</li>
-        <li>Copy of ID of the Authorized Signatory</li>
-    </ul>
-    <p style="font-size: 10pt; margin-top: 10px; font-style: italic;">
-        Additional document/s will be required if needed after initial evaluation.
-    </p>
-</div>
-
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
-    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
-    <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
-    
-    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
-        <tr style="border: none;">
-            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized Representative</div>
-            </td>
-            <td style="border: none; width: 4%;"></td>
-            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${application.addressee_designation || ""}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
-            </td>
-        </tr>
-        <tr style="border: none;">
-            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
-            </td>
-            <td style="border: none;"></td>
-            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Date of Signed</div>
-            </td>
-        </tr>
-    </table>
-</div>
-
 <div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
@@ -740,6 +678,40 @@ ${
     </table>
 </div>
 
+<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
+    <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
+    
+    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized Representative</div>
+            </td>
+            <td style="border: none; width: 4%;"></td>
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${application.addressee_designation || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
+            </td>
+            <td style="border: none;"></td>
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Date of Signed</div>
+            </td>
+        </tr>
+    </table>
+</div>
     </div>
         </td></tr></tbody>
         <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>

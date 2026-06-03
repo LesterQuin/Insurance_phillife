@@ -29,7 +29,7 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
         application.proposal_addressee?.split(" ").pop() || "";
     const totalAnnualPremium = details?.totalAnnualPremium || 0;
     const cfeFullName = `${user.firstname} ${user.lastname}`;
-    const { logoDataUri = null, centerPhotoUri = null, footerPhotoUri = null } = details || {};
+    const { logoDataUri = null, centerPhotoUri = null, footerPhotoUri = null, page2FooterPhotoUri = null } = details || {};
 
     const planName = (application.basic_plan?.name || "").trim();
     const lastSpaceIndex =
@@ -226,6 +226,14 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
             z-index: 5;
             font-weight: bold;
         }
+        .page2-footer {
+            position: absolute;
+            bottom: 115mm;
+            left: 0;
+            width: 100%;
+            z-index: 20;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -270,7 +278,7 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
         </div>
         <div class="cover-bottom">
             <div class="footer-contact">
-                <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">✉️ helpdesk@phillife.com.ph</a>
+                <a href="mailto:groupmarketingsales1@gmail.com" class="footer-link">✉️ groupmarketingsales1@gmail.com</a>
                 <a href="https://www.phillife.com.ph" class="footer-link" target="_blank">🌐  www.phillife.com.ph</a>
                 <a href="tel:+63277985433" class="footer-link">📞 (02) 7798 5433</a>
             </div>
@@ -280,6 +288,13 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     <div class="page-break"></div>
     <div class="main-content">
     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+
+    ${page2FooterPhotoUri ? `
+        <div class="page2-footer">
+            <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
+        </div>
+    ` : ""}
+
     <div class="subsequent-header-gradient"></div>
     <p>
         ${formatDate(proposalDate)} <br><br>
@@ -291,7 +306,9 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     <p>Dear ${application.addressee_designation || ""} ${addresseeLastName},</p>
     <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
     <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
-    <p>Should you have concerns with our program, please feel free to contact us at telephone number (02) 7798 – 5433, local number +63 917 123 4567 or email us at <a href="mailto:helpdesk@phillife.com.ph" class="footer-link">helpdesk@phillife.com.ph</a> and we will be more than willing to answer your queries.</p>
+            <p>
+            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
+            </p>
     <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
     <p>
         Sincerely,<br><br>
@@ -364,6 +381,99 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
         <li>Participation requirements remain the same, regardless of the number of units purchased.</li>
         <li>Benefits, Rates, and NEL will be adjusted accordingly based on the number of units purchased.</li>
     </ul>
+
+<div class="page-break"></div>
+<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
+    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
+    <p style="font-size: 10pt; margin-bottom: 10px;">
+        Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
+    </p>
+    <ul style="font-size: 10pt; margin-left: 20px; line-height: 1.4;">
+        <li>SIGNED PROPOSAL/CONFORME</li>
+        <li>APPLICATION FOR GROUP INSURANCE</li>
+        <li>DTI(FOR SOLE PROPRIETORSHIP)</li>
+        <li>SEC CERTIFICATE OF REGISTRATION</li>
+        <li>ARTICLES OF INCORPORATION</li>
+        <li>BY-LAWS</li>
+        <li>BUSINESS PERMIT</li>
+        <li>MASTERLIST - Declaration with Certified by and Authorized Signatory (PDF & Excel Copy)</li>
+        <li>Copy of ID of the Authorized Signatory</li>
+    </ul>
+    <p style="font-size: 10pt; margin-top: 10px; font-style: italic;">
+        Additional document/s will be required if needed after initial evaluation.
+    </p>
+</div>
+
+<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
+    <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
+    
+    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized Representative</div>
+            </td>
+            <td style="border: none; width: 4%;"></td>
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${application.addressee_designation || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
+            </td>
+            <td style="border: none;"></td>
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Date of Signed</div>
+            </td>
+        </tr>
+    </table>
+</div>
+
+<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
+    <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
+    
+    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${cfeFullName}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized PhilLife Representative</div>
+            </td>
+            <td style="border: none; width: 4%;"></td>
+            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${user.roleName || "Corporate Financial Executive"}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
+            </td>
+        </tr>
+        <tr style="border: none;">
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
+            </td>
+            <td style="border: none;"></td>
+            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    ${user.phoneNumber || ""}
+                </div>
+                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Contact Number</div>
+            </td>
+        </tr>
+    </table>
+</div>
 
     </td></tr></tbody>
     <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
