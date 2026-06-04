@@ -280,7 +280,7 @@ export const generateSecurityGuardsPDFContent = (
             <table class="header-table">
                 <tr>
                     <td><strong>Presented To:</strong><br>${capitalize(application.group_name)}</td>
-                    <td><strong>Proposal Status:</strong><br>${capitalize(application.status?.name || "")}</td>
+                    <td><strong>Proposal Status:</strong><br>${capitalize(application.proposal_status_name || application.status?.name || "New")}</td>
                     <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
                 </tr>
                 <tr>
