@@ -1,96 +1,98 @@
+import { generateSummaryOfBenefits } from "./plan_riders.js";
+
 // Helper to format numbers with commas for currency.
 const capitalize = (str) => {
-  if (!str) return "";
-  const s = String(str);
-  return s.charAt(0).toUpperCase() + s.slice(1);
+    if (!str) return "";
+    const s = String(str);
+    return s.charAt(0).toUpperCase() + s.slice(1);
 };
 
 const formatNumber = (num) => {
-  if (num == null || isNaN(num)) return "0.00";
-  return Number(num).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+    if (num == null || isNaN(num)) return "0.00";
+    return Number(num).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    });
 };
 
 const formatDate = (date) => {
   // Adding timeZone: 'UTC' prevents the date from shifting to the next day
-  // due to local timezone conversion of a UTC-like date string from the database.
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+    // due to local timezone conversion of a UTC-like date string from the database.
+    return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+        timeZone: "UTC",
+    });
 };
 
 // Helper to generate table rows dynamically for rates
 const generateRateRows = (items, suffix = "") => {
-  if (!Array.isArray(items) || items.length === 0)
-    return '<tr><td colspan="4">No rates provided yet</td></tr>';
+    if (!Array.isArray(items) || items.length === 0)
+        return '<tr><td colspan="4">No rates provided yet</td></tr>';
 
-  // Sort items: attained_age first, then age_band, then term_months, then rider_id, then rider_name
-  const sorted = [...items].sort((a, b) => {
-    if (a.attained_age !== null && b.attained_age !== null)
-      return a.attained_age - b.attained_age;
-    if (a.attained_age !== null) return 1;
-    if (b.attained_age !== null) return -1;
-    if (a.age_band !== null && b.age_band !== null)
-      return a.age_band.localeCompare(b.age_band);
-    const aTerm = a.term_of_months || a.term_months;
-    const bTerm = b.term_of_months || b.term_months;
-    if (aTerm != null && bTerm != null) return aTerm - bTerm;
-    if (aTerm != null) return -1;
-    if (bTerm != null) return 1;
-    if (a.rider_id !== null && b.rider_id !== null)
-      return a.rider_id - b.rider_id;
-    return (a.rider_name || "").localeCompare(b.rider_name || "");
-  });
+    // Sort items: attained_age first, then age_band, then term_months, then rider_id, then rider_name
+    const sorted = [...items].sort((a, b) => {
+        if (a.attained_age !== null && b.attained_age !== null)
+        return a.attained_age - b.attained_age;
+        if (a.attained_age !== null) return 1;
+        if (b.attained_age !== null) return -1;
+        if (a.age_band !== null && b.age_band !== null)
+        return a.age_band.localeCompare(b.age_band);
+        const aTerm = a.term_of_months || a.term_months;
+        const bTerm = b.term_of_months || b.term_months;
+        if (aTerm != null && bTerm != null) return aTerm - bTerm;
+        if (aTerm != null) return -1;
+        if (bTerm != null) return 1;
+        if (a.rider_id !== null && b.rider_id !== null)
+        return a.rider_id - b.rider_id;
+        return (a.rider_name || "").localeCompare(b.rider_name || "");
+    });
 
-  return sorted
-    .map((item) => {
-      const ageLabel =
-        item.attained_age ||
-        (item.age_band === "BASIC_PLAN" || item.age_band === "BASIC"
-          ? "Standard"
-          : item.age_band) ||
-        "-";
-      const termVal = item.term_of_months || item.term_months;
-      const termLabel = termVal ? `${termVal}${suffix}` : "-";
-      const riderLabel =
-        item.rider_name || item.basic_plan_name || "Basic Plan";
+    return sorted
+        .map((item) => {
+        const ageLabel =
+            item.attained_age ||
+            (item.age_band === "BASIC_PLAN" || item.age_band === "BASIC"
+            ? "Standard"
+            : item.age_band) ||
+            "-";
+        const termVal = item.term_of_months || item.term_months;
+        const termLabel = termVal ? `${termVal}${suffix}` : "-";
+        const riderLabel =
+            item.rider_name || item.basic_plan_name || "Basic Plan";
 
-      return `
-<tr>
-  <td>${ageLabel}</td>
-  <td>${termLabel}</td>
-  <td>${riderLabel}</td>
-  <td>${item.rate}</td>
-</tr>`;
-    })
-    .join("");
+        return `
+    <tr>
+    <td>${ageLabel}</td>
+    <td>${termLabel}</td>
+    <td>${riderLabel}</td>
+    <td>${item.rate}</td>
+    </tr>`;
+        })
+        .join("");
 };
 
 // Helper to generate chunked tables for 18-64 GCLI rates
 const generateChunkedRateTables = (
-  rates,
-  maturity,
-  header,
-  suffix,
-  minAge = 18,
-  maxAge = 64,
-) => {
-  if (!Array.isArray(rates) || rates.length === 0)
-    return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+    rates,
+    maturity,
+    header,
+    suffix,
+    minAge = 18,
+    maxAge = 64,
+    ) => {
+    if (!Array.isArray(rates) || rates.length === 0)
+        return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
 
-  // Detect if we are dealing with monthly term rates
-  const isMonthly = rates.some((r) => {
-    const t = r.term_of_months || r.term_months;
-    return t !== null && t !== undefined && t > 0 && t <= 120;
-  });
-  const displaySuffix = isMonthly ? " months" : suffix;
+    // Detect if we are dealing with monthly term rates
+    const isMonthly = rates.some((r) => {
+        const t = r.term_of_months || r.term_months;
+        return t !== null && t !== undefined && t > 0 && t <= 120;
+    });
+    const displaySuffix = isMonthly ? " months" : suffix;
 
-  return `
+    return `
         <div class="age-tables-container">
             <div class="age-table-box" style="flex: 0 0 100%;">
                 <table class="compact-table">
@@ -115,62 +117,62 @@ const generateChunkedRateTables = (
  * @returns {string} - The complete HTML content for the proposal.
  */
 export const generateGCLIPDFContent = (application, user, details) => {
-  const proposalDate = new Date(application.updated_at);
-  const expiryDate = new Date(proposalDate);
-  expiryDate.setDate(expiryDate.getDate() + 30);
+    const proposalDate = new Date(application.updated_at);
+    const expiryDate = new Date(proposalDate);
+    expiryDate.setDate(expiryDate.getDate() + 30);
 
-  const addresseeLastName =
-    application.proposal_addressee?.split(" ").pop() || "";
+    const addresseeLastName =
+        application.proposal_addressee?.split(" ").pop() || "";
 
-  // Defaulting details to avoid errors if they are not provided
-  const {
-    totalAnnualPremium = 0,
-    maxAmount18_65 = 0,
-    maxAmount66_70 = 0,
-    maxAmount71_75 = 0,
-    maxAmount76_80 = 0,
-    rates18_65 = {},
-    rates66_70 = {},
-    rates71_75 = {},
-    rates76_80 = {},
-    participationPercentage = 100,
-    logoDataUri = null,
-    centerPhotoUri = null,
-    footerPhotoUri = null,
-    page2FooterPhotoUri = null,
-  } = details || {};
-  const maturity = details?.maturity || 0; // Get maturity from details
+    // Defaulting details to avoid errors if they are not provided
+    const {
+        totalAnnualPremium = 0,
+        maxAmount18_65 = 0,
+        maxAmount66_70 = 0,
+        maxAmount71_75 = 0,
+        maxAmount76_80 = 0,
+        rates18_65 = {},
+        rates66_70 = {},
+        rates71_75 = {},
+        rates76_80 = {},
+        participationPercentage = 100,
+        logoDataUri = null,
+        centerPhotoUri = null,
+        footerPhotoUri = null,
+        page2FooterPhotoUri = null,
+    } = details || {};
+    const maturity = details?.maturity || 0; // Get maturity from details
 
-  const cfeFullName = `${user.firstname} ${user.lastname}`;
+    const cfeFullName = `${user.firstname} ${user.lastname}`;
 
-  // Dynamic configuration based on Plan
-  const isGCLI = Number(application.plan_id) === 1;
-  const standardHeader = isGCLI ? "Term of Loan" : "Rider";
-  const standardSuffix = isGCLI ? " months" : "";
+    // Dynamic configuration based on Plan
+    const isGCLI = Number(application.plan_id) === 1;
+    const standardHeader = isGCLI ? "Term of Loan" : "Rider";
+    const standardSuffix = isGCLI ? " months" : "";
 
-  const planName = (application.basic_plan?.name || "").trim();
-  const lastSpaceIndex =
-    planName.lastIndexOf(" ") !== -1
-      ? planName.lastIndexOf(" ")
-      : planName.length;
+    const planName = (application.basic_plan?.name || "").trim();
+    const lastSpaceIndex =
+        planName.lastIndexOf(" ") !== -1
+        ? planName.lastIndexOf(" ")
+        : planName.length;
 
-  let displayTitle = "";
-  if (planName.lastIndexOf(" ") !== -1) {
-    displayTitle = `
-        <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
-        <br>
-        <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
-    `;
-  } else {
-    // Fallback for single-word plan names
-    displayTitle = `
-        <span style="color:#0d47a1;">${planName}</span>
-        <br>
-        <span style="color:#2e7d32;">PROPOSAL</span>
-    `;
-  }
+    let displayTitle = "";
+    if (planName.lastIndexOf(" ") !== -1) {
+        displayTitle = `
+            <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+            <br>
+            <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+        `;
+    } else {
+        // Fallback for single-word plan names
+        displayTitle = `
+            <span style="color:#0d47a1;">${planName}</span>
+            <br>
+            <span style="color:#2e7d32;">PROPOSAL</span>
+        `;
+    }
 
-  return `
+    return `
     <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -407,14 +409,14 @@ export const generateGCLIPDFContent = (application, user, details) => {
 <body>
     <!-- To disable the watermark entirely, you can comment out the line below: -->
     ${
-      Number(application.status?.id || application.status_id) !== 7 &&
-      logoDataUri
+        Number(application.status?.id || application.status_id) !== 7 &&
+        logoDataUri
         ? `<div class="watermark"></div>`
         : ""
     }
 
     ${
-      footerPhotoUri
+        footerPhotoUri
         ? `
         <div class="subsequent-footer">
             <div class="plan-name-footer">${planName}</div>
@@ -440,11 +442,6 @@ export const generateGCLIPDFContent = (application, user, details) => {
                 <td><strong>Proposal Status:</strong><br>${capitalize(application.proposal_status_name || application.status?.name || "New")}</td>
                 <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
             </tr>
-            <tr>
-                <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || "")}</td>
-                <td><strong>Total Annual Premium:</strong><br>Php ${formatNumber(totalAnnualPremium)}</td>
-                <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || "")}</td>
-            </tr>
         </table>
     </div>
     <div class="cover-bottom">
@@ -461,7 +458,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
 
     ${
-      page2FooterPhotoUri
+        page2FooterPhotoUri
         ? `
         <div class="page2-footer">
             <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
@@ -494,7 +491,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             </p>
 
             <p>
-            We look forward to partnering with ${application.group_name || ""} to protect what matters most—your people, your clients, and your organization’s future.
+            We look forward to partnering with ${application.group_name || ""} to protect what matters most your people, your clients, and your organization’s future.
             </p>
         <p>
             Sincerely,<br><br>
@@ -516,16 +513,12 @@ export const generateGCLIPDFContent = (application, user, details) => {
             <tbody><tr><td>
                 <div class="section-group">
                 <h2>Summary of Benefits</h2>
+                ${generateSummaryOfBenefits(application, application.riders || [])}
+                </div>
 
-                <p>
-                    <strong>Group Credit Life Insurance Plan (GCLIP) – Initial Loan Amount</strong>
-                </p>
-
-                <p>
-                    Pays the initial loan amount upon approval of proof of death of the borrower
-                    while the policy is in force and during the defined period, subject to the
-                    maximum amount.
-                </p>
+                <div class="page-break"></div>
+                <div class="section-group">
+                <h2 style="margin-top:10px;">Classification of Benefits</h2>
     <table>
 
         <tr>
@@ -539,7 +532,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         </tr>
 
         ${
-          application.borrower_age_66_70
+            application.borrower_age_66_70
             ? `
         <tr>
             <td>66-70</td>
@@ -549,7 +542,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         ${
-          application.borrower_age_71_75
+            application.borrower_age_71_75
             ? `
         <tr>
             <td>71-75</td>
@@ -559,7 +552,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         ${
-          application.borrower_age_76_80
+            application.borrower_age_76_80
             ? `
         <tr>
             <td>76-80</td>
@@ -567,209 +560,215 @@ export const generateGCLIPDFContent = (application, user, details) => {
         </tr>`
             : ""
         }
+        
     </table>
-
-    <p>
-    Death benefit is the Amount of Insurance at loan effective date. It is level
-    throughout the term of the loan.
-    </p>
-</div>
-
-<div class="section-group">
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age ${application.minimum_age}-${application.maximum_age})</h2>
-    ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
-
-${
-  application.borrower_age_66_70
-    ? `
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age 66-70)</h2>
-    ${generateChunkedRateTables(rates66_70, maturity, standardHeader, standardSuffix, 66, 70)}
-`
-    : ""
-}
-
-${
-  application.borrower_age_71_75
-    ? `
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age 71-75)</h2>
-    ${generateChunkedRateTables(rates71_75, maturity, standardHeader, standardSuffix, 71, 75)}
-`
-    : ""
-}
-
-${
-  application.borrower_age_76_80
-    ? `
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age 76-80)</h2>
-    ${generateChunkedRateTables(rates76_80, maturity, standardHeader, standardSuffix, 76, 80)}
-`
-    : ""
-}
+            <p>
+                Death benefit is the Amount of Insurance at loan effective date. It is level throughout the term of the loan.
+            </p>
                 </div>
-
+                
 <div class="page-break"></div>
+    <div class="section-group">
+        <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 </h2>
+            <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers ${application.minimum_age}-${application.maximum_age}</p>
+        ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
 
-<h2>Notes</h2>
-<div class="notes">
-
-    <p>
-        1. Rates are inclusive of government-mandated taxes. Renewal rate may change
-        depending on the claims experience of the policy.
-    </p>
-
-    <p>
-        2. <strong>Eligibility Requirements</strong><br>
-            A. Any in good health and actively-at-work debtor of the Policyholder who is at
-        least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
-        at the time of loan application. Actively-at-work means
-    <ul>
-        <li>Performing usual duties of occupation and/or performing activities of daily living</li>
-        <li>Engaged in lawful employment or business</li>
-    </ul>
-    </p>
-
-    <p>
-        3. <strong>Termination of Insurance</strong><br>
-        Insurance coverage automatically terminates on the earliest of the following dates:
-    </p>
-
-    <ul>
-        <li>The date the policy terminates</li>
-        <li>The policy anniversary immediately succeeding the date of the Debtor attains the termination age</li>
-        <li>The date any payment towards the loan becomes six (6) months overdue, not with standing payment for his insurance</li>
-        <li>The Insured Debtor ceases to be a debtor of the Creditor</li>
-        <li>The date the loan matures</li>
-    </ul>
-
-    <div style="margin-bottom: 12px;">
-        4. <strong>Participation Requirements</strong><br>
-        At least ${participationPercentage}% individuals within the policy year
-    </div>
-
-    <div style="margin-bottom: 12px;">
-        5. <strong>Evidence of Insurability</strong>
         ${
-          application.evidence_notes
+            application.borrower_age_66_70
             ? `
-        <div style="margin-left: 5mm; margin-top: 1px;">
-            ${application.evidence_notes}
-        </div>
+            <h2 style="margin-top:10px;">SINGLE RATE PER 1,000</h2>
+                <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers 66-70</p>
+            ${generateChunkedRateTables(rates66_70, maturity, standardHeader, standardSuffix, 66, 70)}
+        `
+            : ""
+        }
+
+        ${
+            application.borrower_age_71_75
+            ? `
+            <h2 style="margin-top:10px;">SINGLE RATE PER 1,000</h2>
+                <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers 71-75</p>
+            ${generateChunkedRateTables(rates71_75, maturity, standardHeader, standardSuffix, 71, 75)}
+        `
+            : ""
+        }
+
+        ${
+            application.borrower_age_76_80
+            ? `
+            <h2 style="margin-top:10px;">SINGLE RATE PER 1,000</h2>
+                <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers 76-80</p>
+            ${generateChunkedRateTables(rates76_80, maturity, standardHeader, standardSuffix, 76, 80)}
         `
             : ""
         }
     </div>
 
-    <p>
-        6. <strong>Payment of Benefits</strong><br>
-        Upon approval of proof of death of the Debtor while the insurance is in force , PHILLIFE shall pay the following:
-    </p>
+<div class="page-break"></div>
+    <h2>Notes</h2>
+    <div class="notes">
+        <p>
+            1. AnnualPremium:<strong> Php ${formatNumber(totalAnnualPremium)} </strong>
+        </p>
 
-    <ul>
-        <li>To the Policyholder: the Outstanding balance of the Debtor's loan</li>
-        <li>To the Debtor's benefeciaries: the difference, if any, between the amount of insurance and the outstanding balance of the Debtor's loan. Outstanding balance were derived from amortization of the insured.</li>
-    </ul>
+        <p>
+            2. Rates are inclusive of government-mandated taxes. Renewal rate may change
+            depending on the claims experience of the policy.
+        </p>
 
-    <p>
-        7. This proposal is subject to the complete provisions to be provided in the Policy.
-    </p>
+        <p>
+            3. <strong>Eligibility Requirements</strong><br>
+                A. Any in good health and actively-at-work debtor of the Policyholder who is at
+            least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
+            at the time of loan application. Actively-at-work means
+        <ul>
+            <li>Performing usual duties of occupation and/or performing activities of daily living</li>
+            <li>Engaged in lawful employment or business</li>
+        </ul>
+        </p>
 
-    <p>
-        8. The proposal validity is until ${formatDate(expiryDate)}.
-    </p>
-</div>
+        <p>
+            4. <strong>Termination of Insurance</strong><br>
+            Insurance coverage automatically terminates on the earliest of the following dates:
+        </p>
+
+        <ul>
+            <li>The date the policy terminates</li>
+            <li>The policy anniversary immediately succeeding the date of the Debtor attains the termination age</li>
+            <li>The date any payment towards the loan becomes six (6) months overdue, not with standing payment for his insurance</li>
+            <li>The Insured Debtor ceases to be a debtor of the Creditor</li>
+            <li>The date the loan matures</li>
+        </ul>
+
+        <div style="margin-bottom: 12px;">
+            5. <strong>Participation Requirements</strong><br>
+            At least ${participationPercentage}% individuals within the policy year
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            6. <strong>Evidence of Insurability</strong>
+            ${
+                application.evidence_notes
+                ? `
+            <div style="margin-left: 5mm; margin-top: 1px;">
+                ${application.evidence_notes}
+            </div>
+            `
+                : ""
+            }
+        </div>
+
+        <p>
+            7. <strong>Payment of Benefits</strong><br>
+            Upon approval of proof of death of the Debtor while the insurance is in force , PHILLIFE shall pay the following:
+        </p>
+
+        <ul>
+            <li>To the Policyholder: the Outstanding balance of the Debtor's loan</li>
+            <li>To the Debtor's benefeciaries: the difference, if any, between the amount of insurance and the outstanding balance of the Debtor's loan. Outstanding balance were derived from amortization of the insured.</li>
+        </ul>
+
+        <p>
+            8. This proposal is subject to the complete provisions to be provided in the Policy.
+        </p>
+
+        <p>
+            9. The proposal validity is until ${formatDate(expiryDate)}.
+        </p>
+    </div>
 
 <div class="page-break"></div>
-<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
-    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
-    <p style="font-size: 10pt; margin-bottom: 10px;">
-        Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
-    </p>
-    <ul style="font-size: 10pt; margin-left: 20px; line-height: 1.4;">
-        <li>SIGNED PROPOSAL/CONFORME</li>
-        <li>APPLICATION FOR GROUP INSURANCE</li>
-        <li>DTI(FOR SOLE PROPRIETORSHIP)</li>
-        <li>SEC CERTIFICATE OF REGISTRATION</li>
-        <li>ARTICLES OF INCORPORATION</li>
-        <li>BY-LAWS</li>
-        <li>BUSINESS PERMIT</li>
-        <li>MASTERLIST - Declaration with Certified by and Authorized Signatory (PDF & Excel Copy)</li>
-        <li>Copy of ID of the Authorized Signatory</li>
-    </ul>
-    <p style="font-size: 10pt; margin-top: 10px; font-style: italic;">
-        Additional document/s will be required if needed after initial evaluation.
-    </p>
-</div>
+    <div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
+        <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
+        <p style="font-size: 10pt; margin-bottom: 10px;">
+            Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
+        </p>
+        <ul style="font-size: 10pt; margin-left: 20px; line-height: 1.4;">
+            <li>SIGNED PROPOSAL/CONFORME</li>
+            <li>APPLICATION FOR GROUP INSURANCE</li>
+            <li>DTI(FOR SOLE PROPRIETORSHIP)</li>
+            <li>SEC CERTIFICATE OF REGISTRATION</li>
+            <li>ARTICLES OF INCORPORATION</li>
+            <li>BY-LAWS</li>
+            <li>BUSINESS PERMIT</li>
+            <li>MASTERLIST - Declaration with Certified by and Authorized Signatory (PDF & Excel Copy)</li>
+            <li>Copy of ID of the Authorized Signatory</li>
+        </ul>
+        <p style="font-size: 10pt; margin-top: 10px; font-style: italic;">
+            Additional document/s will be required if needed after initial evaluation.
+        </p>
+    </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
-    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
-    <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
-    
-    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
-        <tr style="border: none;">
-            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized Representative</div>
-            </td>
-            <td style="border: none; width: 4%;"></td>
-            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${application.addressee_designation || ""}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
-            </td>
-        </tr>
-        <tr style="border: none;">
-            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
-            </td>
-            <td style="border: none;"></td>
-            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Date of Signed</div>
-            </td>
-        </tr>
-    </table>
-</div>
+    <div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+        <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
+        <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
+        
+        <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
+            <tr style="border: none;">
+                <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                        ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""}
+                    </div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized Representative</div>
+                </td>
+                <td style="border: none; width: 4%;"></td>
+                <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                        ${application.addressee_designation || ""}
+                    </div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
+                </td>
+            </tr>
+            <tr style="border: none;">
+                <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
+                </td>
+                <td style="border: none;"></td>
+                <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                    </div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Date of Signed</div>
+                </td>
+            </tr>
+        </table>
+    </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
-    <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
-    <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
-    
-    <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
-        <tr style="border: none;">
-            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${cfeFullName}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized PhilLife Representative</div>
-            </td>
-            <td style="border: none; width: 4%;"></td>
-            <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${user.roleName || "Corporate Financial Executive"}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
-            </td>
-        </tr>
-        <tr style="border: none;">
-            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; height: 40px;"></div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
-            </td>
-            <td style="border: none;"></td>
-            <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
-                <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
-                    ${user.phoneNumber || ""}
-                </div>
-                <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Contact Number</div>
-            </td>
-        </tr>
-    </table>
-</div>
+    <div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+        <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
+        <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
+        
+        <table style="border: none; width: 100%; border-collapse: separate; border-spacing: 0 15px;">
+            <tr style="border: none;">
+                <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                        ${cfeFullName}
+                    </div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Authorized PhilLife Representative</div>
+                </td>
+                <td style="border: none; width: 4%;"></td>
+                <td style="border: none; text-align: left; width: 48%; padding: 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                        ${user.roleName || "Corporate Financial Executive"}
+                    </div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Designation / Title</div>
+                </td>
+            </tr>
+            <tr style="border: none;">
+                <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; height: 40px;"></div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Signature</div>
+                </td>
+                <td style="border: none;"></td>
+                <td style="border: none; text-align: left; padding: 20px 0 0 0; vertical-align: bottom;">
+                    <div style="border-bottom: 1px solid #333; padding-bottom: 5px; font-weight: bold; min-height: 20px;">
+                        ${user.phoneNumber || ""}
+                    </div>
+                    <div style="font-size: 8pt; color: #666; margin-top: 4px; text-transform: uppercase;">Contact Number</div>
+                </td>
+            </tr>
+        </table>
+    </div>
 
     </div>
         </td></tr></tbody>
