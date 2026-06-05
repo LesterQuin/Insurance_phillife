@@ -1,4 +1,4 @@
-export const bookedNotificationTemplate = (accountName, clientName, proposalNumber, bookedDate, cfeName) => {
+export const bookedNotificationTemplate = (recipientName, accountName, clientName, proposalNumber, bookedDate, cfeName) => {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -21,7 +21,7 @@ export const bookedNotificationTemplate = (accountName, clientName, proposalNumb
         <!-- Content -->
         <tr>
             <td style="padding:30px 25px;">
-                <p style="margin:0 0 20px; font-size:16px;">Dear Sir MMC, John Kwong, Team Lead, and EBAM Team,</p>
+                <p style="margin:0 0 20px; font-size:16px;">Dear ${recipientName},</p>
                 
                 <p style="margin:0 0 20px; font-size:16px;">This is to inform you that the account below has been successfully marked as <strong>BOOKED</strong> in the Group Proposal System.</p>
 

@@ -248,9 +248,7 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
 </head>
 <body>
     ${
-        ["pending", "draft", "rejected"].includes(
-            application.status?.name?.toLowerCase(),
-        ) && logoDataUri
+        Number(application.status?.id || application.status_id) !== 7 && logoDataUri
             ? `<div class="watermark"></div>`
             : ""
     }

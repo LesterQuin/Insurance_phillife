@@ -26,51 +26,71 @@ const formatDate = (date) => {
 
 // Helper to generate table rows dynamically for rates
 const generateRateRows = (items, suffix = "") => {
-  if (!Array.isArray(items) || items.length === 0) return '<tr><td colspan="4">No rates provided yet</td></tr>';
+  if (!Array.isArray(items) || items.length === 0)
+    return '<tr><td colspan="4">No rates provided yet</td></tr>';
 
   // Sort items: attained_age first, then age_band, then term_months, then rider_id, then rider_name
   const sorted = [...items].sort((a, b) => {
-    if (a.attained_age !== null && b.attained_age !== null) return a.attained_age - b.attained_age;
+    if (a.attained_age !== null && b.attained_age !== null)
+      return a.attained_age - b.attained_age;
     if (a.attained_age !== null) return 1;
     if (b.attained_age !== null) return -1;
-    if (a.age_band !== null && b.age_band !== null) return a.age_band.localeCompare(b.age_band);
+    if (a.age_band !== null && b.age_band !== null)
+      return a.age_band.localeCompare(b.age_band);
     const aTerm = a.term_of_months || a.term_months;
     const bTerm = b.term_of_months || b.term_months;
     if (aTerm != null && bTerm != null) return aTerm - bTerm;
     if (aTerm != null) return -1;
     if (bTerm != null) return 1;
-    if (a.rider_id !== null && b.rider_id !== null) return a.rider_id - b.rider_id;
+    if (a.rider_id !== null && b.rider_id !== null)
+      return a.rider_id - b.rider_id;
     return (a.rider_name || "").localeCompare(b.rider_name || "");
   });
 
-  return sorted.map((item) => {
-    const ageLabel = item.attained_age || (item.age_band === 'BASIC_PLAN' || item.age_band === 'BASIC' ? 'Standard' : item.age_band) || "-";
-    const termVal = item.term_of_months || item.term_months;
-    const termLabel = termVal ? `${termVal}${suffix}` : "-";
-    const riderLabel = item.rider_name || item.basic_plan_name || "Basic Plan";
-    
-    return `
+  return sorted
+    .map((item) => {
+      const ageLabel =
+        item.attained_age ||
+        (item.age_band === "BASIC_PLAN" || item.age_band === "BASIC"
+          ? "Standard"
+          : item.age_band) ||
+        "-";
+      const termVal = item.term_of_months || item.term_months;
+      const termLabel = termVal ? `${termVal}${suffix}` : "-";
+      const riderLabel =
+        item.rider_name || item.basic_plan_name || "Basic Plan";
+
+      return `
 <tr>
   <td>${ageLabel}</td>
   <td>${termLabel}</td>
   <td>${riderLabel}</td>
   <td>${item.rate}</td>
 </tr>`;
-  }).join("");
+    })
+    .join("");
 };
 
 // Helper to generate chunked tables for 18-64 GCLI rates
-const generateChunkedRateTables = (rates, maturity, header, suffix, minAge = 18, maxAge = 64) => {
-    if (!Array.isArray(rates) || rates.length === 0) return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+const generateChunkedRateTables = (
+  rates,
+  maturity,
+  header,
+  suffix,
+  minAge = 18,
+  maxAge = 64,
+) => {
+  if (!Array.isArray(rates) || rates.length === 0)
+    return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
 
-    // Detect if we are dealing with monthly term rates
-    const isMonthly = rates.some(r => {
-        const t = r.term_of_months || r.term_months;
-        return t !== null && t !== undefined && t > 0 && t <= 120;
-    });
-    const displaySuffix = isMonthly ? " months" : suffix;
+  // Detect if we are dealing with monthly term rates
+  const isMonthly = rates.some((r) => {
+    const t = r.term_of_months || r.term_months;
+    return t !== null && t !== undefined && t > 0 && t <= 120;
+  });
+  const displaySuffix = isMonthly ? " months" : suffix;
 
-    return `
+  return `
         <div class="age-tables-container">
             <div class="age-table-box" style="flex: 0 0 100%;">
                 <table class="compact-table">
