@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as Model from '../models/financial_Insurance_form.model.js';
+import * as ActuarialModel from '../models/actuarial_api/actuarial.model.js';
 import * as User from '../models/user/user_model.js';
 import { success, error } from '../utils/response.js';
 import { auditLog, AuditStatus, AuditActions, normalizeIp } from '../utils/logger.js';
@@ -222,6 +223,14 @@ export const updateApplicationStatus = async (req, res) => {
 
                 if (pendingRequirements.length > 0) {
                     return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
+                }
+            }
+
+            // Release Check: Customized Proposals must be Released (15) by Actuarial before booking
+            const PROTOTYPE_TYPE_ID = 30;
+            if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
+                if (Number(app.status_id) !== 15) {
+                    return error(res, 'Cannot mark as BOOKED. Only proposals that have been Released by the Actuarial department can be booked.', 400);
                 }
             }
 
@@ -1578,7 +1587,7 @@ export const setStatusApproved = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
-        const STATUS_APPROVED = 2;
+        const STATUS_APPROVED = 14;
 
         const loggedInUser = await User.getUserById(userId);
         const isAuthorized = loggedInUser && (Number(loggedInUser.role_id) === 15 || Number(loggedInUser.role_id) === 2);
@@ -1643,6 +1652,15 @@ export const setStatusBooked = async (req, res) => {
 
             if (pendingRequirements.length > 0) {
                 return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
+            }
+        }
+
+        // Rate Check: Customized Proposals must have actuarial rates defined
+        const PROTOTYPE_TYPE_ID = 30;
+        // Release Check: Customized Proposals must be Released (15) by Actuarial before booking
+        if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
+            if (Number(app.status_id) !== 15) {
+                return error(res, 'Cannot mark as BOOKED. Only proposals that have been Released by the Actuarial department can be booked.', 400);
             }
         }
 

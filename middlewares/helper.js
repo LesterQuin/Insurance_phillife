@@ -72,7 +72,8 @@ export const updateActuarialStatus = async (applicationId, userId) => {
     const user = await User.getUserById(userId);
     const isSuperAdmin = user && user.roleName === 'Super Admin';
 
-    if (app.status_id === 4 || app.status_id === 6 || (app.status_id === 3 && !isSuperAdmin)) return;
+    // Prevent updating status if it is Released (15), Closed (6), or Rejected (17) (unless Super Admin)
+    if (Number(app.status_id) === 15 || Number(app.status_id) === 6 || (Number(app.status_id) === 17 && !isSuperAdmin)) return;
 
     const rates = await ActuarialModel.getApplicationRates(applicationId);
     const hasRates = rates && rates.length > 0;
@@ -81,11 +82,11 @@ export const updateActuarialStatus = async (applicationId, userId) => {
 
     let newStatusId = app.status_id;
     if (hasRates && hasPremium && hasNotes) {
-        newStatusId = 2; // Approved
+        newStatusId = 14; // Approved
     } else if (hasRates || hasPremium || hasNotes) {
-        newStatusId = 1; // Pending
+        newStatusId = 13; // Rating
     } else {
-        newStatusId = 5; // Checking
+        newStatusId = 8; // Pending
     }
 
     if (newStatusId !== app.status_id) {

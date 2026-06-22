@@ -118,8 +118,8 @@ export const releaseApplication = async (req, res) => {
         const existingApplication = await MainModel.getApplicationById(id);
         if (!existingApplication) return error(res, 'Application not found', 404);
 
-        const STATUS_APPROVED = 2;
-        const STATUS_RELEASED = 6;
+        const STATUS_APPROVED = 14;
+        const STATUS_RELEASED = 15;
 
         if (Number(existingApplication.status_id) !== STATUS_APPROVED) {
             return error(res, 'Only applications with "Approved" status can be finalized and released.', 400);
@@ -158,12 +158,12 @@ export const rejectApplication = async (req, res) => {
         const existingApplication = await MainModel.getApplicationById(id);
         if (!existingApplication) return error(res, 'Application not found', 404);
 
-        // Terminal or Draft states cannot be rejected
-        if ([3, 4, 6].includes(Number(existingApplication.status_id))) {
+        // Terminal or Draft states cannot be rejected (17 = Rejected, 15 = Released, 6 = Closed)
+        if ([17, 15, 6].includes(Number(existingApplication.status_id))) {
             return error(res, 'Applications that are already Rejected, Released, or in Draft cannot be updated to Rejected status.', 400);
         }
 
-        const STATUS_REJECTED = 3;
+        const STATUS_REJECTED = 17;
         await MainModel.updateApplication(id, { status_id: STATUS_REJECTED }, userId);
 
         const updatedApp = await MainModel.getApplicationById(id);
@@ -196,12 +196,13 @@ export const unrejectApplication = async (req, res) => {
         if (!existingApplication) return error(res, 'Application not found', 404);
 
         // Check if the application is actually rejected
-        if (Number(existingApplication.status_id) !== 3) {
+        if (Number(existingApplication.status_id) !== 17) {
             return error(res, 'Only applications with "Rejected" status can be un-rejected.', 400);
         }
 
-        const STATUS_PENDING = 1;
+        const STATUS_PENDING = 8;
         await MainModel.updateApplication(id, { status_id: STATUS_PENDING }, userId);
+        await updateActuarialStatus(id, userId);
 
         const updatedApp = await MainModel.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);

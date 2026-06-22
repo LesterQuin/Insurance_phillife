@@ -1537,9 +1537,9 @@ export const validateRates = [
             const app = await Financial.getApplicationById(applicationId);
             if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
 
-            // Allow rate input for Checking (5), Pending (1), and Approved (2)
-            if (![1, 2, 5].includes(Number(app.status_id))) {
-                throw new Error('Only proposals with a status of Checking or Pending can be computed.');
+            // Allow rate input for Checking (5), Pending (8), Rating (13), and Approved (14)
+            if (![5, 8, 13, 14].includes(Number(app.status_id))) {
+                throw new Error('Only proposals with a status of Pending or Rating can be computed.');
             }
 
             const planId = Number(app.plan_id);
