@@ -11,13 +11,16 @@ import {
     validateLogout,
     validateAdminUpdateUser, 
     validateAdminIT,
+    validateIsAdmin,
     validateUpdateProfile 
 } from '../../middlewares/validate.js';
 
 const router = express.Router();
 
 // Public routes
-router.post('/register', authLimiter, validateRegister, Controller.register);
+router.get('/hierarchies', Controller.getHierarchies);
+router.get('/potential-superiors', Controller.getPotentialSuperiors);
+router.post('/register', authenticate, validateIsAdmin, validateRegister, Controller.register);
 router.post('/login', authLimiter, validateLogin, Controller.login);
 router.post('/verify-otp', authLimiter, validateVerifyOTP, Controller.verifyOTP);
 router.post('/resend-otp', authLimiter, validateResendOTP, Controller.resendOTP);

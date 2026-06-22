@@ -2,7 +2,7 @@ import { poolPromise, sql } from '../../config/db.js';
 
 export const getAll = async () => {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT * FROM DHUB.sg.financial_insurance_system_lookups WHERE is_active = 1 ORDER BY category, name');
+    const result = await pool.request().query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE is_active = 1 ORDER BY category, name');
     return result.recordset;
 };
 
@@ -10,7 +10,7 @@ export const getById = async (id) => {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('id', sql.Int, id)
-        .query('SELECT * FROM DHUB.sg.financial_insurance_system_lookups WHERE id = @id');
+        .query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE id = @id');
     return result.recordset[0];
 };
 
@@ -18,13 +18,13 @@ export const getByCategory = async (category) => {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('category', sql.NVarChar, category)
-        .query('SELECT * FROM DHUB.sg.financial_insurance_system_lookups WHERE category = @category AND is_active = 1 ORDER BY name');
+        .query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE category = @category AND is_active = 1 ORDER BY name');
     return result.recordset;
 };
 
 export const getCategories = async () => {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT DISTINCT category FROM DHUB.sg.financial_insurance_system_lookups WHERE is_active = 1 ORDER BY category');
+    const result = await pool.request().query('SELECT DISTINCT category FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE is_active = 1 ORDER BY category');
     return result.recordset.map(row => row.category);
 };
 
@@ -36,7 +36,7 @@ export const create = async (data) => {
         .input('code', sql.NVarChar, data.code)
         .input('is_active', sql.Bit, data.is_active ?? 1)
         .query(`
-            INSERT INTO DHUB.sg.financial_insurance_system_lookups (category, name, code, is_active, created_at)
+            INSERT INTO DHUB_UAT.sg.financial_insurance_system_lookups (category, name, code, is_active, created_at)
             VALUES (@category, @name, @code, @is_active, GETDATE());
             SELECT SCOPE_IDENTITY() AS id;
         `);
@@ -69,7 +69,7 @@ export const update = async (id, data) => {
 
     if (setClauses.length > 0) {
         await request.query(`
-            UPDATE DHUB.sg.financial_insurance_system_lookups
+            UPDATE DHUB_UAT.sg.financial_insurance_system_lookups
             SET ${setClauses.join(', ')}
             WHERE id = @id
         `);
@@ -81,6 +81,6 @@ export const deleteLookup = async (id) => {
     const pool = await poolPromise;
     await pool.request()
         .input('id', sql.Int, id)
-        .query('UPDATE DHUB.sg.financial_insurance_system_lookups SET is_active = 0 WHERE id = @id');
+        .query('UPDATE DHUB_UAT.sg.financial_insurance_system_lookups SET is_active = 0 WHERE id = @id');
     return { deleted: true };
 };

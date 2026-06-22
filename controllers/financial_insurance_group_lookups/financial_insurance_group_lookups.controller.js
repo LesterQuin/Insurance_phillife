@@ -46,6 +46,7 @@ export const getByLoanAmountType = (req, res) => fetchByCategory(res, 'LOAN_AMOU
 export const getByPaymentTerm = (req, res) => fetchByCategory(res, 'PAYMENT_TERM');
 export const getByPaymentYear = (req, res) => fetchByCategory(res, 'PAYMENT_YEAR');
 export const getByChannelType = (req, res) => fetchByCategory(res, 'CHANNEL_TYPE');
+export const getByStatusProposal = (req, res) => fetchByCategory(res, 'STATUS_PROPOSAL');
 
 // Generic Get by Category (Optional usage via params)
 export const getByCategory = async (req, res) => {

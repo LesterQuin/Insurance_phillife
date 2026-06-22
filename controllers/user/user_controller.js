@@ -17,6 +17,10 @@ import dns from 'node:dns';
 // This often causes "network_error" on servers that have IPv6 enabled but unconfigured.
 dns.setDefaultResultOrder('ipv4first');
 
+// Role Constants for Business Logic
+const ROLE_CFE = 3;
+const ROLE_SUPER_ADMIN = 15;
+
 // If you do not have SSL configured yet or are behind an SSL-inspecting firewall, 
 // this line allows Node.js to connect to Azure despite certificate validation issues.
 // WARNING: Use this for testing only. Enable SSL for production.
@@ -107,6 +111,63 @@ const cookieOptions = {
 // Helper: generate random OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+export const getHierarchies = async (req, res) => {
+    try {
+        const [roles, departments, locations, superiors] = await Promise.all([
+            User.getLookupListByCategory('ROLE'),
+            User.getLookupListByCategory('DEPARTMENT'),
+            User.getLookupListByCategory('LOCATION'),
+            User.getPotentialSuperiors() // This should return users with roles like 'Team Leader'
+        ]);
+
+        return res.status(200).json({
+            status: true,
+            message: 'Registration hierarchies fetched successfully',
+            data: {
+                roles,
+                departments,
+                locations,
+                superiors: superiors.map(s => ({
+                    user_id: s.user_id,
+                    full_name: `${s.firstname} ${s.lastname}`,
+                    role: s.roleName
+                }))
+            }
+        });
+    } catch (err) {
+        console.error('FETCH HIERARCHIES ERROR:', err);
+        return res.status(500).json({
+            status: false,
+            message: 'Error fetching hierarchy data',
+            error: err.message
+        });
+    }
+};
+
+export const getPotentialSuperiors = async (req, res) => {
+    try {
+        const superiors = await User.getPotentialSuperiors();
+
+        return res.status(200).json({
+            status: true,
+            message: 'Potential superiors fetched successfully',
+            data: superiors.map(s => ({
+                user_id: s.user_id,
+                full_name: `${s.firstname} ${s.lastname}`,
+                role: s.roleName,
+                department: s.departmentName
+            }))
+        });
+    } catch (err) {
+        console.error('FETCH POTENTIAL SUPERIORS ERROR:', err);
+        return res.status(500).json({
+            status: false,
+            message: 'Error fetching potential superiors',
+            error: err.message
+        });
+    }
+};
+
 export const register = async (req, res) => {
     try {
         let {
@@ -119,7 +180,8 @@ export const register = async (req, res) => {
             role_id,
             department_id,
             location_id,
-            phoneNumber
+            phoneNumber,
+            reporting_to_id
         } = req.body;
 
         // Validation is now handled by middleware
@@ -128,6 +190,21 @@ export const register = async (req, res) => {
         role_id = role_id ? Number(role_id) : 1;
         department_id = department_id ? Number(department_id) : null;
         location_id = location_id ? Number(location_id) : null;
+        reporting_to_id = reporting_to_id ? Number(reporting_to_id) : null;
+
+        if (role_id === ROLE_CFE && !reporting_to_id) {
+            return res.status(400).json({
+                status: false,
+                message: "Corporate Financial Executives (CFE) must report to a designated head."
+            });
+        }
+
+        if (role_id === ROLE_SUPER_ADMIN && reporting_to_id) {
+            return res.status(400).json({
+                status: false,
+                message: "Super Admin accounts are top-level and cannot report to a designated head."
+            });
+        }
 
         // Check if email already exists
         const existing = await User.getUserByEmail(email);
@@ -148,7 +225,8 @@ export const register = async (req, res) => {
             role_id,
             department_id,
             location_id,
-            phoneNumber
+            phoneNumber,
+            reporting_to_id
         });
 
         await transporter.sendMail({
@@ -656,7 +734,7 @@ export const updateProfile = async (req, res) => {
 export const adminUpdateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { role_id, department_id, location_id } = req.body;
+        const { role_id, department_id, location_id, reporting_to_id } = req.body;
 
         // Prevent a super admin from modifying their own role/department/location via this route
         if (Number(req.user.user_id) === Number(userId)) {
@@ -669,12 +747,28 @@ export const adminUpdateUser = async (req, res) => {
             return res.status(404).json({ status: false, message: 'User not found.' });
         }
 
+        // Apply hierarchy business logic
+        if (role_id === ROLE_CFE && !reporting_to_id) {
+            return res.status(400).json({
+                status: false,
+                message: "Corporate Financial Executives (CFE) must report to a designated head."
+            });
+        }
+
+        if (role_id === ROLE_SUPER_ADMIN && reporting_to_id) {
+            return res.status(400).json({
+                status: false,
+                message: "Super Admin accounts cannot report to a designated head."
+            });
+        }
+
         // The validation middleware has already checked if the IDs are valid.
         // Now, call a new model function to perform the update.
         const updatedUser = await User.adminUpdateUser(userId, {
             role_id,
             department_id,
-            location_id
+            location_id,
+            reporting_to_id
         });
 
         await auditLog(req, {
@@ -682,7 +776,7 @@ export const adminUpdateUser = async (req, res) => {
             action: AuditActions.USER_UPDATED,
             entity: 'UserMgmt',
             entityId: userId,
-            metadata: { role_id, department_id, location_id }
+            metadata: { role_id, department_id, location_id, reporting_to_id }
         });
 
         res.json({
@@ -774,13 +868,15 @@ export const getAllUsers = async (req, res) => {
                 role_id, role_name, 
                 department_id, department_name, 
                 location_id, location_name,
+                reporting_to_id, reporting_to_name,
                 ...rest 
             } = user;
             return {
                 ...rest,
                 role: { id: role_id, name: role_name },
                 department: { id: department_id, name: department_name },
-                location: { id: location_id, name: location_name }
+                location: { id: location_id, name: location_name },
+                reporting_to: reporting_to_id ? { id: reporting_to_id, name: reporting_to_name } : null
             };
         });
 
@@ -811,6 +907,7 @@ export const getUserById = async (req, res) => {
             role_id, roleName,
             department_id, departmentName, departmentCode,
             location_id, locationName,
+            reporting_to_id, reportingToName,
             ...rest 
         } = user;
 
@@ -820,7 +917,8 @@ export const getUserById = async (req, res) => {
                 ...rest,
                 role: { id: role_id, name: roleName },
                 department: { id: department_id, name: departmentName, code: departmentCode },
-                location: { id: location_id, name: locationName }
+                location: { id: location_id, name: locationName },
+                reporting_to: reporting_to_id ? { id: reporting_to_id, name: reportingToName } : null
             }
         });
 

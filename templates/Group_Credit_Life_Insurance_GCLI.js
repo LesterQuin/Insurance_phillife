@@ -183,9 +183,8 @@ export const generateGCLIPDFContent = (application, user, details) => {
             size: A4;
             margin: 0;
         }
-
         html, body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; 
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif; line-height: 1.6; color: #202124; 
         }
         h2 {
             color: #0d47a1;
@@ -199,10 +198,12 @@ export const generateGCLIPDFContent = (application, user, details) => {
         h3 { 
             margin-top: 30px; break-after: avoid; page-break-after: avoid; 
         }
-        .section-group { 
+        .main-content p { font-size: 11pt; }
+        .section-group, .notes, .installation-requirements, .signature-section { 
             break-inside: auto; page-break-inside: auto; 
+            padding-left: 5mm;
         }
-        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
+        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         table { 
             width: 100%; border-collapse: collapse; margin-top: 15px; 
         }
@@ -273,8 +274,8 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
         .header-table strong {
             display: block;
-            color: #000;
-            font-size: 10pt;
+            color: #202124;
+            font-size: 11pt;
             text-transform: uppercase;
             margin-bottom: 0;
         }
@@ -409,14 +410,14 @@ export const generateGCLIPDFContent = (application, user, details) => {
 <body>
     <!-- To disable the watermark entirely, you can comment out the line below: -->
     ${
-        Number(application.status?.id || application.status_id) !== 7 &&
-        logoDataUri
+      Number(application.status?.id || application.status_id) !== 7 &&
+      logoDataUri
         ? `<div class="watermark"></div>`
         : ""
     }
 
     ${
-        footerPhotoUri
+      footerPhotoUri
         ? `
         <div class="subsequent-footer">
             <div class="plan-name-footer">${planName}</div>
@@ -458,7 +459,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
 
     ${
-        page2FooterPhotoUri
+      page2FooterPhotoUri
         ? `
         <div class="page2-footer">
             <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
@@ -500,7 +501,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             ${user.roleName || "Corporate Financial Executive"} <br>
             ${user.departmentName || "N/A"}
         </p>
-</div>
+    </div>
 
 <div class="page-break"></div>
     <div class="plan-details">
@@ -532,7 +533,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         </tr>
 
         ${
-            application.borrower_age_66_70
+          application.borrower_age_66_70
             ? `
         <tr>
             <td>66-70</td>
@@ -542,7 +543,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         ${
-            application.borrower_age_71_75
+          application.borrower_age_71_75
             ? `
         <tr>
             <td>71-75</td>
@@ -552,7 +553,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         ${
-            application.borrower_age_76_80
+          application.borrower_age_76_80
             ? `
         <tr>
             <td>76-80</td>
@@ -574,7 +575,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
 
         ${
-            application.borrower_age_66_70
+          application.borrower_age_66_70
             ? `
             <h2 style="margin-top:10px;">SINGLE RATE PER 1,000</h2>
                 <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers 66-70</p>
@@ -584,7 +585,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         ${
-            application.borrower_age_71_75
+          application.borrower_age_71_75
             ? `
             <h2 style="margin-top:10px;">SINGLE RATE PER 1,000</h2>
                 <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers 71-75</p>
@@ -594,7 +595,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         ${
-            application.borrower_age_76_80
+          application.borrower_age_76_80
             ? `
             <h2 style="margin-top:10px;">SINGLE RATE PER 1,000</h2>
                 <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers 76-80</p>
@@ -618,13 +619,15 @@ export const generateGCLIPDFContent = (application, user, details) => {
 
         <p>
             3. <strong>Eligibility Requirements</strong><br>
-                A. Any in good health and actively-at-work debtor of the Policyholder who is at
-            least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
-            at the time of loan application. Actively-at-work means
-        <ul>
-            <li>Performing usual duties of occupation and/or performing activities of daily living</li>
-            <li>Engaged in lawful employment or business</li>
-        </ul>
+            <div style="text-indent: 20px;">
+                Any in good health and actively-at-work debtor of the Policyholder who is at
+                least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
+                at the time of loan application. Actively-at-work means
+            </div>
+            <ul>
+                <li>Performing usual duties of occupation and/or performing activities of daily living</li>
+                <li>Engaged in lawful employment or business</li>
+            </ul>
         </p>
 
         <p>
@@ -648,7 +651,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         <div style="margin-bottom: 12px;">
             6. <strong>Evidence of Insurability</strong>
             ${
-                application.evidence_notes
+              application.evidence_notes
                 ? `
             <div style="margin-left: 5mm; margin-top: 1px;">
                 ${application.evidence_notes}

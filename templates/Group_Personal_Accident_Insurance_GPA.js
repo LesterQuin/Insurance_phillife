@@ -1,3 +1,5 @@
+import { generateSummaryOfBenefits } from './plan_riders.js';
+
 // Helper to format numbers with commas for currency.
 const capitalize = (str) => {
   if (!str) return "";
@@ -114,7 +116,7 @@ const generateChunkedRateTables = (
  * @param {object} details - An object containing plan-specific details like rates and premiums.
  * @returns {string} - The complete HTML content for the proposal.
  */
-export const generateGCLIPDFContent = (application, user, details) => {
+export const generateGPAPDFContent = (application, user, details) => {
   const proposalDate = new Date(application.updated_at);
   const expiryDate = new Date(proposalDate);
   expiryDate.setDate(expiryDate.getDate() + 30);
@@ -175,7 +177,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Group Credit Life Insurance Proposal (GCLIP)</title>
+<title>Group Personal Accident Insurance Proposal (GPA)</title>
     <style>
         @page {
             size: A4;
@@ -183,7 +185,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
 
         html, body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; 
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif; line-height: 1.6; color: #202124; 
         }
         h2 {
             color: #0d47a1;
@@ -197,10 +199,12 @@ export const generateGCLIPDFContent = (application, user, details) => {
         h3 { 
             margin-top: 30px; break-after: avoid; page-break-after: avoid; 
         }
-        .section-group { 
+        .main-content p { font-size: 11pt; }    
+        .section-group, .notes, .installation-requirements, .signature-section { 
             break-inside: auto; page-break-inside: auto; 
+            padding-left: 5mm;
         }
-        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
+        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         table { 
             width: 100%; border-collapse: collapse; margin-top: 15px; 
         }
@@ -271,8 +275,8 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
         .header-table strong {
             display: block;
-            color: #000;
-            font-size: 10pt;
+            color: #202124;
+            font-size: 11pt;
             text-transform: uppercase;
             margin-bottom: 0;
         }
@@ -440,11 +444,6 @@ export const generateGCLIPDFContent = (application, user, details) => {
                 <td><strong>Proposal Status:</strong><br>${capitalize(application.proposal_status_name || application.status?.name || "New")}</td>
                 <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
             </tr>
-            <tr>
-                <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || "")}</td>
-                <td><strong>Total Annual Premium:</strong><br>Php ${formatNumber(totalAnnualPremium)}</td>
-                <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || "")}</td>
-            </tr>
         </table>
     </div>
     <div class="cover-bottom">
@@ -481,7 +480,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
 
             <p>
-            We are pleased to present our ${application.basic_plan?.name || "Group Credit Life Insurance Proposal"}, designed to provide 
+            We are pleased to present our ${application.basic_plan?.name || "Group Personal Accident Insurance Proposal"}, designed to provide 
             ${application.group_name || ""} and its valued members with comprehensive protection, financial security, and peace of mind.
             </p>
 
@@ -516,65 +515,10 @@ export const generateGCLIPDFContent = (application, user, details) => {
             <tbody><tr><td>
                 <div class="section-group">
                 <h2>Summary of Benefits</h2>
+                ${generateSummaryOfBenefits(application, application.riders || [])}
+                </div>
 
-                <p>
-                    <strong>Group Credit Life Insurance Plan (GCLIP) – Initial Loan Amount</strong>
-                </p>
-
-                <p>
-                    Pays the initial loan amount upon approval of proof of death of the borrower
-                    while the policy is in force and during the defined period, subject to the
-                    maximum amount.
-                </p>
-    <table>
-
-        <tr>
-            <th>Classification</th>
-            <th>Benefit</th>
-        </tr>
-
-        <tr>
-            <td>${application.minimum_age || 18}-${application.maximum_age || 65}</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_65)}</td>
-        </tr>
-
-        ${
-          application.borrower_age_66_70
-            ? `
-        <tr>
-            <td>66-70</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount66_70)}</td>
-        </tr>`
-            : ""
-        }
-
-        ${
-          application.borrower_age_71_75
-            ? `
-        <tr>
-            <td>71-75</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount71_75)}</td>
-        </tr>`
-            : ""
-        }
-
-        ${
-          application.borrower_age_76_80
-            ? `
-        <tr>
-            <td>76-80</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount76_80)}</td>
-        </tr>`
-            : ""
-        }
-    </table>
-
-    <p>
-    Death benefit is the Amount of Insurance at loan effective date. It is level
-    throughout the term of the loan.
-    </p>
-</div>
-
+<div class="page-break"></div>
 <div class="section-group">
     <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age ${application.minimum_age}-${application.maximum_age})</h2>
     ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
@@ -619,26 +563,45 @@ ${
 
     <p>
         2. <strong>Eligibility Requirements</strong><br>
-            A. Any in good health and actively-at-work debtor of the Policyholder who is at
-        least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
+        <div style="text-indent: 20px;">
+            Any regular, in good health and actively-at-work employee of the
+        Policyholder who is at least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
         at the time of loan application. Actively-at-work means
-    <ul>
-        <li>Performing usual duties of occupation and/or performing activities of daily living</li>
-        <li>Engaged in lawful employment or business</li>
-    </ul>
+        </div>
     </p>
 
     <p>
-        3. <strong>Termination of Insurance</strong><br>
-        Insurance coverage automatically terminates on the earliest of the following dates:
+        3. <strong>Termination Age</strong>
     </p>
 
-    <ul>
-        <li>The date the policy terminates</li>
-        <li>The policy anniversary immediately succeeding the date of the Debtor attains the termination age</li>
-        <li>The date any payment towards the loan becomes six (6) months overdue, not with standing payment for his insurance</li>
-        <li>The Insured Debtor ceases to be a debtor of the Creditor</li>
-        <li>The date the loan matures</li>
+    <ul style="margin-top: 2px; margin-left: 5mm; padding-left: 15px; font-size: 12pt;">
+        <li>
+            <strong>
+                ${
+                  application.basic_plan?.name?.includes(
+                    `(${application.basic_plan?.acronym})`,
+                  )
+                    ? application.basic_plan.name
+                    : `${application.basic_plan?.name || "Basic Plan"}${application.basic_plan?.acronym ? ` (${application.basic_plan.acronym})` : ""}`
+                }
+            </strong> : Coverage terminates at age 65.
+        </li>
+
+        ${(application.riders || [])
+          .map(
+            (r) => `
+                <li>
+                    <strong>
+                        ${
+                          r.rider_name?.includes(`(${r.acronym})`)
+                            ? r.rider_name
+                            : `${r.rider_name || "Rider"}${r.acronym ? ` (${r.acronym})` : ""}`
+                        }
+                    </strong> : Coverage terminates at age 65.
+                </li>
+            `,
+          )
+          .join("")}
     </ul>
 
     <div style="margin-bottom: 12px;">
@@ -661,13 +624,10 @@ ${
 
     <p>
         6. <strong>Payment of Benefits</strong><br>
-        Upon approval of proof of death of the Debtor while the insurance is in force , PHILLIFE shall pay the following:
+        This proposal is subject to the complete provisions to be provided in the Policy.
+        In case of conflict between this proposal and the Policy, the provisions of the
+        latter shall apply.
     </p>
-
-    <ul>
-        <li>To the Policyholder: the Outstanding balance of the Debtor's loan</li>
-        <li>To the Debtor's benefeciaries: the difference, if any, between the amount of insurance and the outstanding balance of the Debtor's loan. Outstanding balance were derived from amortization of the insured.</li>
-    </ul>
 
     <p>
         7. This proposal is subject to the complete provisions to be provided in the Policy.

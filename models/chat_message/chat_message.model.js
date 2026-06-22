@@ -17,10 +17,10 @@ export const getCommentsByApplicationId = async (applicationId) => {
                 u.firstname + ISNULL(' ' + NULLIF(u.middlename, '') + '.', '') + ' ' + u.lastname AS commenter_name,
                 d.name AS department_name,
                 r.name AS role_name
-            FROM DHUB.sg.financial_insurance_application_comments c
-            JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
-            LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
-            LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            FROM DHUB_UAT.sg.financial_insurance_application_comments c
+            JOIN DHUB_UAT.sg.financial_insurance_users u ON c.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
             WHERE c.application_id = @applicationId
         `);
     return result.recordset;
@@ -33,12 +33,12 @@ export const isUserAuthorizedToView = async (applicationId, userId) => {
         .input('userId', sql.Int, userId)
         .query(`
             SELECT TOP 1 1 as authorized
-            FROM DHUB.sg.financial_insurance_application a
+            FROM DHUB_UAT.sg.financial_insurance_application a
             WHERE a.application_id = @applicationId 
                 AND (
                     a.user_id = @userId 
                     OR EXISTS (
-                        SELECT 1 FROM DHUB.sg.financial_insurance_application_comments 
+                        SELECT 1 FROM DHUB_UAT.sg.financial_insurance_application_comments 
                         WHERE application_id = @applicationId AND user_id = @userId
                     )
                 )
@@ -53,7 +53,7 @@ export const createComment = async (data) => {
         .input('userId', sql.Int, data.user_id)
         .input('commentText', sql.NVarChar(sql.MAX), data.comment_text)
         .query(`
-            INSERT INTO DHUB.sg.financial_insurance_application_comments (application_id, user_id, comment_text)
+            INSERT INTO DHUB_UAT.sg.financial_insurance_application_comments (application_id, user_id, comment_text)
             VALUES (@applicationId, @userId, @commentText);
             SELECT SCOPE_IDENTITY() AS comment_id;
         `);
@@ -70,10 +70,10 @@ export const getCommentById = async (commentId) => {
                 u.firstname + ISNULL(' ' + NULLIF(u.middlename, '') + '.', '') + ' ' + u.lastname AS commenter_name,
                 d.name AS department_name,
                 r.name AS role_name
-            FROM DHUB.sg.financial_insurance_application_comments c
-            JOIN DHUB.sg.financial_insurance_users u ON c.user_id = u.user_id
-            LEFT JOIN DHUB.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
-            LEFT JOIN DHUB.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            FROM DHUB_UAT.sg.financial_insurance_application_comments c
+            JOIN DHUB_UAT.sg.financial_insurance_users u ON c.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
             WHERE c.comment_id = @commentId AND (c.is_deleted = 0 OR c.is_deleted IS NULL)
         `);
     return result.recordset[0];
@@ -85,7 +85,7 @@ export const updateComment = async (commentId, text) => {
         .input('commentId', sql.Int, commentId)
         .input('commentText', sql.NVarChar(sql.MAX), text)
         .query(`
-            UPDATE DHUB.sg.financial_insurance_application_comments 
+            UPDATE DHUB_UAT.sg.financial_insurance_application_comments 
             SET comment_text = @commentText, updated_at = GETDATE()
             WHERE comment_id = @commentId AND (is_deleted = 0 OR is_deleted IS NULL)
         `);
@@ -97,7 +97,7 @@ export const deleteComment = async (commentId) => {
     const result = await pool.request()
         .input('commentId', sql.Int, commentId)
         .query(`
-            UPDATE DHUB.sg.financial_insurance_application_comments 
+            UPDATE DHUB_UAT.sg.financial_insurance_application_comments 
             SET is_deleted = 1, deleted_at = GETDATE() 
             WHERE comment_id = @commentId
         `);

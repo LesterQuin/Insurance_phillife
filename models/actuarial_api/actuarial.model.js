@@ -11,8 +11,8 @@ export const saveApplicationRates = async (applicationId, ratesData, userId) => 
             .input('appId', sql.Int, applicationId)
             .query(`
                 SELECT fia.plan_id, bp.basic_plan_name 
-                FROM DHUB.sg.financial_insurance_application fia
-                LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+                FROM DHUB_UAT.sg.financial_insurance_application fia
+                LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
                 WHERE fia.application_id = @appId
             `);
         
@@ -20,12 +20,12 @@ export const saveApplicationRates = async (applicationId, ratesData, userId) => 
         const basicPlanName = appRes.recordset[0]?.basic_plan_name || 'Basic Plan';
 
         const tableName = planId === 1
-            ? 'DHUB.sg.financial_insurance_actuarial_rates_gcli'
+            ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli'
             : planId === 2 
-                ? 'DHUB.sg.financial_insurance_actuarial_rates_gyrt' 
+                ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' 
                 : planId === 3 
-                    ? 'DHUB.sg.financial_insurance_actuarial_rates_gpa' 
-                    : 'DHUB.sg.financial_insurance_application_rates';
+                    ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa' 
+                    : 'DHUB_UAT.sg.financial_insurance_application_rates';
 
         await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
@@ -135,29 +135,29 @@ export const getApplicationRates = async (applicationId) => {
     
     const appRes = await pool.request()
         .input('application_id', sql.Int, applicationId)
-        .query('SELECT plan_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @application_id');
+        .query('SELECT plan_id FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @application_id');
     
     const planId = appRes.recordset[0]?.plan_id;
     if (!planId) return [];
 
     let query = '';
     if (planId === 2 || planId === 3) {
-        const targetTable = planId === 2 ? 'DHUB.sg.financial_insurance_actuarial_rates_gyrt' : 'DHUB.sg.financial_insurance_actuarial_rates_gpa';
+        const targetTable = planId === 2 ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' : 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa';
         // Query for product specific table
         query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
-                 LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
-                 LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
+                 LEFT JOIN DHUB_UAT.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
     } else {
         // Standard rates table
         const targetTable = planId === 1 
-            ? 'DHUB.sg.financial_insurance_actuarial_rates_gcli' 
-            : 'DHUB.sg.financial_insurance_application_rates';
+            ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli' 
+            : 'DHUB_UAT.sg.financial_insurance_application_rates';
         query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
-                 LEFT JOIN DHUB.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
-                 LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
+                 LEFT JOIN DHUB_UAT.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
     }
 
@@ -176,12 +176,12 @@ export const getApplicationsPendingRates = async () => {
             SELECT fia.application_id, fia.group_name, fia.created_at, fia.borrower_age_66_70, fia.borrower_age_71_75, fia.borrower_age_76_80,
                 gl.name as proposal_type, p.product_name as plan_name, pp.name as prototype_name, u.firstname + ' ' + u.lastname as creator_name,
                 fia.total_annual_premium, fia.evidence_notes, ml.month_name as loan_maturity_name
-            FROM DHUB.sg.financial_insurance_application fia
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
-            LEFT JOIN DHUB.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
-            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
             WHERE fia.status_id IN (1, 5)
             ORDER BY fia.created_at ASC
         `);
@@ -196,12 +196,12 @@ export const getApplicationsPendingTotalPremium = async () => {
             SELECT fia.application_id, fia.group_name, fia.created_at, fia.borrower_age_66_70, fia.borrower_age_71_75, fia.borrower_age_76_80,
                 gl.name as proposal_type, p.product_name as plan_name, pp.name as prototype_name, u.firstname + ' ' + u.lastname as creator_name,
                 fia.total_annual_premium, fia.evidence_notes, ml.month_name as loan_maturity_name
-            FROM DHUB.sg.financial_insurance_application fia
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
-            LEFT JOIN DHUB.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
-            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
             WHERE fia.status_id IN (1, 5) AND fia.total_annual_premium IS NULL
             ORDER BY fia.created_at ASC
         `);

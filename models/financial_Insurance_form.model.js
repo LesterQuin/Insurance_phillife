@@ -10,7 +10,7 @@ const logApplicationAction = async (transaction, { applicationId, userId, action
         .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(changes))
         .input('ip_address', sql.NVarChar, ipAddress || null)
         .query(`
-            INSERT INTO DHUB.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+            INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
             VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
         `);
 };
@@ -33,7 +33,7 @@ export const createApplication = async (data, userId) => {
             .input('sub_business_nature_id', sql.Int, data.sub_business_nature_id ? Number(data.sub_business_nature_id) : null)
             .input('number_of_lives', sql.Int, data.number_of_lives)
             .input('business_address', sql.NVarChar, data.business_address)
-            .input('contact_number', sql.NVarChar, data.contact_number)
+            .input('contact_number', sql.NVarChar, data.contact_number || null)
             .input('fax_number', sql.NVarChar, data.fax_number || null)
             .input('email', sql.NVarChar, data.email)
             .input('contact_person_salutation', sql.NVarChar, data.contact_person_salutation)
@@ -56,7 +56,7 @@ export const createApplication = async (data, userId) => {
             .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
             .input('type_of_proposal_id', sql.Int, data.type_of_proposal_id)
             .input('prototype_id', sql.Int, data.prototype_id || null)
-            .input('status_id', sql.Int, data.status_id || 1)
+            .input('status_id', sql.Int, data.status_id || 8)
             .input('amount_loans_id', sql.Int, data.amount_loans_id || null)
             .input('max_loan_amount', sql.Decimal(18, 2), data.max_loan_amount || null)
             .input('min_loan_amount', sql.Decimal(18, 2), data.min_loan_amount || null)
@@ -77,24 +77,26 @@ export const createApplication = async (data, userId) => {
             .input('commission_rate', sql.NVarChar, data.commission_rate || null)
             .input('service_fee', sql.NVarChar, data.service_fee || null)
             .input('total_annual_premium', sql.Decimal(18, 2), data.total_annual_premium || null)
+            .input('proposal_status_id', sql.Int, data.proposal_status_id || null)
             .input('notes', sql.NVarChar(sql.MAX), data.notes || null)
             .input('evidence_notes', sql.NVarChar(sql.MAX), data.evidence_notes || null)
+            .input('expiry_date', sql.DateTime, data.expiry_date || null)
             .input('excel_file_path', sql.NVarChar(sql.MAX), data.excel_file_path || null)
             .query(`
-                INSERT INTO DHUB.sg.financial_insurance_application (
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application (
                     user_id, group_name, business_nature, business_nature_id, sub_business_nature_id, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, max_loan_amount, min_loan_amount, loan_portfolio_amount, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id, excel_file_path,
-                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, channel_type_id, channel_name, commission_rate, service_fee, total_annual_premium, notes, evidence_notes
+                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, channel_type_id, channel_name, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @business_nature_id, @sub_business_nature_id, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type,
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @max_loan_amount, @min_loan_amount, @loan_portfolio_amount, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id, @excel_file_path,
-                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @channel_type_id, @channel_name, @commission_rate, @service_fee, @total_annual_premium, @notes, @evidence_notes
+                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @channel_type_id, @channel_name, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -120,7 +122,7 @@ export const createApplication = async (data, userId) => {
                         .input('application_id', sql.Int, applicationId)
                         .input('sub_group_type_id', sql.Int, subGroupId)
                         .query(`
-                            INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
+                            INSERT INTO DHUB_UAT.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
                             VALUES (@application_id, @sub_group_type_id);
                         `);
                 }
@@ -150,7 +152,7 @@ export const createApplication = async (data, userId) => {
                             .input('rider_id', sql.Int, rider.rider_id)
                             .input('rider_amount', sql.Decimal(18, 2), finalValue.amount || null)
                             .input('rider_unit', sql.Int, finalValue.unit || null)
-                            .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
+                            .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
             }
@@ -164,7 +166,7 @@ export const createApplication = async (data, userId) => {
                     .input('designation', sql.NVarChar, rank.designation)
                     .input('amount', sql.Decimal(18, 2), rank.amount)
                     .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount) 
-                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                    .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                 
                 const rankingId = rankResult.recordset[0].id;
                 await insertRankingRiders(rankingId, rank.designation, data.riders);
@@ -181,7 +183,7 @@ export const createApplication = async (data, userId) => {
                     .input('amount', sql.Decimal(18, 2), rank.amount)
                     .input('salary_multiplier', sql.NVarChar, rank.salary_multiplier)
                     .input('total_coverage_amount', sql.Decimal(18, 2), totalAmount)
-                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                    .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                 
                 const rankingId = rankResult.recordset[0].id;
                 await insertRankingRiders(rankingId, rank.designation, data.riders);
@@ -194,7 +196,7 @@ export const createApplication = async (data, userId) => {
                 .input('amount', sql.Decimal(18, 2), uniformAmount)
                 .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                 .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
-                .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
+                .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
         }
 
         if (data.riders && Array.isArray(data.riders) && data.riders.length > 0) {
@@ -206,7 +208,7 @@ export const createApplication = async (data, userId) => {
                     .input('rider_amount', sql.Decimal(18, 2), rider.amount || null)
                     .input('rider_unit', sql.Int, rider.unit || null)
                     .query(`
-                        INSERT INTO DHUB.sg.financial_insurance_application_rider
+                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_rider
                         (application_id, rider_id, rider_amount, rider_unit)
                         VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
                     `);
@@ -235,7 +237,7 @@ export const getBulkCoverageRankings = async (applicationIds) => {
 
     const result = await request.query(`
         SELECT application_id, designation, amount, salary_multiplier, uniform_coverage_amount, total_coverage_amount
-        FROM DHUB.sg.financial_insurance_coverage_ranking
+        FROM DHUB_UAT.sg.financial_insurance_coverage_ranking
         WHERE application_id IN (${idParams})`);
     return result.recordset ?? [];
 };
@@ -261,9 +263,9 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
             cr.designation,
             crr.rider_amount,
             crr.rider_unit
-        FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr
-        JOIN DHUB.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
-        JOIN sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
+        FROM DHUB_UAT.sg.financial_insurance_coverage_ranking_rider crr
+        JOIN DHUB_UAT.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
+        JOIN DHUB_UAT.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
         WHERE cr.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -273,8 +275,20 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
 export const getAllApplications = async (userId = null) => {
     const pool = await poolPromise;
     const request = pool.request();
+
+    let whereCondition = '(@user_id IS NULL OR fia.user_id = @user_id)';
+    
+    if (Array.isArray(userId)) {
+        const idParams = userId.map((id, i) => {
+            request.input(`uId${i}`, sql.Int, id);
+            return `@uId${i}`;
+        }).join(',');
+        whereCondition = `fia.user_id IN (${idParams})`;
+    } else {
+        request.input('user_id', sql.Int, userId);
+    }
+
     const res = await request
-        .input('user_id', sql.Int, userId)
         .query(`
             SELECT
                 fia.application_id,
@@ -322,6 +336,7 @@ export const getAllApplications = async (userId = null) => {
                 fia.borrower_age_76_80,
                 fia.borrower_amount_76_80,
                 fia.borrower_amount_18_65,
+                fia.proposal_status_id,
                 fia.channel_type_id,
                 fia.channel_name,
                 fia.commission_rate,
@@ -332,7 +347,12 @@ export const getAllApplications = async (userId = null) => {
                 fia.evidence_notes,
                 fia.created_at,
                 fia.updated_at,
+                fia.expiry_date,
+                fia.extension_requested,
+                fia.extension_request_status_id,
+                ext.name AS extension_request_status_name,
                 fis.status_name,
+                ps.name AS proposal_status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
@@ -353,53 +373,104 @@ export const getAllApplications = async (userId = null) => {
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
-                u.suffix AS creator_suffix
-            FROM DHUB.sg.financial_insurance_application fia
-            LEFT JOIN DHUB.sg.financial_insurance_status fis
+                u.suffix AS creator_suffix,
+                req.signed_proposal_path,
+                req.group_app_path,
+                req.dti_path,
+                req.sec_reg_path,
+                req.articles_of_inc_path,
+                req.by_laws_path,
+                req.business_permit_path,
+                req.masterlist_file_path,
+                req.authorized_id_path,
+                req.booking_date
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gc
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups bt
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gt
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups topl
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN DHUB.sg.financial_insurance_product p
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
                 ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            LEFT JOIN DHUB.sg.financial_insurance_industries ind
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries ind
                 ON fia.business_nature_id = ind.id
-            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB.sg.financial_insurance_industries subind
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
-            LEFT JOIN DHUB.sg.financial_insurance_users u
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
-            WHERE (@user_id IS NULL OR fia.user_id = @user_id)
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+                ON fia.proposal_status_id = ps.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ext
+                ON fia.extension_request_status_id = ext.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+                ON fia.application_id = req.application_id
+            WHERE ${whereCondition}
             ORDER BY fia.created_at DESC;
         `);
 
     return res.recordset ?? [];
 };
 
+export const getExtensionRequests = async (userIds = null) => {
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    let query = `SELECT application_id FROM DHUB_UAT.sg.financial_insurance_application WHERE extension_requested = 1`;
+
+    if (userIds) {
+        if (Array.isArray(userIds)) {
+            const idParams = userIds.map((id, i) => {
+                request.input(`uId${i}`, sql.Int, id);
+                return `@uId${i}`;
+            }).join(',');
+            query += ` AND user_id IN (${idParams})`;
+        } else {
+            request.input('user_id', sql.Int, userIds);
+            query += ` AND user_id = @user_id`;
+        }
+    }
+
+    const result = await request.query(query);
+    return result.recordset.map(r => r.application_id);
+};
+
 // Get prototypes (type 30)
 export const getPrototypes = async (userId = null) => {
     const pool = await poolPromise;
     const request = pool.request();
+
+    let userCondition = '(@user_id IS NULL OR fia.user_id = @user_id)';
+    
+    if (Array.isArray(userId)) {
+        const idParams = userId.map((id, i) => {
+            request.input(`uId${i}`, sql.Int, id);
+            return `@uId${i}`;
+        }).join(',');
+        userCondition = `fia.user_id IN (${idParams})`;
+    } else {
+        request.input('user_id', sql.Int, userId);
+    }
+
     const res = await request
-        .input('user_id', sql.Int, userId)
         .query(`
             SELECT
                 fia.application_id, fia.user_id, fia.group_name, fia.number_of_lives,
@@ -421,6 +492,7 @@ export const getPrototypes = async (userId = null) => {
                 fia.borrower_age_76_80,
                 fia.borrower_amount_76_80,
                 fia.borrower_amount_18_65,
+                fia.proposal_status_id,
                 fia.channel_type_id,
                 fia.channel_name,
                 fia.commission_rate,
@@ -431,6 +503,7 @@ export const getPrototypes = async (userId = null) => {
                 fia.evidence_notes,
                 fia.created_at, fia.updated_at,
                 fis.status_name,
+                ps.name AS proposal_status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
@@ -448,9 +521,19 @@ export const getPrototypes = async (userId = null) => {
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
-                u.suffix AS creator_suffix
-            FROM DHUB.sg.financial_insurance_application fia
-            LEFT JOIN sg.financial_insurance_status fis ON fia.status_id = fis.status_id
+                u.suffix AS creator_suffix,
+                req.signed_proposal_path,
+                req.group_app_path,
+                req.dti_path,
+                req.sec_reg_path,
+                req.articles_of_inc_path,
+                req.by_laws_path,
+                req.business_permit_path,
+                req.masterlist_file_path,
+                req.authorized_id_path,
+                req.booking_date
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
             LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
             LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
@@ -458,14 +541,18 @@ export const getPrototypes = async (userId = null) => {
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB.sg.financial_insurance_users u ON fia.user_id = u.user_id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            WHERE fia.type_of_proposal_id = 30 AND (@user_id IS NULL OR fia.user_id = @user_id)
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+                ON fia.proposal_status_id = ps.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+                ON fia.application_id = req.application_id
+            WHERE fia.type_of_proposal_id = 30 AND ${userCondition}
             ORDER BY fia.created_at DESC
         `);
 
@@ -482,6 +569,7 @@ export const getApplicationById = async (id) => {
             SELECT 
                 fia.*,
                 fis.status_name,
+                ps.name AS proposal_status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
                 gt.name AS group_type_name,
@@ -502,40 +590,59 @@ export const getApplicationById = async (id) => {
                 u.firstname AS creator_firstname,
                 u.middlename AS creator_middlename,
                 u.lastname AS creator_lastname,
-                u.suffix AS creator_suffix
-            FROM DHUB.sg.financial_insurance_application fia
-            LEFT JOIN DHUB.sg.financial_insurance_status fis
+                u.suffix AS creator_suffix,
+                u.is_active AS creator_is_active,
+                u.agent_code AS creator_agent_code,
+                ext.name AS extension_request_status_name,
+                req.signed_proposal_path,
+                req.group_app_path,
+                req.dti_path,
+                req.sec_reg_path,
+                req.articles_of_inc_path,
+                req.by_laws_path,
+                req.business_permit_path,
+                req.masterlist_file_path,
+                req.authorized_id_path,
+                req.booking_date
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gc
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups bt
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups gt
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups pm
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups topl
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN DHUB.sg.financial_insurance_product p
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB.sg.financial_insurance_basic_plan bp
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
                 ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups al
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups ct
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB.sg.financial_insurance_group_lookups chant
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            LEFT JOIN DHUB.sg.financial_insurance_industries ind
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries ind
                 ON fia.business_nature_id = ind.id
-            LEFT JOIN DHUB.sg.financial_insurance_industries subind
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
-            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB.sg.financial_insurance_users u
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+                ON fia.proposal_status_id = ps.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ext
+                ON fia.extension_request_status_id = ext.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+                ON fia.application_id = req.application_id
             WHERE fia.application_id = @id
         `);
 
@@ -548,11 +655,27 @@ export const getApplicationByGroupName = async (groupName) => {
     const res = await pool.request()
         .input('group_name', sql.NVarChar, groupName)
         .query(`
-            SELECT TOP 1 application_id
-            FROM DHUB.sg.financial_insurance_application
+            SELECT TOP 1 application_id, user_id, created_at, status_id
+            FROM DHUB_UAT.sg.financial_insurance_application
             WHERE REPLACE(UPPER(group_name), ' ', '') = REPLACE(UPPER(@group_name), ' ', '')
         `);
     return res.recordset[0] || null;
+};
+
+// Search applications by partial group name for renewal lookup
+export const searchApplicationsByGroupName = async (groupName) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('group_name', sql.NVarChar, groupName)
+        .query(`
+            SELECT fia.application_id, fia.group_name, fia.created_at, fia.status_id, fia.user_id, fia.expiry_date,
+                   u.firstname, u.lastname, u.is_active, u.agent_code
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            WHERE fia.group_name LIKE '%' + @group_name + '%'
+            ORDER BY fia.created_at DESC
+        `);
+    return res.recordset ?? [];
 };
 
 // Update application - handles partial updates
@@ -582,7 +705,7 @@ export const updateApplication = async (id, data, userId) => {
                             .input('rider_id', sql.Int, rider.rider_id)
                             .input('rider_amount', sql.Decimal(18, 2), finalValue.amount || null)
                             .input('rider_unit', sql.Int, finalValue.unit || null)
-                            .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
+                            .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
             }
@@ -593,7 +716,7 @@ export const updateApplication = async (id, data, userId) => {
             const deleteSubGroupsRequest = new sql.Request(transaction);
             await deleteSubGroupsRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB.sg.financial_insurance_application_subgroup WHERE application_id = @application_id');
+                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_subgroup WHERE application_id = @application_id');
             
             if (data.sub_group_type_id) {
                 const subGroupIds = Array.isArray(data.sub_group_type_id) ? data.sub_group_type_id : [data.sub_group_type_id];
@@ -603,7 +726,7 @@ export const updateApplication = async (id, data, userId) => {
                         await insertSubGroupRequest
                             .input('application_id', sql.Int, id)
                             .input('sub_group_type_id', sql.Int, subGroupId)
-                            .query('INSERT INTO DHUB.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
+                            .query('INSERT INTO DHUB_UAT.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
                     }
                 }
             }
@@ -617,14 +740,14 @@ export const updateApplication = async (id, data, userId) => {
             const deleteRankingsRequest = new sql.Request(transaction);
             await deleteRankingsRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB.sg.financial_insurance_coverage_ranking WHERE application_id = @application_id');
+                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_coverage_ranking WHERE application_id = @application_id');
 
             let coverageTypeId = data.coverage_type_id;
             
             if (coverageTypeId === undefined) {
                 const currentApp = await new sql.Request(transaction)
                     .input('id', sql.Int, id)
-                    .query('SELECT coverage_type_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @id');
+                    .query('SELECT coverage_type_id FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @id');
                 coverageTypeId = currentApp.recordset[0]?.coverage_type_id;
             }
 
@@ -640,7 +763,7 @@ export const updateApplication = async (id, data, userId) => {
                         .input('designation', sql.NVarChar, rank.designation)
                         .input('amount', sql.Decimal(18, 2), rank.amount)
                         .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount)
-                        .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                        .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                     const rankingId = rankResult.recordset[0].id;
                     // Use new riders if provided, otherwise this will use undefined which is handled by insertRankingRiders
                     await insertRankingRiders(rankingId, rank.designation, data.riders); 
@@ -657,7 +780,7 @@ export const updateApplication = async (id, data, userId) => {
                         .input('amount', sql.Decimal(18, 2), rank.amount)
                         .input('salary_multiplier', sql.NVarChar, rank.salary_multiplier)
                         .input('total_coverage_amount', sql.Decimal(18, 2), totalAmount)
-                        .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                        .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                     const rankingId = rankResult.recordset[0].id;
                     await insertRankingRiders(rankingId, rank.designation, data.riders);
                 }
@@ -669,7 +792,7 @@ export const updateApplication = async (id, data, userId) => {
                     .input('amount', sql.Decimal(18, 2), uniformAmount)
                     .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                     .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
-                    .query(`INSERT INTO DHUB.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
+                    .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
             }
         } else if (areRidersUpdated) {
             // This block handles the case where ONLY riders are updated, but the ranking structure is not.
@@ -677,19 +800,19 @@ export const updateApplication = async (id, data, userId) => {
             let currentCoverageTypeId;
             const typeRes = await new sql.Request(transaction)
                 .input('appId', sql.Int, id)
-                .query('SELECT coverage_type_id FROM DHUB.sg.financial_insurance_application WHERE application_id = @appId');
+                .query('SELECT coverage_type_id FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId');
             currentCoverageTypeId = typeRes.recordset[0]?.coverage_type_id;
 
             if (currentCoverageTypeId === 32 || currentCoverageTypeId === 34) {
                 const existingRankingsRes = await new sql.Request(transaction)
                     .input('appId', sql.Int, id)
-                    .query('SELECT ranking_id, designation FROM DHUB.sg.financial_insurance_coverage_ranking WHERE application_id = @appId');
+                    .query('SELECT ranking_id, designation FROM DHUB_UAT.sg.financial_insurance_coverage_ranking WHERE application_id = @appId');
                 
                 const existingRankings = existingRankingsRes.recordset || [];
 
                 if (existingRankings.length > 0) {
                     // Delete existing ranking riders and re-insert new ones based on the updated rider list
-                    await new sql.Request(transaction).input('appId', sql.Int, id).query(`DELETE crr FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr JOIN DHUB.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id WHERE cr.application_id = @appId`);
+                    await new sql.Request(transaction).input('appId', sql.Int, id).query(`DELETE crr FROM DHUB_UAT.sg.financial_insurance_coverage_ranking_rider crr JOIN DHUB_UAT.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id WHERE cr.application_id = @appId`);
 
                     for (const rank of existingRankings) {
                         await insertRankingRiders(rank.ranking_id, rank.designation, data.riders);
@@ -703,7 +826,7 @@ export const updateApplication = async (id, data, userId) => {
             const deleteRidersRequest = new sql.Request(transaction);
             await deleteRidersRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB.sg.financial_insurance_application_rider WHERE application_id = @application_id');
+                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_rider WHERE application_id = @application_id');
 
             if (Array.isArray(data.riders) && data.riders.length > 0) {
                 for (const rider of data.riders) {
@@ -714,7 +837,7 @@ export const updateApplication = async (id, data, userId) => {
                         .input('rider_amount', sql.Decimal(18, 2), rider.amount || null)
                         .input('rider_unit', sql.Int, rider.unit || null)
                         .query(`
-                            INSERT INTO DHUB.sg.financial_insurance_application_rider
+                            INSERT INTO DHUB_UAT.sg.financial_insurance_application_rider
                             (application_id, rider_id, rider_amount, rider_unit)
                             VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
                         `);
@@ -738,8 +861,8 @@ export const updateApplication = async (id, data, userId) => {
         addClause('sub_business_nature_id', data.sub_business_nature_id, sql.Int);
         addClause('number_of_lives', data.number_of_lives, sql.Int);
         addClause('business_address', data.business_address);
-        addClause('contact_number', data.contact_number);
-        addClause('fax_number', data.fax_number);
+        addClause('contact_number', data.contact_number || null);
+        addClause('fax_number', data.fax_number || null);
         addClause('email', data.email);
         addClause('contact_person_salutation', data.contact_person_salutation);
         addClause('contact_person_firstname', data.contact_person_firstname);
@@ -789,6 +912,9 @@ export const updateApplication = async (id, data, userId) => {
         addClause('commission_rate', data.commission_rate);
         addClause('service_fee', data.service_fee);
         addClause('total_annual_premium', data.total_annual_premium, sql.Decimal(18, 2));
+        addClause('extension_requested', data.extension_requested, sql.Bit);
+        addClause('extension_request_status_id', data.extension_request_status_id, sql.Int);
+        addClause('expiry_date', data.expiry_date, sql.DateTime);
         addClause('evidence_notes', data.evidence_notes, sql.NVarChar(sql.MAX));
 
         // Add excel_file_path to update clause
@@ -806,7 +932,7 @@ export const updateApplication = async (id, data, userId) => {
             for (const input of inputs) {
                 request.input(input.name, input.type, input.value);
             }
-            const query = `UPDATE DHUB.sg.financial_insurance_application SET ${setClauses.join(', ')} WHERE application_id = @id`;
+            const query = `UPDATE DHUB_UAT.sg.financial_insurance_application SET ${setClauses.join(', ')} WHERE application_id = @id`;
             await request.query(query);
         }
 
@@ -833,10 +959,18 @@ export const deleteApplication = async (id) => {
     await pool.request()
         .input('id', sql.Int, id)
         .query(`
-            DELETE FROM sg.financial_insurance_application
+            DELETE FROM DHUB_UAT.sg.financial_insurance_application
             WHERE application_id = @id
         `);
     return { deleted: true };
+};
+
+export const getStatusLookups = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .query(`SELECT status_id, status_name, group_type, parent_id FROM DHUB_UAT.sg.financial_insurance_status_lookup WHERE is_active = 1`);
+    
+    return result.recordset;
 };
 
 // Lookup list by category
@@ -846,7 +980,7 @@ export const getLookupListByCategory = async (category) => {
         .input('category', sql.NVarChar, category)
         .query(`
             SELECT id, name, parent_id
-            FROM sg.financial_insurance_group_lookups
+            FROM DHUB_UAT.sg.financial_insurance_group_lookups
             WHERE category=@category AND is_active=1
         `);
     return res.recordset ?? [];
@@ -858,7 +992,7 @@ export const getAllPlans = async () => {
     const res = await pool.request()
         .query(`
             SELECT product_id AS plan_id, product_name AS plan_name, acronym, is_active
-            FROM sg.financial_insurance_product
+            FROM DHUB_UAT.sg.financial_insurance_product
             WHERE is_active = 1
         `);
     return res.recordset ?? [];
@@ -869,7 +1003,7 @@ export const getPrototypePlans = async () => {
     const pool = await poolPromise;
     const res = await pool.request()
         .query(`
-            SELECT id, name, acronym FROM sg.financial_insurance_prototype_plans WHERE is_active = 1
+            SELECT id, name, acronym FROM DHUB_UAT.sg.financial_insurance_prototype_plans WHERE is_active = 1
         `);
     return res.recordset ?? [];
 };
@@ -881,7 +1015,7 @@ export const getBasicPlansByPlanId = async (planId) => {
         .input('planId', sql.Int, planId)
         .query(`
             SELECT basic_plan_id, basic_plan_name, acronym, is_active
-            FROM sg.financial_insurance_basic_plan
+            FROM DHUB_UAT.sg.financial_insurance_basic_plan
             WHERE product_id = @planId AND is_active = 1
         `);
     return res.recordset ?? [];
@@ -894,7 +1028,7 @@ export const getRidersByProductId = async (productId) => {
         .input('productId', sql.Int, productId)
         .query(`
             SELECT rider_id, rider_name, acronym, is_active
-            FROM sg.financial_insurance_riders
+            FROM DHUB_UAT.sg.financial_insurance_riders
             WHERE product_id = @productId AND is_active = 1
         `);
     return res.recordset ?? [];
@@ -919,7 +1053,7 @@ export const getLookupNamesByIds = async (ids) => {
     });
 
     const result = await request.query(`
-        SELECT id, name FROM sg.financial_insurance_group_lookups 
+        SELECT id, name FROM DHUB_UAT.sg.financial_insurance_group_lookups 
         WHERE id IN (${parameters.join(',')})
     `);
 
@@ -935,7 +1069,7 @@ export const getLookupsByIds = async (ids) => {
     if (!ids || ids.length === 0) return new Map();
     const pool = await poolPromise;
     const subGroupRes = await pool.request()
-        .query(`SELECT id, name FROM sg.financial_insurance_group_lookups WHERE id IN (${ids.join(',')})`);
+        .query(`SELECT id, name FROM DHUB_UAT.sg.financial_insurance_group_lookups WHERE id IN (${ids.join(',')})`);
     const lookupsMap = new Map();
     subGroupRes.recordset.forEach(sg => lookupsMap.set(sg.id, sg.name));
     return lookupsMap;
@@ -955,8 +1089,8 @@ export const getApplicationRiders = async (applicationId) => {
                 r.unit_value,
                 ar.rider_amount as amount,
                 ar.rider_unit as unit
-            FROM sg.financial_insurance_application_rider ar
-            JOIN sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
+            FROM DHUB_UAT.sg.financial_insurance_application_rider ar
+            JOIN DHUB_UAT.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
             WHERE ar.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -971,8 +1105,8 @@ export const getApplicationHistory = async (applicationId) => {
             SELECT 
                 l.log_id, l.application_id, l.user_id, l.action_type, l.changes, l.ip_address, l.created_at,
                 u.firstname, u.lastname, u.email
-            FROM DHUB.sg.financial_insurance_application_history_logs l
-            LEFT JOIN DHUB.sg.financial_insurance_users u ON l.user_id = u.user_id
+            FROM DHUB_UAT.sg.financial_insurance_application_history_logs l
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON l.user_id = u.user_id
             WHERE l.application_id = @application_id
             ORDER BY l.created_at DESC
         `);
@@ -985,8 +1119,8 @@ export const getApplicationSubGroups = async (applicationId) => {
     const result = await pool.request()
         .input('application_id', sql.Int, applicationId)
         .query(`
-            SELECT l.id, l.name FROM DHUB.sg.financial_insurance_application_subgroup s
-            JOIN DHUB.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
+            SELECT l.id, l.name FROM DHUB_UAT.sg.financial_insurance_application_subgroup s
+            JOIN DHUB_UAT.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
             WHERE s.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1003,9 +1137,9 @@ export const getApplicationPaymentTerms = async (applicationId) => {
                 pt.name as payment_term_name,
                 p.sub_payment_term_id,
                 ml.month_name as loan_maturity_month_name
-            FROM DHUB.sg.financial_insurance_application p
-            JOIN DHUB.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
-            LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
+            FROM DHUB_UAT.sg.financial_insurance_application p
+            JOIN DHUB_UAT.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
             WHERE p.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1018,7 +1152,7 @@ export const getCoverageRankingsByAppId = async (applicationId) => {
         .input('application_id', sql.Int, applicationId)
         .query(`
             SELECT designation, amount, salary_multiplier, uniform_coverage_amount, total_coverage_amount
-            FROM DHUB.sg.financial_insurance_coverage_ranking
+            FROM DHUB_UAT.sg.financial_insurance_coverage_ranking
             WHERE application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1038,9 +1172,9 @@ export const getCoverageRankingRiders = async (applicationId) => {
                 r.acronym,
                 crr.rider_amount,
                 crr.rider_unit
-            FROM DHUB.sg.financial_insurance_coverage_ranking_rider crr
-            JOIN DHUB.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
-            JOIN DHUB.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
+            FROM DHUB_UAT.sg.financial_insurance_coverage_ranking_rider crr
+            JOIN DHUB_UAT.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
+            JOIN DHUB_UAT.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
             WHERE cr.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1059,8 +1193,8 @@ export const getBulkApplicationSubGroups = async (applicationIds) => {
     }).join(',');
 
     const result = await request.query(`
-        SELECT s.application_id, l.id, l.name FROM DHUB.sg.financial_insurance_application_subgroup s
-        JOIN DHUB.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
+        SELECT s.application_id, l.id, l.name FROM DHUB_UAT.sg.financial_insurance_application_subgroup s
+        JOIN DHUB_UAT.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
         WHERE s.application_id IN (${idParams})`);
     return result.recordset ?? [];
 };
@@ -1084,9 +1218,9 @@ export const getBulkApplicationPaymentTerms = async (applicationIds) => {
             pt.name as payment_term_name,
             p.sub_payment_term_id,
             ml.month_name as loan_maturity_month_name
-        FROM DHUB.sg.financial_insurance_application p
-        JOIN DHUB.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
-        LEFT JOIN DHUB.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
+        FROM DHUB_UAT.sg.financial_insurance_application p
+        JOIN DHUB_UAT.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
         WHERE p.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -1106,48 +1240,9 @@ export const getBulkApplicationRiders = async (applicationIds) => {
 
     const result = await request.query(`
         SELECT ar.application_id, r.rider_id, r.rider_name, r.acronym, r.input_type, r.unit_value, ar.rider_amount as amount, ar.rider_unit as unit
-        FROM sg.financial_insurance_application_rider ar
-        JOIN sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
+        FROM DHUB_UAT.sg.financial_insurance_application_rider ar
+        JOIN DHUB_UAT.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
         WHERE ar.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
 };
-
-// Get list of applications that are pending max amounts (strictly where NO values have been input yet)
-// export const getApplicationsPendingMaxAmounts = async () => {
-//     const pool = await poolPromise;
-//     const result = await pool.request()
-//         .query(`
-//             SELECT
-//                 fia.application_id,
-//                 fia.group_name,
-//                 fia.created_at,
-//                 fia.borrower_age_66_70,
-//                 fia.borrower_age_71_75,
-//                 fia.borrower_age_76_80,
-//                 gl.name as proposal_type,
-//                 p.product_name as plan_name,
-//                 pp.name as prototype_name,
-//                 u.firstname + ' ' + u.lastname as creator_name,
-//                 fia.max_amount_18_64,
-//                 fia.max_amount_66_70,
-//                 fia.max_amount_71_75,
-//                 fia.max_amount_76_80
-//             FROM DHUB.sg.financial_insurance_application fia
-//             LEFT JOIN DHUB.sg.financial_insurance_group_lookups gl
-//                 ON fia.type_of_proposal_id = gl.id
-//             LEFT JOIN DHUB.sg.financial_insurance_product p
-//                 ON fia.plan_id = p.product_id
-//             LEFT JOIN DHUB.sg.financial_insurance_prototype_plans pp
-//                 ON fia.prototype_id = pp.id
-//             LEFT JOIN DHUB.sg.financial_insurance_users u
-//                 ON fia.user_id = u.user_id
-//             WHERE fia.status_id = 1 
-//                 AND fia.max_amount_18_64 IS NULL
-//                 AND fia.max_amount_66_70 IS NULL
-//                 AND fia.max_amount_71_75 IS NULL
-//                 AND fia.max_amount_76_80 IS NULL
-//             ORDER BY fia.created_at ASC
-//         `);
-//     return result.recordset ?? [];
-// };

@@ -4,7 +4,9 @@ import puppeteer from 'puppeteer';
 import * as Model from '../models/financial_Insurance_form.model.js';
 import * as ActuarialModel from '../models/actuarial_api/actuarial.model.js';
 import * as User from '../models/user/user_model.js';
-import { generateGCLIPDFContent } from '../templates/proposal_generator.js';
+import { generateGCLIPDFContent } from '../templates/Group_Credit_Life_Insurance_GCLI.js';
+import { generateGPAPDFContent } from '../templates/Group_Personal_Accident_Insurance_GPA.js';
+import { generateGYRTPDFContent } from '../templates/Group_Term_Life_Insurance_GYRT.js';
 import { generateBarangayPDFContent } from '../templates/prototype_BarangayProtectPlan.js';
 import { generateStudentsGTLIPPDFContent } from '../templates/prototype_StudentsGroupTermLifeInsurancePlan.js';
 import { generateStudentsGPAPDFContent } from '../templates/prototype_StudentsGroupPersonalAccidentPlan.js';
@@ -39,6 +41,19 @@ export const getImageDataUri = (imagePath) => {
         }
     } catch (e) {}
     return null;
+};
+
+// Helper to ensure group-specific and requirement-specific directory exists
+export const ensureRequirementsDir = (groupName, requirementType = '') => {
+    const rootDir = path.resolve('uploads/requirements');
+    // Sanitize group name for folder path (remove special chars, replace spaces with underscores)
+    const sanitizedGroup = groupName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const appDir = path.join(rootDir, sanitizedGroup, requirementType);
+    
+    if (!fs.existsSync(appDir)) {
+        fs.mkdirSync(appDir, { recursive: true });
+    }
+    return appDir;
 };
 
 // Configuration for rich-text sanitization
@@ -394,6 +409,25 @@ export const buildApplicationResponse = async (app) => {
     const rankingRiders = await Model.getCoverageRankingRiders(app.application_id);
     const ratesRows = await ActuarialModel.getApplicationRates(app.application_id);
     const planId = Number(app.plan_id);
+    const STATUS_BOOKED = 7;
+    const STATUS_CLOSED = 6;
+
+    // Countdown Logic: Prioritizes explicit expiry_date, otherwise defaults to 30 days from creation
+    const createdAt = new Date(app.created_at);
+    const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(createdAt);
+    if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30);
+    
+    const now = new Date();
+    // Ensure 'now' isn't before 'createdAt' to avoid 31-day race conditions during creation
+    const effectiveNow = new Date(Math.max(now.getTime(), createdAt.getTime()));
+    
+    const currentStatus = Number(app.status_id);
+    const isExpiredByTime = effectiveNow > expiryDate;
+    const isFinalized = currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED || isExpiredByTime;
+    
+    const daysRemaining = (currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED) 
+        ? 0 
+        : Math.max(0, Math.ceil((expiryDate.getTime() - effectiveNow.getTime()) / (1000 * 60 * 60 * 24)));
 
     if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && rankingRiders.length > 0) {
         riders.forEach(mainRider => {
@@ -423,6 +457,7 @@ export const buildApplicationResponse = async (app) => {
         coverage_type_id, coverage_type_name,
         channel_type_id, channel_type_name, channel_name,
         business_nature_name, sub_business_nature_name,
+        proposal_status_id, proposal_status_name,
         type_of_proposal_id, type_of_proposal_name,
         prototype_id, prototype_plan_name, prototype_plan_acronym,
         plan_id, plan_name, plan_acronym,
@@ -433,8 +468,13 @@ export const buildApplicationResponse = async (app) => {
         loan_maturity_month_name,
         payment_term_id, sub_payment_term_id,
         excel_file_path,
+        signed_proposal_path, group_app_path, dti_path, sec_reg_path,
+        articles_of_inc_path, by_laws_path, business_permit_path,
+        masterlist_file_path, authorized_id_path, booking_date,
         ...cleanedApp
     } = app;
+    const extension_request_status_id = app.extension_request_status_id;
+    const extension_request_status_name = app.extension_request_status_name;
 
     return {
         ...cleanedApp,
@@ -447,6 +487,18 @@ export const buildApplicationResponse = async (app) => {
             lastname: contact_person_lastname
         },
         excel_file_path: excel_file_path ? path.basename(excel_file_path) : null,
+        installation_requirements: {
+            signed_proposal: signed_proposal_path ? path.basename(signed_proposal_path) : null,
+            group_app: group_app_path ? path.basename(group_app_path) : null,
+            dti: dti_path ? path.basename(dti_path) : null,
+            sec_reg: sec_reg_path ? path.basename(sec_reg_path) : null,
+            articles_of_inc: articles_of_inc_path ? path.basename(articles_of_inc_path) : null,
+            by_laws: by_laws_path ? path.basename(by_laws_path) : null,
+            business_permit: business_permit_path ? path.basename(business_permit_path) : null,
+            masterlist: masterlist_file_path ? path.basename(masterlist_file_path) : null,
+            auth_id: authorized_id_path ? path.basename(authorized_id_path) : null,
+            booking_date: booking_date || null
+        },
         business_nature_id: app.business_nature_id,
         sub_business_nature_id: app.sub_business_nature_id,
         status: { id: status_id, name: status_name },
@@ -491,6 +543,10 @@ export const buildApplicationResponse = async (app) => {
             payment_term: { id: p.payment_term_id, name: p.payment_term_name }, 
             sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name || p.sub_payment_term_id?.toString() } 
         })),
+        proposal_type: {
+            id: proposal_status_id,
+            name: proposal_status_name
+        },
         type_of_proposal: {
             id: type_of_proposal_id,
             name: type_of_proposal_name
@@ -518,6 +574,19 @@ export const buildApplicationResponse = async (app) => {
             "71-75": formatDbRatesForTemplate(ratesRows, '71_75', planId, app),
             "76-80": formatDbRatesForTemplate(ratesRows, '76_80', planId, app)
         },
+        validity: {
+            expiry_date: expiryDate,
+            days_remaining: daysRemaining,
+            is_expired: (currentStatus === STATUS_CLOSED || isExpiredByTime) && currentStatus !== STATUS_BOOKED,
+            countdown_active: !isFinalized && currentStatus !== STATUS_BOOKED && currentStatus !== STATUS_CLOSED,
+            extension_requested: !!app.extension_requested,
+            extension_status_id: extension_request_status_id || null,
+            extension_status_name: extension_request_status_name || (
+                extension_request_status_id === 62 ? 'Approved' :
+                extension_request_status_id === 63 ? 'Declined' :
+                app.extension_requested ? 'Pending' : null
+            )
+        },
         coverage_totals,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
@@ -531,12 +600,14 @@ export const generateProposalHtml = async (id) => {
     if (!appData) throw new Error("Application not found.");
     const ratesRows = await ActuarialModel.getApplicationRates(id);
     const paymentTerms = await Model.getApplicationPaymentTerms(id);
+    const riders = await Model.getApplicationRiders(id);
     const maturity = paymentTerms.length > 0 ? Number(paymentTerms[0].sub_payment_term_id) : 0;
     const planId = Number(appData.plan_id);
     let user = appData.user_id ? await User.getUserById(appData.user_id) : { firstname: 'Phillife', lastname: 'Representative' };
 
     const application = { 
         ...appData, 
+        riders,
         status: { id: appData.status_id, name: appData.status_name || 'Pending' },
         plan: { id: appData.plan_id, name: appData.plan_name && appData.plan_acronym ? `${appData.plan_name} (${appData.plan_acronym})` : appData.plan_name, acronym: appData.plan_acronym || null },
         basic_plan: { 
@@ -581,7 +652,11 @@ export const generateProposalHtml = async (id) => {
             default: return generateGCLIPDFContent(application, user, details);
         }
     }
-    return generateGCLIPDFContent(application, user, details);
+
+    // Route to specialized templates for Customized Proposals (Type 31)
+    if (planId === 2) return generateGYRTPDFContent(application, user, details);
+    if (planId === 3) return generateGPAPDFContent(application, user, details);
+    return generateGCLIPDFContent(application, user, details); // Default/fallback for Plan ID 1
 };
 
 // Helper for unified PDF generation logic

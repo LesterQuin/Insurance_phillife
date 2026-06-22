@@ -8,32 +8,47 @@ import { auditLog, AuditStatus, AuditActions, normalizeIp } from '../utils/logge
 import sanitizeHtml from 'sanitize-html';
 import * as Helper from '../middlewares/helper.js';
 import { broadcastApplicationUpdate, broadcastApplicationDelete } from '../websocket.js';
+import { transporter } from './user/user_controller.js';
+import { expirationNotificationTemplate } from '../templates/expirationNotificationTemplate.js';
+import { bookedNotificationTemplate } from '../templates/bookedNotificationTemplate.js';
+import { closedNotificationTemplate } from '../templates/closedNotificationTemplate.js';
+// Constants for extension request statuses
+const EXTENSION_STATUS_APPROVED = 62;
+const EXTENSION_STATUS_DECLINED = 63;
+import { INSTALLATION_REQUIREMENTS_METADATA } from './requirements/installation_requirements.controller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+
+// Helper to identify missing installation requirements
+const getPendingRequirements = (app) => {
+    return INSTALLATION_REQUIREMENTS_METADATA.filter(m => {
+        // Handle specific naming discrepancies found in the model's column selection
+        const keyToColMap = {
+            'masterlist': 'masterlist_file_path',
+            'auth_id': 'authorized_id_path'
+        };
+        const dbCol = m.dbColumn || keyToColMap[m.key] || `${m.key}_path`;
+        const val = app[dbCol];
+        return val === null || val === undefined || (typeof val === 'string' && val.trim() === '');
+    }).map(m => m.label);
+};
+
 // Create Application
 export const createApplication = async (req, res) => {
     try {
         const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
-        // // Check if group name already exists to prevent duplicate registration
-        if (dataToSave.group_name) {
-            const existingGroup = await Model.getApplicationByGroupName(dataToSave.group_name);
-            if (existingGroup) {
-                return error(res, `An application for "${dataToSave.group_name}" (or a company with a similar name) already exists in the system.`, 400);
-            }
-        }
-        
-        // Determine initial status: Approved (2) for Prototypes (30), Checking (5) otherwise
-        const STATUS_CHECKING = 5;
-        const STATUS_APPROVED = 2;
+        // Determine initial status: Approved (14) for Prototypes (30), Pending (8) otherwise
+        const STATUS_PENDING = 8;
+        const STATUS_APPROVED = 14;
         const PROTOTYPE_TYPE_ID = 30;
 
         dataToSave.status_id = Number(dataToSave.type_of_proposal_id) === PROTOTYPE_TYPE_ID 
             ? STATUS_APPROVED 
-            : STATUS_CHECKING;
+            : STATUS_PENDING;
 
         dataToSave = Helper.cleanProposalFields(dataToSave);
         const cleanedData = await Helper.cleanupOtherFields(dataToSave);
@@ -95,6 +110,586 @@ export const createApplication = async (req, res) => {
             metadata: { error: err.message }
         });
         console.error('Service Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Fetch statuses allowed for the user's department
+// export const getAvailableStatuses = async (req, res) => {
+//     try {
+//         const allStatuses = await Model.getStatusLookups();
+//         const userDeptId = Number(req.user.department_id);
+//         const isSuperAdmin = req.user.roleName === 'Super Admin' || Number(req.user.role_id) === 15;
+
+//         // Mapping: User Dept ID -> Status Parent ID
+//         const deptMapping = { 12: 4, 18: 2 }; // 12=GMS(Parent 4), 18=Actuarial(Parent 2)
+//         const allowedParentId = deptMapping[userDeptId];
+
+//         const filtered = isSuperAdmin 
+//             ? allStatuses 
+//             : allStatuses.filter(s => Number(s.parent_id) === allowedParentId);
+
+//         return success(res, filtered, 'Available statuses fetched successfully.');
+//     } catch (err) {
+//         return error(res, err.message);
+//     }
+// };
+export const getAvailableStatuses = async (req, res) => {
+    try {
+        const allStatuses = await Model.getStatusLookups();
+        const userDeptId = Number(req.user.department_id);
+
+        // Mapping: User Dept ID -> Status Parent ID
+        const deptMapping = {
+        12: 4, // GMS
+        18: 2, // Actuarial
+        };
+
+        const allowedParentId = deptMapping[userDeptId];
+
+        const filtered = allStatuses.filter(
+        (s) => Number(s.parent_id) === allowedParentId,
+        );
+
+        return success(res, filtered, "Available statuses fetched successfully.");
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
+
+// Generic Status Update with Department Validation
+export const updateApplicationStatus = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const { status_id } = req.body;
+
+        if (!status_id) return error(res, 'status_id is required.', 400);
+
+        const [app, allStatuses] = await Promise.all([
+            Model.getApplicationById(appId),
+            Model.getStatusLookups()
+        ]);
+
+        if (!app) return error(res, 'Application not found.', 404);
+
+        // Business Rule: Update expiry_date based on finalized status.
+        if (Number(status_id) === 7) { // Booked: Policy is valid for 1 year
+            const oneYearLater = new Date();
+            // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1); 
+            oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+            req.body.expiry_date = oneYearLater;
+        } else if (Number(status_id) === 6) { // Closed: Proposal expired today
+            req.body.expiry_date = new Date();
+        }
+
+        const targetStatus = allStatuses.find(s => s.status_id === Number(status_id));
+        if (!targetStatus) return error(res, 'Invalid status_id.', 400);
+
+        const loggedInUser = req.user;
+        const userRoleName = loggedInUser.roleName?.trim();
+        const userRoleId = Number(loggedInUser.role_id);
+
+        // Bypass Logic: Super Admin (15) and Team Leader (2)
+        const isSuperAdmin = userRoleName === 'Super Admin' || userRoleId === 15;
+        const isTeamLeader = userRoleName === 'Team Leader' || userRoleId === 2;
+        const canBypass = isSuperAdmin || isTeamLeader;
+
+        const isOwner = Number(app.user_id) === Number(userId);
+        if (!isOwner && !canBypass) {
+            return error(res, 'Access Denied: Only the original creator, a Team Leader, or a Super Admin can update application status.', 403);
+        }
+
+        // Department Authorization Check
+        const deptMapping = { 12: 4, 18: 2 }; 
+        
+        const isAuthorized = canBypass || (deptMapping[Number(loggedInUser.department_id)] === Number(targetStatus.parent_id));
+
+        if (!isAuthorized) {
+            return error(res, `Access Denied: Your department is not authorized to set the "${targetStatus.status_name}" status.`, 403);
+        }
+
+        // Enforce Business Rules for Booked (7)
+        if (Number(status_id) === 7) {
+            const isCFE = userRoleName === 'Corporate Financial Executive' || userRoleId === 3;
+
+            if (!canBypass && (!isOwner || !isCFE)) {
+                return error(res, 'Access Denied: Only the original CFE creator, a Team Leader, or a Super Admin can mark a proposal as Booked.', 403);
+            }
+
+            if (!canBypass) {
+                const pendingRequirements = getPendingRequirements(app);
+
+                if (pendingRequirements.length > 0) {
+                    return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
+                }
+            }
+
+            // Validity Check: Use stored expiry_date if available (e.g., from an extension), otherwise default to 30 days from creation
+            const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+            if (!canBypass && new Date() > expiryDate) {
+                return error(res, `Proposal expired on ${expiryDate.toLocaleDateString()}. Cannot Book.`, 400);
+            }
+        }
+
+        const updated = await Model.updateApplication(appId, { status_id, expiry_date: req.body.expiry_date }, userId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        // Notify via email if status is manually set to Booked (7)
+        if (Number(status_id) === 7) {
+            try {
+                const creator = await User.getUserById(app.user_id);
+                const bookedDate = new Date().toLocaleDateString();
+                const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
+                const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
+                const internalSalutation = "Sir MMC, John Kwong, Team Lead, and EBAM Team";
+                const clientSalutation = `Mr./Ms. ${app.contact_person_lastname}`;
+
+                // Notify CFE (Creator)
+                if (creator && creator.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: creator.email,
+                        subject: `Account BOOKED: ${app.group_name}`,
+                        html: bookedNotificationTemplate(
+                            internalSalutation,
+                            app.group_name,
+                            clientName,
+                            proposalNumber,
+                            bookedDate,
+                            `${creator.firstname} ${creator.lastname}`
+                        )
+                    });
+                }
+
+                // Notify Applicant (Registered Email on the form)
+                if (app.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: app.email,
+                        subject: `Proposal Booked Successfully: ${app.group_name}`,
+                        html: bookedNotificationTemplate(
+                            clientSalutation,
+                            app.group_name,
+                            clientName,
+                            proposalNumber,
+                            bookedDate,
+                            creator ? `${creator.firstname} ${creator.lastname}` : 'System'
+                        )
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Manual Booking Notification Error:', emailErr);
+            }
+        }
+
+        // Notify via email if status is manually set to Closed (6)
+        if (Number(status_id) === 6) {
+            try {
+                const creator = await User.getUserById(app.user_id);
+                const closedDate = new Date().toLocaleDateString();
+                const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
+                const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
+
+                const emailHtml = closedNotificationTemplate(
+                    app.group_name,
+                    clientName,
+                    proposalNumber,
+                    closedDate,
+                    creator ? `${creator.firstname} ${creator.lastname}` : 'System'
+                );
+
+                // Notify CFE (Creator)
+                if (creator && creator.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: creator.email,
+                        subject: `Account CLOSED: ${app.group_name}`,
+                        html: emailHtml
+                    });
+                }
+
+                // Notify Applicant (Registered Email on the form)
+                if (app.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: app.email,
+                        subject: `Notice of Proposal Closure: ${app.group_name}`,
+                        html: emailHtml
+                    });
+                }
+            } catch (emailErr) {
+                console.error('Manual Closure Notification Error:', emailErr);
+            }
+        }
+
+        broadcastApplicationUpdate(appId, response);
+        return success(res, response, `Status successfully updated to ${response.status.name}.`);
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
+
+// View all applications with pending extension requests
+export const getExtensionRequests = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const loggedInUser = req.user;
+        const isSuperAdmin = loggedInUser.roleName === 'Super Admin' || Number(loggedInUser.role_id) === 15;
+
+        let filterUserIds = null;
+        if (!isSuperAdmin) {
+            // Fetch only subordinate IDs so that heads (TLs/Managers) only see requests from their team (e.g., CFEs)
+            filterUserIds = await User.getSubordinateIds(userId);
+            if (filterUserIds.length === 0) return success(res, [], 'No pending extension requests from your subordinates.');
+        }
+
+        const pendingIds = await Model.getExtensionRequests(filterUserIds);
+        if (pendingIds.length === 0) return success(res, [], 'No pending extension requests.');
+
+        const requests = await Promise.all(pendingIds.map(id => Model.getApplicationById(id)));
+        const response = await Promise.all(requests.map(app => Helper.buildApplicationResponse(app)));
+
+        return success(res, response, 'Pending extension requests fetched successfully.');
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
+
+// Approve or Reject a 30-day extension
+export const approveExtension = async (req, res) => {
+    try {
+        const appId = req.params.id;
+        const userId = req.user.user_id;
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const loggedInUser = req.user;
+        const isSuperAdmin = loggedInUser.roleName === 'Super Admin' || Number(loggedInUser.role_id) === 15;
+
+        // Enforce Hierarchy: Only Super Admins or the actual superior (Head/TL) of the creator can approve
+        if (!isSuperAdmin) {
+            const subordinates = await User.getSubordinateIds(userId);
+            if (!subordinates.includes(Number(app.user_id))) {
+                return error(res, 'Access Denied: You do not have the capacity to approve this extension request. Only a Team Leader or Super Admin overseeing the CFE can perform this action.', 403);
+            }
+        }
+
+        if (!app.extension_requested) {
+            return error(res, 'This application does not have a pending extension request.', 400);
+        }
+
+        // Calculate new expiry: Current expiry + 30 days
+        const currentExpiry = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+        const newExpiry = new Date(currentExpiry);
+        newExpiry.setDate(newExpiry.getDate() + 30);
+
+        await Model.updateApplication(appId, {
+            extension_requested: 0,
+            extension_request_status_id: EXTENSION_STATUS_APPROVED,
+            expiry_date: newExpiry
+        }, userId);
+
+        const updated = await Model.getApplicationById(appId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        broadcastApplicationUpdate(appId, response); // Real-time sync
+        return success(res, response, 'Extension approved successfully.');
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
+
+// Reject a 30-day extension request
+export const rejectExtension = async (req, res) => {
+    try {
+        const appId = req.params.id;
+        const userId = req.user.user_id;
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const loggedInUser = req.user;
+        const isSuperAdmin = loggedInUser.roleName === 'Super Admin' || Number(loggedInUser.role_id) === 15;
+
+        // Enforce Hierarchy: Only Super Admins or the actual superior (Head/TL) of the creator can reject
+        if (!isSuperAdmin) {
+            const subordinates = await User.getSubordinateIds(userId);
+            if (!subordinates.includes(Number(app.user_id))) {
+                return error(res, 'Access Denied: You do not have the capacity to decline this extension request. Only a Team Leader or Super Admin overseeing the CFE can perform this action.', 403);
+            }
+        }
+
+        if (!app.extension_requested) {
+            return error(res, 'This application does not have a pending extension request.', 400);
+        }
+
+        // Clear the request flag. Expiry date remains unchanged.
+        await Model.updateApplication(appId, {
+            extension_requested: 0,
+            extension_request_status_id: EXTENSION_STATUS_DECLINED
+        }, userId);
+        
+        const updated = await Model.getApplicationById(appId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        // Real-time sync: Update the UI to show the request is no longer pending
+        broadcastApplicationUpdate(appId, response);
+
+        return success(res, response, 'Extension request denied.');
+    } catch (err) {
+        return error(res, err.message);
+    }
+};
+
+// Request 30-day extension - Only for CFEs and the original creator
+export const requestExtension = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+
+        // Validations (existence, role, ownership, status, timing window) are handled in validateRequestExtension middleware
+        await Model.updateApplication(appId, { extension_requested: 1 }, userId);
+
+        const updated = await Model.getApplicationById(appId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        broadcastApplicationUpdate(appId, response);
+        return success(res, response, 'Extension request submitted to your Team Leader/Admin.');
+    } catch (err) {
+        console.error('Request Extension Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Logic for a daily task to notify CFEs about expiring applications (at 5 and 3 days)
+export const notifyExpiringProposals = async (req, res) => {
+    try {
+        const result = await Model.getAllApplications(); // Adjusted for internal logic
+        const now = new Date();
+
+        for (const app of result) {
+            const currentStatus = Number(app.status_id);
+            if (currentStatus === 7 || currentStatus === 6) continue; // Skip Booked or already Closed
+
+            const createdAt = new Date(app.created_at);
+            const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(createdAt);
+            if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30);
+
+            const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+
+            // 1. Automatic Closure Logic
+            if (diffDays <= 0) {
+                await Model.updateApplication(app.application_id, { status_id: 6, expiry_date: now }, app.user_id);
+                
+                const creator = await User.getUserById(app.user_id);
+                const closedDate = new Date().toLocaleDateString();
+                const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
+                const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
+
+                const emailHtml = closedNotificationTemplate(
+                    app.group_name,
+                    clientName,
+                    proposalNumber,
+                    closedDate,
+                    creator ? `${creator.firstname} ${creator.lastname}` : 'System'
+                );
+
+                // Notify CFE
+                if (creator && creator.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: creator.email,
+                        subject: `Account Automatically CLOSED: ${app.group_name}`,
+                        html: emailHtml
+                    });
+                }
+
+                // Notify Registered Client Email
+                if (app.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: app.email,
+                        subject: `Notice of Proposal Closure: ${app.group_name}`,
+                        html: emailHtml
+                    });
+                }
+
+                continue; // Move to next application
+            }
+
+            if ([5, 3, 1].includes(diffDays)) {
+                const creator = await User.getUserById(app.user_id);
+                
+                // Notify CFE (Creator)
+                if (creator && creator.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: creator.email,
+                        subject: `Urgent: Proposal for ${app.group_name} expires in ${diffDays} days`,
+                        html: expirationNotificationTemplate(creator.lastname, app.group_name, diffDays, `${process.env.APP_BASE_URL}/applications/${app.application_id}`)
+                    });
+                }
+
+                // Notify Registered Client Email
+                if (app.email) {
+                    await transporter.sendMail({
+                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                        to: app.email,
+                        subject: `Urgent: Your proposal for ${app.group_name} expires in ${diffDays} days`,
+                        html: expirationNotificationTemplate(app.contact_person_lastname, app.group_name, diffDays, `${process.env.APP_BASE_URL}/applications/${app.application_id}`)
+                    });
+                }
+            }
+        }
+        if (res) return success(res, null, 'Expiration checks completed and notifications sent.');
+    } catch (err) {
+        console.error('Notification Task Error:', err);
+        if (res) return error(res, err.message);
+    }
+};
+
+// Helper function for role-based authorization for renewing inactive user's applications
+const isUserAuthorizedForInactiveRenewal = (user) => {
+    const roleId = Number(user.role_id);
+    const roleName = user.roleName?.trim();
+    return roleName === 'Super Admin' || roleId === 15 || roleName === 'Team Leader' || roleId === 2 || 
+           ['Assistant Vice President', 'Group Sales & Marketing Head'].includes(roleName);
+};
+
+// Renewal Lookup
+export const getRenewalLookup = async (req, res) => {
+    try {
+        const { group_name, id } = req.query;
+        const userId = req.user.user_id;
+        const loggedInUser = req.user;
+
+        // 1. Search/List Mode: If no specific ID is provided, return a list of eligible renewals
+        if (!id) {
+            // If group_name is provided, search by it. Otherwise, fetch all applications to filter for renewals.
+            const matches = group_name 
+                ? await Model.searchApplicationsByGroupName(group_name)
+                : await Model.getAllApplications(); 
+
+            if (!matches || matches.length === 0) {
+                return error(res, group_name ? `No records found matching "${group_name}".` : "No applications found in the system.", 404);
+            }
+
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const filtered = [];
+            for (const m of matches) {
+                // Check Renewal Timing Eligibility
+                const canRenewDate = new Date(m.expiry_date || m.created_at);
+                // If no expiry_date (legacy), fallback to 1 year after creation
+                if (!m.expiry_date) canRenewDate.setFullYear(canRenewDate.getFullYear() + 1);
+                canRenewDate.setHours(0, 0, 0, 0);
+
+                const gracePeriodDate = new Date(canRenewDate);
+                gracePeriodDate.setMonth(gracePeriodDate.getMonth() + 1);
+
+                // Eligibility check: Within grace period and not too early
+                if (today < canRenewDate || today > gracePeriodDate) continue;
+
+                // Authorization check: Show only own applications or authorized inactive ones
+                const isOwner = Number(m.user_id) === Number(userId);
+                let isAuthorized = isOwner;
+
+                if (!isOwner) {
+                    // Handle property name differences between Model.search... and Model.getAll...
+                    const creatorIsActive = m.creator_is_active !== undefined ? m.creator_is_active : m.is_active;
+
+                    if (creatorIsActive === false) { // Only check if the original creator is inactive
+                        // Use the helper function for role-based authorization
+                        if (isUserAuthorizedForInactiveRenewal(loggedInUser)) {
+                            isAuthorized = true;
+                        }
+                    }
+                }
+
+                if (isAuthorized) {
+                    const creatorName = m.creator_firstname 
+                        ? `${m.creator_firstname} ${m.creator_lastname}` 
+                        : `${m.firstname} ${m.lastname}`;
+                    const agentCode = m.creator_agent_code || m.agent_code;
+
+                    filtered.push({
+                        application_id: m.application_id,
+                        group_name: m.group_name,
+                        created_at: m.created_at,
+                        expiry_date: m.expiry_date,
+                        created_by: creatorName,
+                        agent_code: agentCode,
+                        is_owner: isOwner
+                    });
+                }
+            }
+
+            if (filtered.length === 0) {
+                const msg = group_name 
+                    ? `No records matching "${group_name}" are currently eligible for renewal by you.` 
+                    : "You currently have no applications eligible for renewal.";
+                return success(res, [], msg);
+            }
+
+            return success(res, filtered, `Found ${filtered.length} record(s) eligible for renewal.`);
+        }
+
+        // 2. Action Mode: If an ID is provided, proceed with detailed renewal logic for that specific application
+        const app = await Model.getApplicationById(id);
+
+        if (!app) {
+            return error(res, 'The requested application record does not exist.', 404);
+        }
+
+        const owner = await User.getUserById(app.user_id);
+        const isOwnerActive = owner && owner.is_active;
+        const isOwner = Number(app.user_id) === Number(userId);
+
+        if (!isOwner) {
+            if (isOwnerActive) {
+                return error(res, `Renewal lookup failed. The original creator ("${owner.firstname} ${owner.lastname}") is still an active user. Only they can initiate this renewal.`, 403);
+            }
+
+            // Use the helper function for role-based authorization
+            const isAuthorizedRole = isUserAuthorizedForInactiveRenewal(loggedInUser);
+            
+            if (!isAuthorizedRole) {
+                return error(res, `Renewal lookup failed. You are not authorized to renew this inactive user's application.`, 403);
+            }
+        }
+
+        // Renewal Timing Logic
+        const canRenewDate = new Date(app.expiry_date || app.created_at);
+        // If no expiry_date (legacy), fallback to 1 year after creation
+        if (!app.expiry_date) canRenewDate.setFullYear(canRenewDate.getFullYear() + 1);
+        canRenewDate.setHours(0, 0, 0, 0);
+
+        const gracePeriodDate = new Date(canRenewDate);
+        gracePeriodDate.setMonth(gracePeriodDate.getMonth() + 1);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        if (today < canRenewDate) {
+            return error(res, `Renewal is not applicable yet. This policy is active until ${canRenewDate.toLocaleDateString()}. You can initiate the renewal starting on that date.`, 400);
+        }
+
+        if (today > gracePeriodDate) {
+            if (Number(app.status_id) !== 6) {
+                await Model.updateApplication(app.application_id, { status_id: 6 }, userId);
+                const updatedApp = await Model.getApplicationById(app.application_id);
+                broadcastApplicationUpdate(app.application_id, await Helper.buildApplicationResponse(updatedApp));
+            }
+            return error(res, `Renewal period has expired. The 1-month grace period ended on ${gracePeriodDate.toLocaleDateString()}. This application is now Closed.`, 400);
+        }
+
+        const response = await Helper.buildApplicationResponse(app);
+        return success(res, response, 'Application found and eligible for renewal.');
+    } catch (err) {
+        console.error('Renewal Lookup Error:', err);
         return error(res, err.message);
     }
 };
@@ -185,7 +780,7 @@ export const saveDraft = async (req, res) => {
         const applicationId = dataToSave.application_id;
 
         // Set status to Draft. 
-        const STATUS_DRAFT = 4;
+        const STATUS_DRAFT = 11;
         dataToSave.status_id = STATUS_DRAFT;
 
         dataToSave = Helper.cleanProposalFields(dataToSave);
@@ -400,173 +995,22 @@ export const getPrototypes = async (req, res) => {
         const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
         const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
 
-        const filterUserId = (isSuperAdmin || isTeamLeader || isActuarial) ? null : userId;
+        let filterUserId = userId;
+        if (isSuperAdmin || isActuarial) {
+            filterUserId = null; // Sees everything
+        } else if (isTeamLeader || ['Assistant Vice President', 'Group Sales & Marketing Head', 'Corporate Financial Executive'].includes(loggedInUser.roleName)) {
+            // Get IDs of all subordinates in the hierarchy
+            const subordinates = await User.getSubordinateIds(userId);
+            filterUserId = [userId, ...subordinates];
+        }
 
-        const prototypes = await Model.getPrototypes(filterUserId);
+        const rawPrototypes = await Model.getPrototypes(filterUserId);
 
-        if (prototypes.length === 0) {
+        if (rawPrototypes.length === 0) {
             return success(res, [], 'No prototypes found.');
         }
 
-        // --- Bulk fetch related data ---
-        const appIds = prototypes.map(app => app.application_id);
-
-        const allRiders = await Model.getBulkApplicationRiders(appIds);
-        const ridersByAppId = allRiders.reduce((acc, rider) => {
-            (acc[rider.application_id] = acc[rider.application_id] || []).push(rider);
-            return acc;
-        }, {});
-        
-        const allSubGroups = await Model.getBulkApplicationSubGroups(appIds);
-        const subGroupsByAppId = allSubGroups.reduce((acc, sg) => {
-            (acc[sg.application_id] = acc[sg.application_id] || []).push({ id: sg.id, name: sg.name });
-            return acc;
-        }, {});
-
-        const allPayments = await Model.getBulkApplicationPaymentTerms(appIds);
-        const paymentsByAppId = allPayments.reduce((acc, p) => {
-            (acc[p.application_id] = acc[p.application_id] || []).push({
-                payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-                sub_payment_term: { 
-                    id: p.sub_payment_term_id, 
-                    name: p.sub_payment_term_name || (p.sub_payment_term_id ? p.sub_payment_term_id.toString() : null)
-                }
-            });
-            return acc;
-        }, {});
-
-        const allRankings = await Model.getBulkCoverageRankings(appIds);
-        const rankingsByAppId = allRankings.reduce((acc, r) => {
-            (acc[r.application_id] = acc[r.application_id] || []).push(r);
-            return acc;
-        }, {});
-
-        const allRankingRiders = await Model.getBulkCoverageRankingRiders(appIds);
-        const rankingRidersByAppId = allRankingRiders.reduce((acc, rr) => {
-            (acc[rr.application_id] = acc[rr.application_id] || []).push(rr);
-            return acc;
-        }, {});
-
-        // --- Map the bulk-fetched data back to each application ---
-        const formattedPrototypes = prototypes.map(app => {
-            const rankings = rankingsByAppId[app.application_id] || [];
-            const appRiders = ridersByAppId[app.application_id] || [];
-            const appRankingRiders = rankingRidersByAppId[app.application_id] || [];
-
-            // Map ranking-specific riders back to the riders array
-            if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && appRankingRiders.length > 0) {
-                appRiders.forEach(mainRider => {
-                    const riderValues = appRankingRiders
-                        .filter(rr => rr.rider_id === mainRider.rider_id)
-                        .map(rr => ({ designation: rr.designation, acronym: rr.acronym, amount: rr.rider_amount, unit: rr.rider_unit }));
-                    if (riderValues.length > 0) mainRider.values = riderValues;
-                });
-            }
-
-            let levelRanking = null;
-            let salaryRanking = null;
-            if (app.coverage_type_id === 32) { 
-                levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, application_id, ...rest }) => rest);
-            } else if (app.coverage_type_id === 34) { 
-                salaryRanking = rankings.map(({ uniform_coverage_amount, application_id, ...rest }) => rest);
-            }
-
-            let coverage_totals = [];
-            if (app.coverage_type_id !== 34) {
-                coverage_totals = rankings.map(r => ({
-                    designation: r.designation,
-                    total_coverage_amount: r.total_coverage_amount
-                }));
-            }
-
-            return {
-                application_id: app.application_id,
-                user_id: app.user_id,
-                user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
-                group_name: app.group_name,
-                business_nature_id: app.business_nature_id,
-                sub_business_nature_id: app.sub_business_nature_id,
-                business_nature: app.business_nature_id ? {
-                    id: app.business_nature_id,
-                    name: app.business_nature_name,
-                    sub_nature: app.sub_business_nature_id ? {
-                        id: app.sub_business_nature_id,
-                        name: app.sub_business_nature_name
-                    } : null
-                } : null,
-                number_of_lives: app.number_of_lives,
-                contact_person: {
-                    full_name: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
-                    salutation: app.contact_person_salutation,
-                    firstname: app.contact_person_firstname,
-                    mi: app.contact_person_mi,
-                    lastname: app.contact_person_lastname
-                },
-                status: { id: app.status_id, name: app.status_name },
-                group_classification: { 
-                    id: app.group_classification_id, 
-                    name: app.group_classification_name,
-                    other_value: app.other_group_classification
-                },
-                business_type: {
-                    id: app.business_type_id,
-                    name: app.business_type_name,
-                    other_value: app.other_business_type
-                },
-                group_type: { 
-                    id: app.group_type_id, 
-                    name: app.group_type_name,
-                    other_value: app.other_group_type
-                },
-                sub_group_types: subGroupsByAppId[app.application_id] || [],
-                payment: paymentsByAppId[app.application_id] || [],
-                coverage_type: {
-                    id: app.coverage_type_id,
-                    name: app.coverage_type_name,
-                    details: app.coverage_type_id === 32 ? levelRanking : 
-                            app.coverage_type_id === 34 ? salaryRanking :
-                            app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
-                },
-                channel_type: { 
-                    id: app.channel_type_id,
-                    name: app.channel_type_name,
-                    channel_name: app.channel_name || null
-                },
-                commission_rate: app.commission_rate || null,
-                service_fee: app.service_fee || null,
-                level_ranking: levelRanking,
-                salary_ranking: salaryRanking,
-                uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
-                coverage_totals: coverage_totals,
-                amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
-                max_loan_amount: app.max_loan_amount,
-                min_loan_amount: app.min_loan_amount,
-                loan_portfolio_amount: app.loan_portfolio_amount,
-                loans_amount: app.loans_amount,
-                borrower_age_66_70: app.borrower_age_66_70,
-                borrower_age_71_75: app.borrower_age_71_75,
-                borrower_age_76_80: app.borrower_age_76_80,
-                type_of_proposal: {
-                    id: app.type_of_proposal_id,
-                    name: app.type_of_proposal_name
-                },
-                prototype_plan: { 
-                    id: app.prototype_id, 
-                    name: app.prototype_plan_name && app.prototype_plan_acronym ? `${app.prototype_plan_name} (${app.prototype_plan_acronym})` : app.prototype_plan_name 
-                },
-                plan: { 
-                    id: app.plan_id, 
-                    name: app.plan_name && app.plan_acronym ? `${app.plan_name} (${app.plan_acronym})` : app.plan_name 
-                },
-                basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
-                riders: appRiders,
-                excel_file_path: app.excel_file_path ? path.basename(app.excel_file_path) : null,
-                notes: app.notes,
-                created_at: app.created_at,
-                updated_at: app.updated_at,
-            };
-        });
-
+        const formattedPrototypes = await Promise.all(rawPrototypes.map(app => Helper.buildApplicationResponse(app)));
         return success(res, formattedPrototypes, 'Prototypes fetched successfully.');
     } catch (err) {
         console.error('Service Error:', err);
@@ -590,182 +1034,22 @@ export const getAllApplications = async (req, res) => {
         const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
         const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
 
-        const filterUserId = (isSuperAdmin || isTeamLeader || isActuarial) ? null : userId;
+        let filterUserId = userId;
+        if (isSuperAdmin || isActuarial) {
+            filterUserId = null; // See everything
+        } else if (isTeamLeader || loggedInUser.roleName === 'Supervisor') {
+            // Get IDs of all subordinates to include in the view
+            const subordinates = await User.getSubordinateIds(userId);
+            filterUserId = [userId, ...subordinates];
+        }
 
-        const rawApplications = await Model.getAllApplications(filterUserId);
-        if (rawApplications.length === 0) {
+        const rawApplications = await Model.getAllApplications(filterUserId); // Fetch raw data
+        if (rawApplications.length === 0) { // Check if any applications were found
             return success(res, [], 'Applications fetched successfully.');
         }
 
-        // --- Bulk fetch related data ---
-        const appIds = rawApplications.map(app => app.application_id);
-
-        const allRiders = await Model.getBulkApplicationRiders(appIds);
-        const ridersByAppId = allRiders.reduce((acc, rider) => {
-            (acc[rider.application_id] = acc[rider.application_id] || []).push(rider);
-            return acc;
-        }, {});
-        
-        const allSubGroups = await Model.getBulkApplicationSubGroups(appIds);
-        const subGroupsByAppId = allSubGroups.reduce((acc, sg) => {
-            (acc[sg.application_id] = acc[sg.application_id] || []).push({ id: sg.id, name: sg.name });
-            return acc;
-        }, {});
-
-        const allPayments = await Model.getBulkApplicationPaymentTerms(appIds);
-        const paymentsByAppId = allPayments.reduce((acc, p) => {
-            (acc[p.application_id] = acc[p.application_id] || []).push({
-                payment_term: { id: p.payment_term_id, name: p.payment_term_name },
-                sub_payment_term: { 
-                    id: p.sub_payment_term_id, 
-                    name: p.sub_payment_term_name || (p.sub_payment_term_id ? p.sub_payment_term_id.toString() : null)
-                }
-            });
-            return acc;
-        }, {});
-
-        const allRankings = await Model.getBulkCoverageRankings(appIds);
-        const rankingsByAppId = allRankings.reduce((acc, r) => {
-            (acc[r.application_id] = acc[r.application_id] || []).push(r);
-            return acc;
-        }, {});
-
-        const allRankingRiders = await Model.getBulkCoverageRankingRiders(appIds);
-        const rankingRidersByAppId = allRankingRiders.reduce((acc, rr) => {
-            (acc[rr.application_id] = acc[rr.application_id] || []).push(rr);
-            return acc;
-        }, {});
-
-        // --- Map the bulk-fetched data back to each application ---
-        const formattedApplications = rawApplications.map(app => {
-            const rankings = rankingsByAppId[app.application_id] || [];
-            const appRiders = ridersByAppId[app.application_id] || [];
-            const appRankingRiders = rankingRidersByAppId[app.application_id] || [];
-
-            // Map ranking-specific riders back to the riders array
-            if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && appRankingRiders.length > 0) {
-                appRiders.forEach(mainRider => {
-                    const riderValues = appRankingRiders
-                        .filter(rr => rr.rider_id === mainRider.rider_id)
-                        .map(rr => ({ designation: rr.designation, acronym: rr.acronym, amount: rr.rider_amount, unit: rr.rider_unit }));
-                    if (riderValues.length > 0) mainRider.values = riderValues;
-                });
-            }
-
-            let levelRanking = null;
-            let salaryRanking = null;
-            if (app.coverage_type_id === 32) { 
-                levelRanking = rankings.map(({ salary_multiplier, uniform_coverage_amount, application_id, ...rest }) => rest);
-            } else if (app.coverage_type_id === 34) { 
-                salaryRanking = rankings.map(({ uniform_coverage_amount, application_id, ...rest }) => rest);
-            }
-
-            let coverage_totals = [];
-            if (app.coverage_type_id !== 34) {
-                coverage_totals = rankings.map(r => ({
-                    designation: r.designation,
-                    total_coverage_amount: r.total_coverage_amount
-                }));
-            }
-
-            return {
-                application_id: app.application_id,
-                user_id: app.user_id,
-                user_full_name: [app.creator_firstname, app.creator_middlename, app.creator_lastname, app.creator_suffix].filter(Boolean).join(' '),
-                group_name: app.group_name,
-                business_nature_id: app.business_nature_id,
-                sub_business_nature_id: app.sub_business_nature_id,
-                business_nature: app.business_nature_id ? {
-                    id: app.business_nature_id,
-                    name: app.business_nature_name,
-                    sub_nature: app.sub_business_nature_id ? {
-                        id: app.sub_business_nature_id,
-                        name: app.sub_business_nature_name
-                    } : null
-                } : null,
-                number_of_lives: app.number_of_lives,
-                business_address: app.business_address,
-                contact_number: app.contact_number,
-                fax_number: app.fax_number,
-                email: app.email,
-                contact_person: {
-                    full_name: [app.contact_person_salutation, app.contact_person_firstname, app.contact_person_mi, app.contact_person_lastname].filter(Boolean).join(' '),
-                    salutation: app.contact_person_salutation,
-                    firstname: app.contact_person_firstname,
-                    mi: app.contact_person_mi,
-                    lastname: app.contact_person_lastname
-                },
-                designation: app.designation,
-                proposal_addressee: app.proposal_addressee,
-                addressee_designation: app.addressee_designation,
-                minimum_age: app.minimum_age,
-                maximum_age: app.maximum_age,
-                status: { id: app.status_id, name: app.status_name },
-                group_classification: { 
-                    id: app.group_classification_id, 
-                    name: app.group_classification_name,
-                    other_value: app.other_group_classification
-                },
-                business_type: {
-                    id: app.business_type_id,
-                    name: app.business_type_name,
-                    other_value: app.other_business_type
-                },
-                group_type: { 
-                    id: app.group_type_id, 
-                    name: app.group_type_name,
-                    other_value: app.other_group_type
-                },
-                sub_group_types: subGroupsByAppId[app.application_id] || [],
-                payment_mode: { id: app.payment_mode_id, name: app.payment_mode_name },
-                coverage_type: {
-                    id: app.coverage_type_id,
-                    name: app.coverage_type_name,
-                    details: app.coverage_type_id === 32 ? levelRanking : 
-                            app.coverage_type_id === 34 ? salaryRanking :
-                            app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
-                },
-                channel_type: {
-                    id: app.channel_type_id,
-                    name: app.channel_type_name,
-                    channel_name: app.channel_name || null
-                },
-                commission_rate: app.commission_rate || null,
-                service_fee: app.service_fee || null,
-                payment: paymentsByAppId[app.application_id] || [],
-                type_of_proposal: {
-                    id: app.type_of_proposal_id,
-                    name: app.type_of_proposal_name
-                },
-                prototype_plan: { 
-                    id: app.prototype_id, 
-                    name: app.prototype_plan_name && app.prototype_plan_acronym ? `${app.prototype_plan_name} (${app.prototype_plan_acronym})` : app.prototype_plan_name 
-                },
-                plan: { 
-                    id: app.plan_id, 
-                    name: app.plan_name && app.plan_acronym ? `${app.plan_name} (${app.plan_acronym})` : app.plan_name 
-                },
-                basic_plan: { id: app.basic_plan_id, name: app.basic_plan_name },
-                amount_loans: app.amount_loans_id ? { id: app.amount_loans_id, name: app.amount_loans_name } : null,
-                loans_amount: app.loans_amount,
-                max_loan_amount: app.max_loan_amount,
-                min_loan_amount: app.min_loan_amount,
-                loan_portfolio_amount: app.loan_portfolio_amount,
-                level_ranking: levelRanking,
-                salary_ranking: salaryRanking,
-                uniform_coverage_amount: app.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
-                borrower_age_66_70: app.borrower_age_66_70,
-                borrower_age_71_75: app.borrower_age_71_75,
-                borrower_age_76_80: app.borrower_age_76_80,
-                coverage_totals: coverage_totals,
-                riders: appRiders,
-                excel_file_path: app.excel_file_path ? path.basename(app.excel_file_path) : null,
-                notes: app.notes,
-                created_at: app.created_at,
-                updated_at: app.updated_at,
-            };
-        });
-
+        // Use Promise.all with map to build responses concurrently
+        const formattedApplications = await Promise.all(rawApplications.map(app => Helper.buildApplicationResponse(app)));
         return success(res, formattedApplications, 'Applications fetched successfully.');
     } catch (err) {
         console.error('Service Error:', err);
@@ -1073,10 +1357,10 @@ export const updateApplication = async (req, res) => {
         
         const { agent_code, ...updateData } = req.body;
         
-        // Automatically transition from Draft: Approved (2) for Prototypes (30), Checking (5) otherwise
-        const STATUS_DRAFT = 4;
-        const STATUS_CHECKING = 5;
-        const STATUS_APPROVED = 2;
+        // Automatically transition from Draft: Approved (14) for Prototypes (30), Pending (8) otherwise
+        const STATUS_DRAFT = 11;
+        const STATUS_PENDING = 8;
+        const STATUS_APPROVED = 14;
         const PROTOTYPE_TYPE_ID = 30;
 
         if (Number(existingApplication.status_id) === STATUS_DRAFT) {
@@ -1084,7 +1368,7 @@ export const updateApplication = async (req, res) => {
                 ? Number(updateData.type_of_proposal_id) 
                 : Number(existingApplication.type_of_proposal_id);
             
-            updateData.status_id = typeId === PROTOTYPE_TYPE_ID ? STATUS_APPROVED : STATUS_CHECKING;
+            updateData.status_id = typeId === PROTOTYPE_TYPE_ID ? STATUS_APPROVED : STATUS_PENDING;
         }
 
         const cleanedProposal = Helper.cleanProposalFields(updateData);
@@ -1162,6 +1446,7 @@ export const uploadExcelFile = async (req, res) => {
         const appId = req.params.id;
         const excelFile = req.files?.excel_file;
 
+        // Fetch application to get group_name for folder structure
         const app = await Model.getApplicationById(appId);
         if (!app) return error(res, 'Application not found', 404);
 
@@ -1183,13 +1468,15 @@ export const uploadExcelFile = async (req, res) => {
             return error(res, 'You are not authorized to upload files for this application.', 403);
         }
 
-        if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-
         const oldFilePath = app.excel_file_path;
 
-        const uniqueFilename = `APP-${appId}-v${Helper.getFileTimestamp()}-${excelFile.originalFilename}`;
-        const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
+        // Create the new structured directory: uploads/requirements/{group_name}/excel_files/
+        const targetDir = Helper.ensureRequirementsDir(app.group_name, 'excel_files');
 
+        const uniqueFilename = `APP-${appId}-v${Helper.getFileTimestamp()}-${excelFile.originalFilename}`;
+        const newFilePath = path.join(targetDir, uniqueFilename);
+
+        // Move the uploaded temporary file to its permanent structured location
         await fs.promises.rename(excelFile.filepath, newFilePath);
 
         await Model.updateApplication(appId, { excel_file_path: newFilePath }, userId);
@@ -1247,49 +1534,6 @@ export const deleteApplication = async (req, res) => {
     }
 };
 
-// Specialized API for Super Admins and Team Leaders to change Prototype application status
-// export const updatePrototypeStatus = async (req, res) => {
-//     try {
-//         const userId = req.user.user_id;
-//         const appId = req.params.id;
-
-//         if (!req.body || req.body.status_id === undefined) {
-//             return error(res, 'The "status_id" field is required in the request body.', 400);
-//         }
-//         const status_id = Number(req.body.status_id);
-
-//         // 1. Authorization: Super Admin or Team Leader
-//         const loggedInUser = await User.getUserById(userId);
-//         const ROLE_SA_ID = 15;
-//         const ROLE_TL_ID = 2;
-//         const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
-//         const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
-
-//         if (!isSuperAdmin && !isTeamLeader) {
-//             return error(res, 'Access Denied: Only Super Admins and Team Leaders are authorized to change prototype statuses.', 403);
-//         }
-
-//         const app = await Model.getApplicationById(appId);
-//         if (!app) return error(res, 'Application not found', 404);
-
-//         // 2. Validation: Ensure it is a Prototype (ID 30)
-//         const PROTOTYPE_TYPE_ID = 30;
-//         if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
-//             return error(res, 'Action Denied: This operation is strictly for Prototype applications.', 400);
-//         }
-
-//         const updated = await Model.updateApplication(appId, { status_id }, userId);
-//         const response = await Helper.buildApplicationResponse(updated);
-
-//         broadcastApplicationUpdate(appId, response);
-
-//         return success(res, response, `Prototype status successfully changed to "${response.status.name}".`);
-//     } catch (err) {
-//         console.error('Update Prototype Status Error:', err);
-//         return error(res, err.message);
-//     }
-// };
-
 // Change status to Checking (5) - No body required
 export const setStatusChecking = async (req, res) => {
     try {
@@ -1306,6 +1550,11 @@ export const setStatusChecking = async (req, res) => {
 
         const app = await Model.getApplicationById(appId);
         if (!app) return error(res, 'Application not found', 404);
+
+        const isOwner = Number(app.user_id) === Number(userId);
+        if (!isOwner) {
+            return error(res, 'Access Denied: Only the original creator of this application can update its status.', 403);
+        }
 
         const PROTOTYPE_TYPE_ID = 30;
         if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
@@ -1341,6 +1590,11 @@ export const setStatusApproved = async (req, res) => {
         const app = await Model.getApplicationById(appId);
         if (!app) return error(res, 'Application not found', 404);
 
+        const isOwner = Number(app.user_id) === Number(userId);
+        if (!isOwner) {
+            return error(res, 'Access Denied: Only the original creator of this application can update its status.', 403);
+        }
+
         const PROTOTYPE_TYPE_ID = 30;
         if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
             return error(res, 'Action Denied: This operation is strictly for Prototype applications.', 400);
@@ -1354,6 +1608,110 @@ export const setStatusApproved = async (req, res) => {
         return success(res, response, 'Status successfully updated to Approved.');
     } catch (err) {
         console.error('Set Status Approved Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Change status to Booked (7) - Stops the 30-day countdown
+export const setStatusBooked = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const STATUS_BOOKED = 7;
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        // 1. Authorization & Bypass Logic: Super Admin (15) and Team Leader (2) bypass requirements
+        const userRoleName = req.user.roleName?.trim();
+        const userRoleId = Number(req.user.role_id);
+
+        const isSuperAdmin = userRoleName === 'Super Admin' || userRoleId === 15;
+        const isTeamLeader = userRoleName === 'Team Leader' || userRoleId === 2;
+        const canBypass = isSuperAdmin || isTeamLeader;
+        
+        const isCFE = userRoleName === 'Corporate Financial Executive' || userRoleId === 3;
+        const isOwner = Number(app.user_id) === Number(userId);
+
+        if (!canBypass && (!isOwner || !isCFE)) {
+            return error(res, 'Access Denied: Only the original CFE creator, a Team Leader, or a Super Admin can mark a proposal as Booked.', 403);
+        }
+
+        // 2. Requirements Validation (CFE Only)
+        if (!canBypass) {
+            const pendingRequirements = getPendingRequirements(app);
+
+            if (pendingRequirements.length > 0) {
+                return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
+            }
+        }
+
+        // 3. Expiry Check
+        // Use stored expiry_date if available (e.g., from an extension), otherwise default to 30 days from creation
+        const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+        if (!canBypass && new Date() > expiryDate) {
+            return error(res, `Action Denied: This proposal expired on ${expiryDate.toLocaleDateString()}. You cannot book an expired proposal.`, 400);
+        }
+
+        // 4. Update Status (Status ID 7)
+        const oneYearLater = new Date();
+        // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+        oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+        const updated = await Model.updateApplication(appId, { status_id: STATUS_BOOKED, expiry_date: oneYearLater }, userId);
+        
+        // 4. Return updated data (the validity object will now show as stopped)
+        const response = await Helper.buildApplicationResponse(updated);
+
+        // 5. Send Notification Email
+        try {
+            const creator = await User.getUserById(app.user_id);
+            const bookedDate = new Date().toLocaleDateString();
+            const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
+            const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
+            const internalSalutation = "Sir MMC, John Kwong, Team Lead, and EBAM Team";
+            const clientSalutation = `Mr./Ms. ${app.contact_person_lastname}`;
+
+            // Notify CFE (Creator)
+            if (creator && creator.email) {
+                await transporter.sendMail({
+                    from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                    to: creator.email,
+                    subject: `Account Successfully BOOKED: ${app.group_name}`,
+                    html: bookedNotificationTemplate(
+                        internalSalutation,
+                        app.group_name,
+                        clientName,
+                        proposalNumber,
+                        bookedDate,
+                        `${creator.firstname} ${creator.lastname}`
+                    )
+                });
+            }
+
+            // Notify Applicant (Registered Email on the form)
+            if (app.email) {
+                await transporter.sendMail({
+                    from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                    to: app.email,
+                    subject: `Congratulations! Your proposal for ${app.group_name} is now Booked`,
+                    html: bookedNotificationTemplate(
+                        clientSalutation,
+                        app.group_name,
+                        clientName,
+                        proposalNumber,
+                        bookedDate,
+                        creator ? `${creator.firstname} ${creator.lastname}` : 'System'
+                    )
+                });
+            }
+        } catch (emailErr) {
+            console.error('Booked Notification Error:', emailErr);
+        }
+
+        broadcastApplicationUpdate(appId, response);
+        return success(res, response, 'Application successfully marked as Booked. The 30-day window is now closed.');
+    } catch (err) {
+        console.error('Set Status Booked Error:', err);
         return error(res, err.message);
     }
 };

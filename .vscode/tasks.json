@@ -9,7 +9,20 @@
         "runOn": "folderOpen"
       },
       "presentation": {
-        "panel": "dedicated",   // use "dedicated" to keep it separate
+        "panel": "dedicated",
+        "reveal": "always",
+        "focus": false,
+        "clear": true
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "Antigravity CLI",
+      "type": "shell",
+      "command": "agy",
+      "presentation": {
+        "panel": "dedicated",
         "reveal": "always",
         "focus": false,
         "clear": true

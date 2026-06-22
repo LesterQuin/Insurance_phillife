@@ -44,6 +44,43 @@ export const validateGetHistory = [
     }
 ];
 
+// New middleware for routes that don't have a :userId parameter (like /register)
+export const validateIsAdmin = [
+    async (req, res, next) => {
+        try {
+        const requester = req.user;
+
+        const isSuperAdmin =
+            requester &&
+            (requester.role_id === 15 ||
+            requester.roleName === "Super Admin" ||
+            requester.roleCode === "ROLE_SA");
+
+        const isITDepartment =
+            requester &&
+            (requester.department_id === 16 ||
+            requester.departmentName === "Information Technology" ||
+            requester.departmentCode === "DEPT_IT");
+
+        if (!isSuperAdmin && !isITDepartment) {
+            return res.status(403).json({
+            status: false,
+            message:
+                "Unauthorized. Only Super Admins or IT department personnel can perform this action.",
+            });
+        }
+
+        next();
+        } catch (error) {
+        console.error("Permission check error:", error);
+        return res.status(500).json({
+            status: false,
+            message: "Error checking permissions",
+        });
+        }
+    },
+];
+
 // Validation for user registration
 export const validateRegister = [
     body('firstname')
@@ -111,6 +148,21 @@ export const validateRegister = [
             const locationList = locations.map(l => `${l.id} - ${l.name}`).join(', ');
             throw new Error(
                 `Invalid location_id (${value}). Please select one of the following: ${locationList}`
+            );
+        }
+        return true;
+    }),
+    body('reporting_to_id')
+    .optional({ nullable: true })
+    .isInt({ min: 1 }).withMessage('Reporting To ID must be a positive integer')
+    .custom(async (value) => {
+        if (value == null) return true;
+        const superiors = await User.getPotentialSuperiors();
+        const validIds = superiors.map(s => s.user_id);
+        if (!validIds.includes(Number(value))) {
+            const superiorList = superiors.map(s => `${s.user_id} - ${s.firstname} ${s.lastname} (${s.roleName})`).join(', ');
+            throw new Error(
+                `Invalid reporting_to_id (${value}). Please select one of the following: ${superiorList}`
             );
         }
         return true;
@@ -355,7 +407,56 @@ export const validateAdminUpdateUser = [
 export const validateFinancialApplication = [
     body('group_name')
         .notEmpty().withMessage('Group Name is required')
-        .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
+        .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters')
+        .custom(async (value, { req }) => {
+            const proposalStatusId = Number(req.body.proposal_status_id);
+            const RENEW_STATUS_ID = 61;
+            const NEW_STATUS_ID = 60;
+
+            const existingGroup = await Financial.getApplicationByGroupName(value);
+
+            if (proposalStatusId === RENEW_STATUS_ID) {
+                if (!existingGroup) {
+                    throw new Error(`The group "${value}" does not exist in our records. Renewal is only possible for existing groups.`);
+                }
+                
+                // Authorization Check: Creator OR (Team Leader/Super Admin)
+                const currentUser = req.user;
+                const owner = await User.getUserById(existingGroup.user_id);
+                const isOwnerActive = owner && owner.is_active;
+                const isCreator = Number(currentUser.user_id) === Number(existingGroup.user_id);
+
+                if (!isCreator) {
+                    if (isOwnerActive) {
+                        throw new Error(`Renewal failed. The original creator ("${owner.firstname} ${owner.lastname}") is still an active user. Only the original creator can renew this application.`);
+                    }
+
+                    const isAuthorizedRole = currentUser && (
+                        [1, 2, 3, 15, 19].includes(Number(currentUser.role_id)) || 
+                        ['Super Admin', 'Team Leader', 'Group Sales & Marketing Head', 'Assistant Vice President', 'Corporate Financial Executive'].includes(currentUser.roleName)
+                    );
+
+                    if (!isAuthorizedRole) {
+                        throw new Error(`Renewal failed. The original creator is inactive, but you do not have the required leadership permissions to process this renewal.`);
+                    }
+                }
+
+                // Check if created_at is at least 1 year old
+                const createdAt = new Date(existingGroup.created_at);
+                const oneYearAgo = new Date();
+                oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+                if (createdAt > oneYearAgo) {
+                    const formattedDate = createdAt.toLocaleDateString();
+                    throw new Error(`Renewal failed. The application for "${value}" was created on ${formattedDate}. You can only renew applications that are at least 1 year old.`);
+                }
+            } else if (proposalStatusId === NEW_STATUS_ID) {
+                if (existingGroup && Number(existingGroup.status_id) !== 6) {
+                    throw new Error(`An active application for "${value}" already exists in the system. Please select "Renew" if you wish to process a renewal.`);
+                }
+            }
+            return true;
+        }),
     body('business_nature_id')
         .notEmpty().withMessage('Business Nature is required')
         .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)')
@@ -699,6 +800,22 @@ export const validateFinancialApplication = [
             if (!item) {
                 const validOptions = lookups.map(l => `${l.id} (${l.name})`).join(', ');
                 throw new Error(`Invalid channel_type_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('proposal_status_id')
+        .notEmpty().withMessage('Proposal type (New/Renew) is required')
+        .isInt({ min: 60, max: 61 }).withMessage('proposal_status_id must be 60 (New) or 61 (Renew)')
+        .custom(async (value, { req }) => {
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.STATUS_PROPOSAL) {
+                req.lookupCache.STATUS_PROPOSAL = await Financial.getLookupListByCategory('STATUS_PROPOSAL');
+            }
+            const lookups = req.lookupCache.STATUS_PROPOSAL;
+            const item = lookups.find(l => l.id === Number(value));
+            if (!item) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid proposal_status_id (${value}). Valid options: ${validOptions}`);
             }
             return true;
         }),
@@ -1296,6 +1413,14 @@ export const validateDraftFinancialApplication = [
         if (!lookups.some(l => l.id === Number(value))) throw new Error(`Invalid type_of_proposal_id`);
         return true;
     }),
+    body('proposal_status_id').optional().isInt().custom(async (value) => {
+        const lookups = await Financial.getLookupListByCategory('STATUS_PROPOSAL');
+        if (!lookups.some(l => l.id === Number(value))) {
+            const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+            throw new Error(`Invalid proposal_status_id (${value}). Valid options: ${validOptions}`);
+        }
+        return true;
+    }),
 
     // Nested Data Structures
     body('riders').optional({ nullable: true }).isArray().withMessage('riders must be an array'),
@@ -1691,6 +1816,26 @@ export const validateRates = [
             }
             return true;
         }),
+    body('reporting_to_id')
+        .optional({ nullable: true })
+        .isInt({ min: 1 }).withMessage('Reporting To ID must be a positive integer')
+        .custom(async (value, { req }) => {
+            if (value == null) return true;
+            
+            if (Number(value) === Number(req.params.userId)) {
+                throw new Error('A user cannot report to themselves.');
+            }
+
+            const superiors = await User.getPotentialSuperiors();
+            const validIds = superiors.map(s => s.user_id);
+            if (!validIds.includes(Number(value))) {
+                const superiorList = superiors.map(s => `${s.user_id} - ${s.firstname} ${s.lastname} (${s.roleName})`).join(', ');
+                throw new Error(
+                    `Invalid reporting_to_id (${value}). Please select one of the following: ${superiorList}`
+                );
+            }
+            return true;
+        }),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -1718,7 +1863,62 @@ export const validateUpdateFinancialApplication = [
     },
 
     // All fields are optional for an update. If a field is present, its validation rules are applied.
-    body('group_name').optional().isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
+    body('group_name')
+        .optional()
+        .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters')
+        .custom(async (value, { req }) => {
+            const appId = req.params.id;
+            const proposalStatusId = req.body.proposal_status_id !== undefined 
+                ? Number(req.body.proposal_status_id) 
+                : Number(req.existingApplication?.proposal_status_id);
+            
+            const RENEW_STATUS_ID = 61;
+            const NEW_STATUS_ID = 60;
+
+            const existingGroup = await Financial.getApplicationByGroupName(value);
+
+            // If another record exists with this name (ignoring the current one we are updating)
+            if (existingGroup && Number(existingGroup.application_id) !== Number(appId)) {
+                if (proposalStatusId === NEW_STATUS_ID && Number(existingGroup.status_id) !== 6) {
+                    throw new Error(`An active application for "${value}" already exists. Please select "Renew" if you wish to process a renewal.`);
+                }
+
+                if (proposalStatusId === RENEW_STATUS_ID) {
+                    // Authorization Check for Renewal Target
+                    const currentUser = req.user;
+                    const owner = await User.getUserById(existingGroup.user_id);
+                    const isOwnerActive = owner && owner.is_active;
+                    const isCreator = Number(currentUser.user_id) === Number(existingGroup.user_id);
+
+                    if (!isCreator) {
+                        if (isOwnerActive) {
+                            throw new Error(`Renewal failed. The original creator ("${owner.firstname} ${owner.lastname}") is still an active user. Only they can process this renewal.`);
+                        }
+
+                        const isAuthorizedRole = currentUser && (
+                            [1, 2, 3, 15, 19].includes(Number(currentUser.role_id)) || 
+                            ['Super Admin', 'Team Leader', 'Group Sales & Marketing Head', 'Assistant Vice President', 'Corporate Financial Executive'].includes(currentUser.roleName)
+                        );
+
+                        if (!isAuthorizedRole) {
+                            throw new Error(`Renewal failed. You do not have permission to renew this application for the inactive original agent.`);
+                        }
+                    }
+
+                    // If they are trying to "Renew" but pointing to another group name, 
+                    // check if THAT target group is at least 1 year old.
+                    const createdAt = new Date(existingGroup.created_at);
+                    const oneYearAgo = new Date();
+                    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
+                    if (createdAt > oneYearAgo) {
+                        const formattedDate = createdAt.toLocaleDateString();
+                        throw new Error(`Renewal failed. The target group "${value}" was created on ${formattedDate}. You can only renew applications that are at least 1 year old.`);
+                    }
+                }
+            }
+            return true;
+        }),
     body('business_nature_id')
         .optional()
         .isInt({ min: 1 }).withMessage('Business Nature ID must be a positive integer (no letters or special characters allowed)')
@@ -1841,6 +2041,21 @@ export const validateUpdateFinancialApplication = [
             if (!item) {
                 const validOptions = lookups.map(l => `${l.id} (${l.name})`).join(', ');
                 throw new Error(`Invalid channel_type_id (${value}). Valid options: ${validOptions}`);
+            }
+            return true;
+        }),
+    body('proposal_status_id')
+        .optional()
+        .isInt()
+        .custom(async (value, { req }) => {
+            if (!req.lookupCache) req.lookupCache = {};
+            if (!req.lookupCache.STATUS_PROPOSAL) {
+                req.lookupCache.STATUS_PROPOSAL = await Financial.getLookupListByCategory('STATUS_PROPOSAL');
+            }
+            const lookups = req.lookupCache.STATUS_PROPOSAL;
+            if (!lookups.some(l => l.id === Number(value))) {
+                const validOptions = lookups.map(l => `${l.id} - ${l.name}`).join(', ');
+                throw new Error(`Invalid proposal_status_id (${value}). Valid options: ${validOptions}`);
             }
             return true;
         }),
@@ -2304,6 +2519,173 @@ export const validateExcelUpload = [
 
         if (!isExcel) {
             return res.status(400).json({ status: false, errors: [{ msg: 'Invalid file type. Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.' }] });
+        }
+        next();
+    }
+];
+
+// -----------------------------
+// Installation Requirements Validation
+// -----------------------------
+export const validateInstallationRequirements = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    (req, res, next) => {
+        const validMetadata = [
+            { id: 1, key: 'signed_proposal', label: 'SIGNED PROPOSAL/CONFORME' },
+            { id: 2, key: 'group_app', label: 'APPLICATION FOR GROUP INSURANCE' },
+            { id: 3, key: 'dti', label: 'DTI (FOR SOLE PROPRIETORSHIP)' },
+            { id: 4, key: 'sec_reg', label: 'SEC CERTIFICATE OF REGISTRATION' },
+            { id: 5, key: 'articles_of_inc', label: 'ARTICLES OF INCORPORATION' },
+            { id: 6, key: 'by_laws', label: 'BY-LAWS' },
+            { id: 7, key: 'business_permit', label: 'BUSINESS PERMIT' },
+            { id: 8, key: 'masterlist', label: 'MASTERLIST (PDF & Excel Copy)' },
+            { id: 9, key: 'auth_id', label: 'Copy of ID of the Authorized Signatory' }
+        ];
+        
+        if (!req.files || Object.keys(req.files).length === 0) {
+            return res.status(400).json({ status: false, message: 'No files provided for upload.' });
+        }
+
+        const validIds = validMetadata.map(m => m.id.toString());
+        const validKeys = validMetadata.map(m => m.key);
+        const validOptions = validMetadata.map(m => `${m.id} (${m.label})`).join(', ');
+
+        const uploadedKeys = Object.keys(req.files);
+        for (const key of uploadedKeys) {
+            if (!validIds.includes(key) && !validKeys.includes(key)) {
+                return res.status(400).json({
+                    status: false,
+                    message: `Invalid requirement ID or Key (${key}). Valid options: ${validOptions}`
+                });
+            }
+        }
+        next();
+    }
+];
+
+// -----------------------------
+// Extension Request Validations
+// -----------------------------
+
+// Validation for viewing extension requests (Leadership roles only)
+export const validateGetExtensionRequests = [
+    (req, res, next) => {
+        const loggedInUser = req.user;
+        const isAuthorized = [1, 2, 15, 19].includes(Number(loggedInUser.role_id)) || 
+            ['Super Admin', 'Team Leader', 'Assistant Vice President', 'Group Sales & Marketing Head'].includes(loggedInUser.roleName);
+
+        if (!isAuthorized) {
+            return res.status(403).json({
+                status: false,
+                message: 'Access Denied: You do not have the capacity to view extension requests. This feature is restricted to Team Leaders and Super Admins.'
+            });
+        }
+        next();
+    }
+];
+
+// Validation for requesting an extension
+export const validateRequestExtension = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    async (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+
+        try {
+            const userId = req.user.user_id;
+            const appId = req.params.id;
+
+            const app = await Financial.getApplicationById(appId);
+            if (!app) {
+                return res.status(404).json({ status: false, message: 'Application not found' });
+            }
+
+            // Authorization Logic: Creator must have a valid role or administrative privileges
+            const userRoleName = req.user.roleName?.trim();
+            const userRoleId = Number(req.user.role_id);
+
+            const isSuperAdmin = userRoleName === 'Super Admin' || userRoleId === 15;
+            const isTeamLeader = userRoleName === 'Team Leader' || userRoleId === 2;
+            const isCFE = userRoleName === 'Corporate Financial Executive' || userRoleId === 3;
+            const isOwner = Number(app.user_id) === Number(userId);
+
+            if (!isOwner || (!isCFE && !isSuperAdmin && !isTeamLeader)) {
+                return res.status(403).json({
+                    status: false,
+                    message: 'Access Denied: Only the original creator with a valid role (CFE, Team Leader, or Super Admin) can request an extension.'
+                });
+            }
+
+            if (app.extension_requested) {
+                return res.status(400).json({
+                    status: false,
+                    message: 'An extension request is already pending for this application.'
+                });
+            }
+
+            // Business Rule: Only allow extension requests when 1-5 days are remaining
+            const now = new Date();
+            const currentStatus = Number(app.status_id);
+            if (currentStatus === 7 || currentStatus === 6) {
+                return res.status(400).json({
+                    status: false,
+                    message: 'Extension requests are not available for Booked or Closed proposals.'
+                });
+            }
+
+            // can request for extension if 5 days or less before expiry date. 
+            /*
+            const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+            const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+
+            if (diffDays > 5 || diffDays < 1) {
+                const daysMsg = diffDays < 1 ? 'The proposal has already expired or is expiring today.' : `It still has ${diffDays} days left.`;
+                return res.status(400).json({
+                    status: false,
+                    message: `Extension request denied. You can only request an extension when there are 5 days or fewer remaining. ${daysMsg}`
+                });
+            }
+            */
+
+            next();
+        } catch (error) {
+            console.error('validateRequestExtension error:', error);
+            return res.status(500).json({ status: false, message: 'Error checking extension request validity' });
+        }
+    }
+];
+
+// Validation for approving or rejecting an extension
+export const validateApproveExtension = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+
+        const loggedInUser = req.user;
+        const isAuthorized = [1, 2, 15, 19].includes(Number(loggedInUser.role_id)) || 
+            ['Super Admin', 'Team Leader', 'Assistant Vice President', 'Group Sales & Marketing Head'].includes(loggedInUser.roleName);
+
+        if (!isAuthorized) {
+            return res.status(403).json({ status: false, message: 'Access Denied: You do not have the capacity to approve extension requests. This action is reserved for Team Leaders and Super Admins.' });
+        }
+        next();
+    }
+];
+
+// Validation for rejecting an extension request (Leadership roles only)
+export const validateRejectExtension = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+
+        const loggedInUser = req.user;
+        const isAuthorized = [1, 2, 15, 19].includes(Number(loggedInUser.role_id)) || 
+            ['Super Admin', 'Team Leader', 'Assistant Vice President', 'Group Sales & Marketing Head'].includes(loggedInUser.roleName);
+
+        if (!isAuthorized) {
+            return res.status(403).json({ status: false, message: 'Access Denied: You do not have the capacity to decline extension requests. This action is reserved for Team Leaders and Super Admins.' });
         }
         next();
     }
