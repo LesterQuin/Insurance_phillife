@@ -606,9 +606,25 @@ export const generateProposalHtml = async (id) => {
     const planId = Number(appData.plan_id);
     let user = appData.user_id ? await User.getUserById(appData.user_id) : { firstname: 'Phillife', lastname: 'Representative' };
 
+    const rankings = await Model.getCoverageRankingsByAppId(id);
+    const rankingRiders = await Model.getCoverageRankingRiders(id);
+
+    if ((appData.coverage_type_id === 32 || appData.coverage_type_id === 34) && rankingRiders.length > 0) {
+        riders.forEach(mainRider => {
+            const riderValues = rankingRiders.filter(rr => rr.rider_id === mainRider.rider_id).map(rr => ({ designation: rr.designation, acronym: rr.acronym, amount: rr.rider_amount, unit: rr.rider_unit }));
+            if (riderValues.length > 0) mainRider.values = riderValues;
+        });
+    }
+
+    const levelRanking = appData.coverage_type_id === 32 ? rankings.map(({ salary_multiplier, uniform_coverage_amount, ...rest }) => rest) : null;
+    const salaryRanking = appData.coverage_type_id === 34 ? rankings.map(({ uniform_coverage_amount, ...rest }) => rest) : null;
+
     const application = { 
         ...appData, 
         riders,
+        level_ranking: levelRanking,
+        salary_ranking: salaryRanking,
+        uniform_coverage_amount: appData.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
         status: { id: appData.status_id, name: appData.status_name || 'Pending' },
         plan: { id: appData.plan_id, name: appData.plan_name && appData.plan_acronym ? `${appData.plan_name} (${appData.plan_acronym})` : appData.plan_name, acronym: appData.plan_acronym || null },
         basic_plan: { 

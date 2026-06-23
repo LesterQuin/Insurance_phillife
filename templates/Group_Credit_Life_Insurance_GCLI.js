@@ -26,87 +26,109 @@ const formatDate = (date) => {
     });
 };
 
-// Helper to generate table rows dynamically for rates
-const generateRateRows = (items, suffix = "") => {
-    if (!Array.isArray(items) || items.length === 0)
-        return '<tr><td colspan="4">No rates provided yet</td></tr>';
+// Helper to generate the GCLI table in a 3-column side-by-side format
+const generateGCLITableHTML = (ratesArray) => {
+    if (!Array.isArray(ratesArray) || ratesArray.length === 0) {
+        return '<p>No rates provided yet</p>';
+    }
 
-    // Sort items: attained_age first, then age_band, then term_months, then rider_id, then rider_name
-    const sorted = [...items].sort((a, b) => {
-        if (a.attained_age !== null && b.attained_age !== null)
-        return a.attained_age - b.attained_age;
-        if (a.attained_age !== null) return 1;
-        if (b.attained_age !== null) return -1;
-        if (a.age_band !== null && b.age_band !== null)
-        return a.age_band.localeCompare(b.age_band);
-        const aTerm = a.term_of_months || a.term_months;
-        const bTerm = b.term_of_months || b.term_months;
-        if (aTerm != null && bTerm != null) return aTerm - bTerm;
-        if (aTerm != null) return -1;
-        if (bTerm != null) return 1;
-        if (a.rider_id !== null && b.rider_id !== null)
-        return a.rider_id - b.rider_id;
-        return (a.rider_name || "").localeCompare(b.rider_name || "");
-    });
+    // Sort by term of months
+    const sorted = [...ratesArray].sort((a, b) => a.term_of_months - b.term_of_months);
 
-    return sorted
-        .map((item) => {
-        const ageLabel =
-            item.attained_age ||
-            (item.age_band === "BASIC_PLAN" || item.age_band === "BASIC"
-            ? "Standard"
-            : item.age_band) ||
-            "-";
-        const termVal = item.term_of_months || item.term_months;
-        const termLabel = termVal ? `${termVal}${suffix}` : "-";
-        const riderLabel =
-            item.rider_name || item.basic_plan_name || "Basic Plan";
+    // Chunk into groups of 3
+    const rows = [];
+    for (let i = 0; i < sorted.length; i += 3) {
+        rows.push(sorted.slice(i, i + 3));
+    }
 
-        return `
-    <tr>
-    <td>${ageLabel}</td>
-    <td>${termLabel}</td>
-    <td>${riderLabel}</td>
-    <td>${item.rate}</td>
-    </tr>`;
-        })
-        .join("");
+    let html = `
+    <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 10pt;">
+        <thead>
+            <tr style="background-color: #f9f9f9;">
+                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
+                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
+                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
+                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
+                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
+                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
+            </tr>
+        </thead>
+        <tbody>
+    `;
+
+    for (const row of rows) {
+        html += '<tr>';
+        for (let col = 0; col < 3; col++) {
+            const item = row[col];
+            if (item) {
+                const termSuffix = item.term_of_months === 1 ? ' month' : ' months';
+                html += `
+                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${item.term_of_months}${termSuffix}</td>
+                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold;">${item.basic_rate || '0.000'}</td>
+                `;
+            } else {
+                html += `
+                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #ccc;">-</td>
+                    <td style="padding: 6px; border: 1px solid #ddd; text-align: center; color: #ccc;">-</td>
+                `;
+            }
+        }
+        html += '</tr>';
+    }
+
+    html += `
+        </tbody>
+    </table>
+    `;
+    return html;
 };
 
-// Helper to generate chunked tables for 18-64 GCLI rates
+// Helper to generate chunked tables for 18-64 GCLI rates (supports GCLI nested object structure)
 const generateChunkedRateTables = (
-    rates,
+    ratesObj,
     maturity,
     header,
     suffix,
     minAge = 18,
     maxAge = 64,
-    ) => {
-    if (!Array.isArray(rates) || rates.length === 0)
+) => {
+    if (!ratesObj) {
         return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+    }
 
-    // Detect if we are dealing with monthly term rates
-    const isMonthly = rates.some((r) => {
-        const t = r.term_of_months || r.term_months;
-        return t !== null && t !== undefined && t > 0 && t <= 120;
-    });
-    const displaySuffix = isMonthly ? " months" : suffix;
-
-    return `
-        <div class="age-tables-container">
-            <div class="age-table-box" style="flex: 0 0 100%;">
-                <table class="compact-table">
-                    <tr style="background-color: #f9f9f9;">
-                        <th style="font-size: 8.5pt;">Attained Age</th>
-                        <th style="font-size: 8.5pt;">Term of Loan</th>
-                        <th style="font-size: 8.5pt;">Rider</th>
-                        <th style="font-size: 8.5pt;">Rate(%)</th>
-                    </tr>
-                    ${generateRateRows(rates, displaySuffix)}
-                </table>
+    // Base bracket case (contains basic_plan array)
+    if (ratesObj.basic_plan && Array.isArray(ratesObj.basic_plan)) {
+        if (ratesObj.basic_plan.length === 0) {
+            return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+        }
+        return `
+            <div class="age-tables-container">
+                <div class="age-table-box" style="flex: 0 0 100%;">
+                    ${generateGCLITableHTML(ratesObj.basic_plan)}
+                </div>
             </div>
-        </div>
-    `;
+        `;
+    }
+
+    // Senior bracket case (contains age_XX arrays)
+    const ageKeys = Object.keys(ratesObj).filter(k => k.startsWith('age_')).sort();
+    if (ageKeys.length === 0) {
+        return '<div class="age-tables-container"><div class="age-table-box"><p>No rates provided yet</p></div></div>';
+    }
+
+    let html = '<div class="age-tables-container" style="display: flex; flex-direction: column; gap: 15px; width: 100%;">';
+    for (const key of ageKeys) {
+        const ageNum = key.replace('age_', '');
+        const ageRates = ratesObj[key];
+        html += `
+            <div class="age-table-box" style="flex: 0 0 100%;">
+                <h4 style="margin-top: 5px; margin-bottom: 5px; color: #0d47a1; font-size: 10pt; text-align: left;">Age ${ageNum}</h4>
+                ${generateGCLITableHTML(ageRates)}
+            </div>
+        `;
+    }
+    html += '</div>';
+    return html;
 };
 
 /**
@@ -573,7 +595,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 </h2>
             <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers ${application.minimum_age}-${application.maximum_age}</p>
         ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
-
+        <br>
         ${
           application.borrower_age_66_70
             ? `
@@ -583,7 +605,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         `
             : ""
         }
-
+        <br>
         ${
           application.borrower_age_71_75
             ? `
@@ -593,7 +615,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
         `
             : ""
         }
-
+        <br>
         ${
           application.borrower_age_76_80
             ? `

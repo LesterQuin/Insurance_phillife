@@ -26,6 +26,22 @@ const formatDate = (date) => {
   });
 };
 
+const getPaymentModeName = (application) => {
+  const modeId = Number(application.payment_mode_id || application.payment_mode?.id || 0);
+  switch (modeId) {
+    case 23: return "Annual";
+    case 24: return "Semi-Annual";
+    case 25: return "Quarterly";
+    case 26: return "Monthly";
+    case 27: return "Single Mode";
+    default:
+      if (application.payment_mode?.name) {
+        return capitalize(application.payment_mode.name);
+      }
+      return "Annual";
+  }
+};
+
 // Helper to generate table rows dynamically for rates
 const generateRateRows = (items, suffix = "") => {
   if (!Array.isArray(items) || items.length === 0)
@@ -107,6 +123,321 @@ const generateChunkedRateTables = (
             </div>
         </div>
     `;
+};
+
+// Helper to extract flat rate for basic plan or riders (when lives > 30)
+const getRateForRider = (ratesObj, riderId, isBasic = false) => {
+  if (isBasic) {
+    const basicVal = ratesObj?.rates?.[0]?.basic_rate;
+    return basicVal != null ? parseFloat(String(basicVal).replace(/,/g, '')) : 0;
+  }
+  if (Number(riderId) === 7) return 0; // GTIR is Free
+  const riderObj = ratesObj?.rates?.[0]?.riders?.find(r => Number(r.rider_id) === Number(riderId));
+  const rateVal = riderObj?.rider_rate;
+  return rateVal != null ? parseFloat(String(rateVal).replace(/,/g, '')) : 0;
+};
+
+// Helper to extract age-banded rate (when lives <= 30)
+const getAgeBasedRateForRider = (ratesObj, ageKey, riderId, isBasic = false) => {
+  const ageGroup = ratesObj?.[ageKey];
+  if (!ageGroup || ageGroup.length === 0) return 0;
+  if (isBasic) {
+    const basicVal = ageGroup[0]?.basic_rate;
+    return basicVal != null ? parseFloat(String(basicVal).replace(/,/g, '')) : 0;
+  }
+  if (Number(riderId) === 7) return 0; // GTIR is Free
+  const riderObj = ageGroup[0]?.riders?.find(r => Number(r.rider_id) === Number(riderId));
+  const rateVal = riderObj?.rider_rate;
+  return rateVal != null ? parseFloat(String(rateVal).replace(/,/g, '')) : 0;
+};
+
+// Helper to extract benefit amount (numeric)
+const getBenefitAmount = (application, riderId, designation = null, isBasic = false) => {
+  if (Number(riderId) === 7) {
+    return 0; // GTIR has no numeric benefit for premium calculation
+  }
+
+  // Uniform Coverage
+  if (Number(application.coverage_type_id) === 33) {
+    if (isBasic) {
+      return parseFloat(application.uniform_coverage_amount || 0);
+    }
+    const rider = application.riders?.find(r => Number(r.rider_id) === Number(riderId));
+    return parseFloat(rider?.amount ?? rider?.values?.[0]?.amount ?? 0);
+  }
+
+  // Level Ranking
+  if (Number(application.coverage_type_id) === 32) {
+    if (isBasic) {
+      const ranking = application.level_ranking?.find(r => r.designation === designation);
+      return parseFloat(ranking?.total_coverage_amount ?? 0);
+    }
+    const rider = application.riders?.find(r => Number(r.rider_id) === Number(riderId));
+    const riderVal = rider?.values?.find(v => v.designation === designation);
+    return parseFloat(riderVal?.amount ?? 0);
+  }
+
+  // By Salary Rank
+  if (Number(application.coverage_type_id) === 34) {
+    if (isBasic || Number(riderId) === 6 || Number(riderId) === 3) {
+      const rank = application.salary_ranking?.find(r => r.designation === designation);
+      return parseFloat(rank?.total_coverage_amount ?? 0);
+    }
+    const rider = application.riders?.find(r => Number(r.rider_id) === Number(riderId));
+    const riderVal = rider?.values?.find(v => v.designation === designation);
+    return parseFloat(riderVal?.amount ?? 0);
+  }
+
+  return 0;
+};
+
+// Helper to extract benefit display text
+const getBenefitDisplay = (application, riderId, designation = null, isBasic = false) => {
+  if (Number(riderId) === 7) {
+    return "50% of GTLIP maximum of Php 4,000,000.00";
+  }
+
+  if (Number(application.coverage_type_id) === 34) {
+    if (isBasic || Number(riderId) === 6 || Number(riderId) === 3) {
+      const rank = application.salary_ranking?.find(r => r.designation === designation);
+      if (rank) {
+        const mult = rank.salary_multiplier || "";
+        const cleanMult = mult.toLowerCase().replace(/x$/, '').trim();
+        return `${cleanMult} Monthly Basic Salary maximum of Php ${formatNumber(rank.total_coverage_amount)}`;
+      }
+    }
+  }
+
+  const amt = getBenefitAmount(application, riderId, designation, isBasic);
+  return formatNumber(amt);
+};
+
+
+const formatRate = (num, decimals = 2) => {
+  if (num == null || isNaN(num)) return "0.00";
+  return Number(num).toLocaleString("en-US", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+};
+
+const getRiderHeader = (rider, isBasic = false, application = null) => {
+  if (isBasic) {
+    return application?.basic_plan?.acronym || 'GPA';
+  }
+  if (Number(rider.rider_id) === 11 || rider.acronym === 'BMSR') return 'GTLI - Burial';
+  return rider.acronym || rider.rider_name;
+};
+
+const getSortedAgeKeys = (ratesObj) => {
+  if (!ratesObj) return [];
+  return Object.keys(ratesObj)
+    .filter(key => key.startsWith('age_'))
+    .sort((a, b) => {
+      const getStartAge = (key) => {
+        const parts = key.split('_');
+        const val = parseInt(parts[1], 10);
+        return isNaN(val) ? 0 : val;
+      };
+      return getStartAge(a) - getStartAge(b);
+    });
+};
+
+const formatAgeLabel = (key) => {
+  const clean = key.replace(/^age_/, '');
+  if (clean.includes('_')) {
+    return clean.replace('_', ' to ');
+  }
+  return clean;
+};
+
+const renderGPATables = (application, rates18_65, details) => {
+  const lives = Number(application.number_of_lives || 0);
+  const coverageTypeId = Number(application.coverage_type_id || 0);
+  const paymentMode = getPaymentModeName(application);
+
+  
+  // Only support Level Ranking (32), Uniform Coverage (33), and By Salary Rank (34)
+  if (coverageTypeId !== 32 && coverageTypeId !== 33 && coverageTypeId !== 34) {
+    const standardHeader = "Rider";
+    const standardSuffix = "";
+    return `
+      <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age ${application.minimum_age}-${application.maximum_age})</h2>
+      ${generateChunkedRateTables(rates18_65, details?.maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
+    `;
+  }
+
+  // Get active riders list (excluding basic plan, which is always shown first)
+  const activeRiders = (application.riders || []).filter(r => r.rider_id !== null && r.rider_id !== 0);
+
+  // Setup headers: basic plan is always first, then each active rider
+  const columns = [
+    { id: 'basic', label: getRiderHeader(null, true, application), isBasic: true }
+  ];
+  activeRiders.forEach(r => {
+    columns.push({
+      id: r.rider_id,
+      label: getRiderHeader(r, false, application),
+      isBasic: false,
+      acronym: r.acronym
+    });
+  });
+
+  // Setup classifications/rows based on coverage type
+  let rows = [];
+  if (coverageTypeId === 32) {
+    // Level Ranking: Get all designations
+    const designations = (application.level_ranking || []).map(r => r.designation).filter(Boolean);
+    rows = designations.map(d => ({ id: d, label: d }));
+  } else if (coverageTypeId === 34) {
+    // By Salary Rank: Get all designations from salary_ranking
+    const designations = (application.salary_ranking || []).map(r => r.designation).filter(Boolean);
+    rows = designations.map(d => ({ id: d, label: d }));
+  } else if (coverageTypeId === 33) {
+    // Uniform Coverage: Single row
+    rows = [{ id: 'uniform', label: 'All eligible individuals' }];
+  }
+
+
+  // 1. Benefits Table HTML
+  let benefitsHtml = `
+    <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">Benefits:</h3>
+    <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
+      <thead>
+        <tr style="background-color: #f2f2f2;">
+          <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Classification</th>
+          ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map(row => `
+          <tr>
+            <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${row.label}</td>
+            ${columns.map(col => {
+              const display = getBenefitDisplay(application, col.id, row.id, col.isBasic);
+              return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${display}</td>`;
+            }).join('')}
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
+
+  // Check lives threshold
+  if (lives > 30) {
+    // 2. Rate per 1,000 Table HTML (flat rates)
+    const getRateDisplay = (col) => {
+      if (Number(col.id) === 7) return 'Free';
+      const rateVal = getRateForRider(rates18_65, col.id, col.isBasic);
+      return formatRate(rateVal, 2);
+    };
+
+    let ratesHtml = `
+      <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">${paymentMode} Rate per 1,000</h3>
+      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            ${columns.map(col => `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${getRateDisplay(col)}</td>`).join('')}
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    // 3. Premium Table HTML (computed premiums)
+    let premiumHtml = `
+      <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">${paymentMode} Premium per Head (Php):</h3>
+      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Classification</th>
+            ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+            <th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">TOTAL</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => {
+            let rowTotal = 0;
+            const cells = columns.map(col => {
+              if (Number(col.id) === 7) {
+                return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">Free</td>`;
+              }
+              const benefitAmt = getBenefitAmount(application, col.id, row.id, col.isBasic);
+              const rateVal = getRateForRider(rates18_65, col.id, col.isBasic);
+              const premium = (benefitAmt / 1000) * rateVal;
+              rowTotal += premium;
+              return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${formatNumber(premium)}</td>`;
+            });
+
+            return `
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${row.label}</td>
+                ${cells.join('')}
+                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; background-color: #fafafa; font-size: 8.5pt;">${formatNumber(rowTotal)}</td>
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Grand Total Premium
+    let grandTotalHtml = `
+      <div style="margin-top: 15px; text-align: left; font-size: 11pt; font-weight: bold; color: #0d47a1; border-top: 2px solid #0d47a1; padding-top: 10px;">
+        Grand Total Premium: Php ${formatNumber(details?.totalAnnualPremium || 0)}
+      </div>
+    `;
+
+    if (coverageTypeId === 34) {
+      return benefitsHtml + ratesHtml + grandTotalHtml;
+    }
+    return benefitsHtml + ratesHtml + premiumHtml + grandTotalHtml;
+
+  } else {
+    // Case 2: lives <= 30
+    // Render the age-banded rate table
+    const ageKeys = getSortedAgeKeys(rates18_65);
+    
+    let ratesTableHtml = `
+      <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">${paymentMode} Rate per 1,000</h3>
+      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Attained Age</th>
+            ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${ageKeys.map(ageKey => {
+            const ageLabel = formatAgeLabel(ageKey);
+            return `
+              <tr>
+                <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${ageLabel}</td>
+                ${columns.map(col => {
+                  if (Number(col.id) === 7) return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">Free</td>`;
+                  const rate = getAgeBasedRateForRider(rates18_65, ageKey, col.id, col.isBasic);
+                  return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${formatRate(rate, 3)}</td>`;
+                }).join('')}
+              </tr>
+            `;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Grand Total Premium
+    let grandTotalHtml = `
+      <div style="margin-top: 15px; text-align: left; font-size: 11pt; font-weight: bold; color: #0d47a1; border-top: 2px solid #0d47a1; padding-top: 10px;">
+        Grand Total Premium: Php ${formatNumber(details?.totalAnnualPremium || 0)}
+      </div>
+    `;
+
+    return benefitsHtml + ratesTableHtml + grandTotalHtml;
+  }
 };
 
 /**
@@ -520,36 +851,8 @@ export const generateGPAPDFContent = (application, user, details) => {
 
 <div class="page-break"></div>
 <div class="section-group">
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age ${application.minimum_age}-${application.maximum_age})</h2>
-    ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
-
-${
-  application.borrower_age_66_70
-    ? `
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age 66-70)</h2>
-    ${generateChunkedRateTables(rates66_70, maturity, standardHeader, standardSuffix, 66, 70)}
-`
-    : ""
-}
-
-${
-  application.borrower_age_71_75
-    ? `
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age 71-75)</h2>
-    ${generateChunkedRateTables(rates71_75, maturity, standardHeader, standardSuffix, 71, 75)}
-`
-    : ""
-}
-
-${
-  application.borrower_age_76_80
-    ? `
-    <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 (Age 76-80)</h2>
-    ${generateChunkedRateTables(rates76_80, maturity, standardHeader, standardSuffix, 76, 80)}
-`
-    : ""
-}
-                </div>
+    ${renderGPATables(application, rates18_65, details)}
+</div>
 
 <div class="page-break"></div>
 
