@@ -45,7 +45,7 @@ app.use('/api/chat-messages', chatMessageRoutes);
 // Installation requirements routes
 app.use('/api/installation-requirements', installationRequirementsRoutes);
 
-const PORT = process.env.LOCAL_SERVER_PORT || 5000;
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
 // import express from "express";

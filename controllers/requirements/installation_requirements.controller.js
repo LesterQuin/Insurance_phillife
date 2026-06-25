@@ -172,7 +172,7 @@ export const getInstallationRequirementsStatus = async (req, res) => {
             label: reqInfo.label,
             is_uploaded: !!app[reqInfo.dbColumn],
             file_path: app[reqInfo.dbColumn] || null,
-            file_name: app[reqInfo.dbColumn] ? path.basename(app[reqInfo.dbColumn]) : null
+            file_name: app[reqInfo.dbColumn] ? path.basename(app[reqInfo.dbColumn]).replace(/^\d+_/, '') : null
         }));
 
         return res.status(200).json({ status: true, data: requirementsStatus });
@@ -210,6 +210,40 @@ export const updateApplicationStatus = async (req, res) => {
         await ApplicationModel.updateApplication(applicationId, { status_id }, userId);
         return success(res, null, 'Status updated successfully.');
     } catch (err) {
+        return error(res, err.message, 500);
+    }
+};
+
+export const viewRequirementFile = async (req, res) => {
+    try {
+        const relativePath = req.query.path;
+        if (!relativePath) {
+            return error(res, 'File path query parameter is required.', 400);
+        }
+
+        const uploadsDir = path.resolve(process.cwd(), 'uploads');
+        const absolutePath = path.resolve(process.cwd(), relativePath);
+
+        // Security check: Prevent path traversal (must be inside uploads directory)
+        const relative = path.relative(uploadsDir, absolutePath);
+        const isSafe = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+
+        if (!isSafe) {
+            return error(res, 'Access Denied: Invalid file path.', 403);
+        }
+
+        if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
+            return error(res, 'File not found on server.', 404);
+        }
+
+        // Support forcing download via query param ?download=true
+        if (req.query.download === 'true') {
+            return res.download(absolutePath, path.basename(absolutePath));
+        }
+
+        return res.sendFile(absolutePath);
+    } catch (err) {
+        console.error('View requirement file error:', err);
         return error(res, err.message, 500);
     }
 };
