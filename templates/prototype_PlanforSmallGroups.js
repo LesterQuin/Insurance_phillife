@@ -37,24 +37,34 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     } = details || {};
 
     const planName = (application.basic_plan?.name || "").trim();
-    const lastSpaceIndex =
-        planName.lastIndexOf(" ") !== -1
-        ? planName.lastIndexOf(" ")
-        : planName.length;
-
+    const openParenIndex = planName.indexOf("(");
     let displayTitle = "";
-    if (planName.lastIndexOf(" ") !== -1) {
+    if (openParenIndex !== -1) {
         displayTitle = `
-                <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+                <span style="color:#0d47a1;">${planName.substring(0, openParenIndex).trim()}</span>
                 <br>
-                <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+                <span style="color:#2e7d32;">${planName.substring(openParenIndex).trim()} PROPOSAL</span>
             `;
     } else {
-        displayTitle = `
-                <span style="color:#0d47a1;">${planName}</span>
-                <br>
-                <span style="color:#2e7d32;">PROPOSAL</span>
-            `;
+        const lastSpaceIndex =
+            planName.lastIndexOf(" ") !== -1
+            ? planName.lastIndexOf(" ")
+            : planName.length;
+
+        if (planName.lastIndexOf(" ") !== -1) {
+            displayTitle = `
+                    <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+                    <br>
+                    <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+                `;
+        } else {
+            // Fallback for single-word plan names
+            displayTitle = `
+                    <span style="color:#0d47a1;">${planName}</span>
+                    <br>
+                    <span style="color:#2e7d32;">PROPOSAL</span>
+                `;
+        }
     }
 
     return `
@@ -70,24 +80,141 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         }
 
         html, body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; 
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif; line-height: 1.6; color: #202124; 
         }
         h2 {
             color: #0d47a1;
-            margin-top: 30px;
+            margin-top: 35px;
             margin-bottom: 15px;
             border-bottom: 2px solid #0d47a1;
-            padding-bottom: 5px;
+            padding-bottom: 8px;
+            font-size: 15pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             break-after: avoid;
             page-break-after: avoid;
         }
-        h2, h3 { margin-top: 30px; break-after: avoid; page-break-after: avoid; }
+        h3 {
+            color: #000000ff;
+            margin-top: 25px;
+            margin-bottom: 4px;
+            font-size: 11pt;
+            font-weight: 600;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .h3-details {
+            padding-left: 0;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .h3-details p {
+            margin-top: 0;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            color: #202124;
+            text-indent: 15px;
+        }
+        .h3-details ul {
+            list-style-type: none;
+            padding-left: 15px;
+            margin-top: 0;
+            margin-bottom: 6px;
+        }
+        .h3-details li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 4px;
+            font-size: 10pt;
+            color: #202124;
+        }
+        .h3-details li::before {
+            content: "•";
+            color: #000000ff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            font-size: 12pt;
+            line-height: 1;
+            vertical-align: middle;
+        }
+        h4 {
+            color: #000000ff;
+            margin-top: 20px;
+            margin-bottom: 4px;
+            font-size: 10pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .main-content p { 
+            font-size: 11pt; 
+            line-height: 1.65;
+            color: #202124;
+            margin-bottom: 18px;
+        }
         .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        table, th, td { border: 1px solid #000; }
-        th, td { padding: 8px; text-align: center; }
-        .note { font-size: 14px; margin-top: 10px; }
-        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #020202; font-style: italic; }
+        
+        /* Modern Data Table Styling */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+            margin-bottom: 6px;
+        }
+        .data-table th {
+            background: linear-gradient(135deg, #0d47a1 0%, #1b5aa1 100%);
+            color: #ffffff;
+            font-size: 8.5pt;
+            font-weight: 600;
+            padding: 10px 8px;
+            border: 1px solid #e2e8f0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .data-table td {
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            font-size: 9pt;
+            color: #202124;
+            text-align: center;
+        }
+        .data-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        
+        /* Custom List Styling */
+        .plan-details ul {
+            list-style-type: none;
+            padding-left: 15px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+        }
+        .plan-details li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            color: #202124;
+        }
+        .plan-details li::before {
+            content: "•";
+            color: #000000ff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            font-size: 12pt;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .note { font-size: 9pt; color: #64748b; font-style: italic; margin-top: 2px; margin-bottom: 10px; }
+        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #202124; font-style: italic; }
         .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
         .page-break { page-break-before: always; }
         .logo { 
@@ -117,8 +244,8 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         }
         .header-table strong {
             display: block;
-            color: #000;
-            font-size: 10pt;
+            color: #202124;
+            font-size: 11pt;
             text-transform: uppercase;
             margin-bottom: 0;
         }
@@ -244,7 +371,7 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
 </head>
 <body>
     ${
-        Number(application.status?.id || application.status_id) !== 7 && logoDataUri
+        false && logoDataUri
             ? `<div class="watermark"></div>`
             : ""
     }
@@ -272,11 +399,6 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
                     <td><strong>Proposal Status:</strong><br>${capitalize(application.proposal_status_name || application.status?.name || "New")}</td>
                     <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
                 </tr>
-                <tr>
-                    <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || "")}</td>
-                    <td><strong>Total Annual Premium:</strong><br>Php ${formatNumber(totalAnnualPremium)}</td>
-                    <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || "")}</td>
-                </tr>
             </table>
         </div>
         <div class="cover-bottom">
@@ -301,12 +423,12 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     <div class="subsequent-header-gradient"></div>
         <p>
             ${formatDate(proposalDate)} <br><br>
-            ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
+            ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
             ${application.addressee_designation || ""} <br>
             ${application.group_name || ""} <br>
             ${application.business_address || ""}
         </p>
-        <p>Dear ${application.addressee_designation || ""} ${addresseeLastName},</p>
+        <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
         <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
         <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
             <p>
@@ -331,216 +453,233 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         <tbody><tr><td>
 
     <h2>Prototype Plan for Small Groups</h2>
-    <p>Group Size: 10 to 50 lives per group</p>
-    <h3>Class I</h3>
-    <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
-    <table>
-        <tr>
-            <th>Group Size</th>
-            <th>10,000.00</th>
-            <th>15,000.00</th>
-            <th>20,000.00</th>
-            <th>25,000.00</th>
-            <th>30,000.00</th>
-        </tr>
-        <tr><td>10-15</td><td>266,000.00</td><td>399,000.00</td><td>532,000.00</td><td>665,000.00</td><td>798,000.00</td></tr>
-        <tr><td>16-20</td><td>192,000.00</td><td>288,000.00</td><td>384,000.00</td><td>480,000.00</td><td>576,000.00</td></tr>
-        <tr><td>21-25</td><td>150,000.00</td><td>225,000.00</td><td>301,000.00</td><td>376,000.00</td><td>451,000.00</td></tr>
-        <tr><td>26-30</td><td>123,000.00</td><td>185,000.00</td><td>247,000.00</td><td>308,000.00</td><td>370,000.00</td></tr>
-        <tr><td>31-35</td><td>105,000.00</td><td>157,000.00</td><td>210,000.00</td><td>262,000.00</td><td>314,000.00</td></tr>
-        <tr><td>35-40</td><td>91,000.00</td><td>136,000.00</td><td>182,000.00</td><td>227,000.00</td><td>273,000.00</td></tr>
-        <tr><td>41-50</td><td>80,000.00</td><td>120,000.00</td><td>161,000.00</td><td>201,000.00</td><td>241,000.00</td></tr>
-    </table>
+    <div class="benefit-item" style="margin-top: 15px;">
+        <h4 style="margin-bottom: 0;">Prototype Plan:</h4>
+    </div>
+    <div class="h3-details">
+        <p>Group Size: 10 to 50 lives per group</p>
+    </div>
 
-    <ul>
-        <li>Office/Clerical Jobs/Professional</li>
-        <li>Finance/Investment/Insurance/Banking/Holding Company/Real Estate</li>
-        <li>Developer Semi-Conductor/Call Center</li>
-        <li>Retail Trading/Distributors/Dealers (not including Drivers)</li>
-        <li>Manufacturing Food, Textile Mill Products, Apparels</li>
-        <li>Manufacturing Electrical Products, Electric Equipment, Instruments</li>
-    </ul>
+    <h3>Class I</h3>
+    <div class="h3-details">
+        <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
+        <table class="data-table">
+            <tr>
+                <th>Group Size</th>
+                <th>10,000.00</th>
+                <th>15,000.00</th>
+                <th>20,000.00</th>
+                <th>25,000.00</th>
+                <th>30,000.00</th>
+            </tr>
+            <tr><td>10-15</td><td>266,000.00</td><td>399,000.00</td><td>532,000.00</td><td>665,000.00</td><td>798,000.00</td></tr>
+            <tr><td>16-20</td><td>192,000.00</td><td>288,000.00</td><td>384,000.00</td><td>480,000.00</td><td>576,000.00</td></tr>
+            <tr><td>21-25</td><td>150,000.00</td><td>225,000.00</td><td>301,000.00</td><td>376,000.00</td><td>451,000.00</td></tr>
+            <tr><td>26-30</td><td>123,000.00</td><td>185,000.00</td><td>247,000.00</td><td>308,000.00</td><td>370,000.00</td></tr>
+            <tr><td>31-35</td><td>105,000.00</td><td>157,000.00</td><td>210,000.00</td><td>262,000.00</td><td>314,000.00</td></tr>
+            <tr><td>35-40</td><td>91,000.00</td><td>136,000.00</td><td>182,000.00</td><td>227,000.00</td><td>273,000.00</td></tr>
+            <tr><td>41-50</td><td>80,000.00</td><td>120,000.00</td><td>161,000.00</td><td>201,000.00</td><td>241,000.00</td></tr>
+        </table>
+
+        <ul>
+            <li>Office/Clerical Jobs/Professional</li>
+            <li>Finance/Investment/Insurance/Banking/Holding Company/Real Estate</li>
+            <li>Developer Semi-Conductor/Call Center</li>
+            <li>Retail Trading/Distributors/Dealers (not including Drivers)</li>
+            <li>Manufacturing Food, Textile Mill Products, Apparels</li>
+            <li>Manufacturing Electrical Products, Electric Equipment, Instruments</li>
+        </ul>
+    </div>
 
     <h3>Class II</h3>
-    <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
+    <div class="h3-details">
+        <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
+        <table class="data-table">
+            <tr>
+                <th>Group Size</th>
+                <th>10,000.00</th>
+                <th>15,000.00</th>
+                <th>20,000.00</th>
+                <th>25,000.00</th>
+                <th>30,000.00</th>
+            </tr>
+            <tr>
+                <td>10-15</td>
+                <td>222,000.00</td>
+                <td>332,000.00</td>
+                <td>443,000.00</td>
+                <td>554,000.00</td>
+                <td>665,000.00</td>
+            </tr>
+            <tr>
+                <td>16-20</td>
+                <td>160,000.00</td>
+                <td>240,000.00</td>
+                <td>320,000.00</td>
+                <td>400,000.00</td>
+                <td>480,000.00</td>
+            </tr>
+            <tr>
+                <td>21-25</td>
+                <td>125,000.00</td>
+                <td>188,000.00</td>
+                <td>250,000.00</td>
+                <td>313,000.00</td>
+                <td>376,000.00</td>
+            </tr>
+            <tr>
+                <td>26-30</td>
+                <td>103,000.00</td>
+                <td>154,000.00</td>
+                <td>206,000.00</td>
+                <td>257,000.00</td>
+                <td>309,000.00</td>
+            </tr>
+            <tr>
+                <td>31-35</td>
+                <td>87,000.00</td>
+                <td>131,000.00</td>
+                <td>175,000.00</td>
+                <td>218,000.00</td>
+                <td>262,000.00</td>
+            </tr>
+            <tr>
+                <td>35-40</td>
+                <td>76,000.00</td>
+                <td>113,000.00</td>
+                <td>151,000.00</td>
+                <td>189,000.00</td>
+                <td>227,000.00</td>
+            </tr>
+            <tr>
+                <td>41-50</td>
+                <td>67,000.00</td>
+                <td>100,000.00</td>
+                <td>134,000.00</td>
+                <td>167,000.00</td>
+                <td>201,000.00</td>
+            </tr>
+        </table>
 
-    <table>
-        <tr>
-            <th>Group Size</th>
-            <th>10,000.00</th>
-            <th>15,000.00</th>
-            <th>20,000.00</th>
-            <th>25,000.00</th>
-            <th>30,000.00</th>
-        </tr>
-        <tr>
-            <td>10-15</td>
-            <td>222,000.00</td>
-            <td>332,000.00</td>
-            <td>443,000.00</td>
-            <td>554,000.00</td>
-            <td>665,000.00</td>
-        </tr>
-        <tr>
-            <td>16-20</td>
-            <td>160,000.00</td>
-            <td>240,000.00</td>
-            <td>320,000.00</td>
-            <td>400,000.00</td>
-            <td>480,000.00</td>
-        </tr>
-        <tr>
-            <td>21-25</td>
-            <td>125,000.00</td>
-            <td>188,000.00</td>
-            <td>250,000.00</td>
-            <td>313,000.00</td>
-            <td>376,000.00</td>
-        </tr>
-        <tr>
-            <td>26-30</td>
-            <td>103,000.00</td>
-            <td>154,000.00</td>
-            <td>206,000.00</td>
-            <td>257,000.00</td>
-            <td>309,000.00</td>
-        </tr>
-        <tr>
-            <td>31-35</td>
-            <td>87,000.00</td>
-            <td>131,000.00</td>
-            <td>175,000.00</td>
-            <td>218,000.00</td>
-            <td>262,000.00</td>
-        </tr>
-        <tr>
-            <td>35-40</td>
-            <td>76,000.00</td>
-            <td>113,000.00</td>
-            <td>151,000.00</td>
-            <td>189,000.00</td>
-            <td>227,000.00</td>
-        </tr>
-        <tr>
-            <td>41-50</td>
-            <td>67,000.00</td>
-            <td>100,000.00</td>
-            <td>134,000.00</td>
-            <td>167,000.00</td>
-            <td>201,000.00</td>
-        </tr>
-    </table>
-
-    <ul>
-        <li>Manufacturing Glass, Cement, & Plaster Products</li>
-        <li>Manufacturing Miscellaneous Wood Products (Furniture & Fixtures)</li>
-        <li>Manufacturing Fabricated Metal Products (Cutlery / Hand Tools / Metal Cans / Bolts)</li>
-        <li>Manufacturing Machineries (Office & Computing Machines / Farm & Garden Machineries)</li>
-        <li>Manufacturing Transportation Equipment & Parts (Motor Vehicles / Aircraft / Ship & Boat)</li>
-        <li>Manufacturing Paper & Allied Products (Paper Mills / Pulp Mills / Building Paper)</li>
-        <li>Manufacturing Rubber & Miscellaneous Products (Tires / Rubbers / Plastic Products)</li>
-        <li>Manufacturing Leather & Leather Products (Luggage / Footwear / Handbags)</li>
-        <li>Hotel & Resort Management</li>
-        <li>Business Services (Service to Building / Advertising / Personnel Supply Services; Auto Repair, Services and Garages)</li>
-    </ul>
+        <ul>
+            <li>Manufacturing Glass, Cement, & Plaster Products</li>
+            <li>Manufacturing Miscellaneous Wood Products (Furniture & Fixtures)</li>
+            <li>Manufacturing Fabricated Metal Products (Cutlery / Hand Tools / Metal Cans / Bolts)</li>
+            <li>Manufacturing Machineries (Office & Computing Machines / Farm & Garden Machineries)</li>
+            <li>Manufacturing Transportation Equipment & Parts (Motor Vehicles / Aircraft / Ship & Boat)</li>
+            <li>Manufacturing Paper & Allied Products (Paper Mills / Pulp Mills / Building Paper)</li>
+            <li>Manufacturing Rubber & Miscellaneous Products (Tires / Rubbers / Plastic Products)</li>
+            <li>Manufacturing Leather & Leather Products (Luggage / Footwear / Handbags)</li>
+            <li>Hotel & Resort Management</li>
+            <li>Business Services (Service to Building / Advertising / Personnel Supply Services; Auto Repair, Services and Garages)</li>
+        </ul>
+    </div>
 
     <h3>Class III</h3>
-    <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
+    <div class="h3-details">
+        <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
+        <table class="data-table">
+            <tr>
+                <th>Group Size</th>
+                <th>10,000.00</th>
+                <th>15,000.00</th>
+                <th>20,000.00</th>
+                <th>25,000.00</th>
+                <th>30,000.00</th>
+            </tr>
+            <tr>
+                <td>10-15</td>
+                <td>190,000.00</td>
+                <td>285,000.00</td>
+                <td>380,000.00</td>
+                <td>475,000.00</td>
+                <td>570,000.00</td>
+            </tr>
+            <tr>
+                <td>16-20</td>
+                <td>137,000.00</td>
+                <td>206,000.00</td>
+                <td>274,000.00</td>
+                <td>343,000.00</td>
+                <td>412,000.00</td>
+            </tr>
+            <tr>
+                <td>21-25</td>
+                <td>107,000.00</td>
+                <td>161,000.00</td>
+                <td>215,000.00</td>
+                <td>268,000.00</td>
+                <td>322,000.00</td>
+            </tr>
+            <tr>
+                <td>26-30</td>
+                <td>88,000.00</td>
+                <td>132,000.00</td>
+                <td>176,000.00</td>
+                <td>220,000.00</td>
+                <td>264,000.00</td>
+            </tr>
+            <tr>
+                <td>31-35</td>
+                <td>75,000.00</td>
+                <td>112,000.00</td>
+                <td>150,000.00</td>
+                <td>187,000.00</td>
+                <td>224,000.00</td>
+            </tr>
+            <tr>
+                <td>35-40</td>
+                <td>65,000.00</td>
+                <td>97,000.00</td>
+                <td>130,000.00</td>
+                <td>162,000.00</td>
+                <td>195,000.00</td>
+            </tr>
+            <tr>
+                <td>41-50</td>
+                <td>57,000.00</td>
+                <td>86,000.00</td>
+                <td>115,000.00</td>
+                <td>143,000.00</td>
+                <td>172,000.00</td>
+            </tr>
+        </table>
 
-    <table>
-        <tr>
-            <th>Group Size</th>
-            <th>10,000.00</th>
-            <th>15,000.00</th>
-            <th>20,000.00</th>
-            <th>25,000.00</th>
-            <th>30,000.00</th>
-        </tr>
-        <tr>
-            <td>10-15</td>
-            <td>190,000.00</td>
-            <td>285,000.00</td>
-            <td>380,000.00</td>
-            <td>475,000.00</td>
-            <td>570,000.00</td>
-        </tr>
-        <tr>
-            <td>16-20</td>
-            <td>137,000.00</td>
-            <td>206,000.00</td>
-            <td>274,000.00</td>
-            <td>343,000.00</td>
-            <td>412,000.00</td>
-        </tr>
-        <tr>
-            <td>21-25</td>
-            <td>107,000.00</td>
-            <td>161,000.00</td>
-            <td>215,000.00</td>
-            <td>268,000.00</td>
-            <td>322,000.00</td>
-        </tr>
-        <tr>
-            <td>26-30</td>
-            <td>88,000.00</td>
-            <td>132,000.00</td>
-            <td>176,000.00</td>
-            <td>220,000.00</td>
-            <td>264,000.00</td>
-        </tr>
-        <tr>
-            <td>31-35</td>
-            <td>75,000.00</td>
-            <td>112,000.00</td>
-            <td>150,000.00</td>
-            <td>187,000.00</td>
-            <td>224,000.00</td>
-        </tr>
-        <tr>
-            <td>35-40</td>
-            <td>65,000.00</td>
-            <td>97,000.00</td>
-            <td>130,000.00</td>
-            <td>162,000.00</td>
-            <td>195,000.00</td>
-        </tr>
-        <tr>
-            <td>41-50</td>
-            <td>57,000.00</td>
-            <td>86,000.00</td>
-            <td>115,000.00</td>
-            <td>143,000.00</td>
-            <td>172,000.00</td>
-        </tr>
-    </table>
-
-    <ul>
-        <li>Construction (General Building Contractors / Special Trade Contractors)</li>
-        <li>Manufacturing Primary Metal Industries (Iron & Steel)</li>
-        <li>Manufacturing Lumber</li>
-    </ul>
+        <ul>
+            <li>Construction (General Building Contractors / Special Trade Contractors)</li>
+            <li>Manufacturing Primary Metal Industries (Iron & Steel)</li>
+            <li>Manufacturing Lumber</li>
+        </ul>
+    </div>
     
     <h3>Eligibility</h3>
-    <p>Any regular, in good health and actively-at-work employee of the Policyholder who is at least eighteen (18) years
-        old and has not attained his 65th birth anniversary.</p>
+    <div class="h3-details">
+        <p>Any regular, in good health and actively-at-work employee of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
+    </div>
 
     <h3>Termination Age</h3>
-    <ul>
-        <li>GTLIP: Coverage terminates at age 65.</li>
-        <li>GTPDR: Coverage terminates at age 65.</li>
-        <li>GADDR: Coverage terminates at age 65.</li>
-        <li>Other Riders: Coverage terminates at age 65.</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li>GTLIP: Coverage terminates at age 65.</li>
+            <li>GTPDR: Coverage terminates at age 65.</li>
+            <li>GADDR: Coverage terminates at age 65.</li>
+            <li>Other Riders: Coverage terminates at age 65.</li>
+        </ul>
+    </div>
 
     <h3>Participation Requirements</h3>
-    <ul>
-        <li>100% of all eligible individuals</li>
-        <li>At least 10 individuals at policy inception</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li>100% of all eligible individuals</li>
+            <li>At least 10 individuals at policy inception</li>
+        </ul>
+    </div>
 
     <h3>Underwriting</h3>
-    <p>Each eligible individual must submit an accomplished health questionnaire and application form.</p>
-    <p>Non-medical limit is Php 500,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
+    <div class="h3-details">
+        <p>Each eligible individual must submit an accomplished health questionnaire and application form.</p>
+        <p>Non-medical limit is Php 500,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
+    </div>
 
 <div class="page-break"></div>
 <div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">

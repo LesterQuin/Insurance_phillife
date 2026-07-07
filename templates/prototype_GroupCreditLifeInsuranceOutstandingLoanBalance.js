@@ -41,24 +41,34 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
     } = details || {};
 
     const planName = (application.basic_plan?.name || "").trim();
-    const lastSpaceIndex =
-        planName.lastIndexOf(" ") !== -1
-        ? planName.lastIndexOf(" ")
-        : planName.length;
-
+    const openParenIndex = planName.indexOf("(");
     let displayTitle = "";
-    if (planName.lastIndexOf(" ") !== -1) {
+    if (openParenIndex !== -1) {
         displayTitle = `
-                <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+                <span style="color:#0d47a1;">${planName.substring(0, openParenIndex).trim()}</span>
                 <br>
-                <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+                <span style="color:#2e7d32;">${planName.substring(openParenIndex).trim()} PROPOSAL</span>
             `;
     } else {
-        displayTitle = `
-                <span style="color:#0d47a1;">${planName}</span>
-                <br>
-                <span style="color:#2e7d32;">PROPOSAL</span>
-            `;
+        const lastSpaceIndex =
+            planName.lastIndexOf(" ") !== -1
+            ? planName.lastIndexOf(" ")
+            : planName.length;
+
+        if (planName.lastIndexOf(" ") !== -1) {
+            displayTitle = `
+                    <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+                    <br>
+                    <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+                `;
+        } else {
+            // Fallback for single-word plan names
+            displayTitle = `
+                    <span style="color:#0d47a1;">${planName}</span>
+                    <br>
+                    <span style="color:#2e7d32;">PROPOSAL</span>
+                `;
+        }
     }
 
     return `
@@ -74,24 +84,141 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
         }
 
         html, body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; 
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif; line-height: 1.6; color: #202124; 
         }
         h2 {
             color: #0d47a1;
-            margin-top: 30px;
+            margin-top: 35px;
             margin-bottom: 15px;
             border-bottom: 2px solid #0d47a1;
-            padding-bottom: 5px;
+            padding-bottom: 8px;
+            font-size: 15pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             break-after: avoid;
             page-break-after: avoid;
         }
-        h2, h3 { margin-top: 30px; break-after: avoid; page-break-after: avoid; }
+        h3 {
+            color: #000000ff;
+            margin-top: 25px;
+            margin-bottom: 4px;
+            font-size: 11pt;
+            font-weight: 600;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .h3-details {
+            padding-left: 0;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .h3-details p {
+            margin-top: 0;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            color: #202124;
+            text-indent: 15px;
+        }
+        .h3-details ul {
+            list-style-type: none;
+            padding-left: 15px;
+            margin-top: 0;
+            margin-bottom: 6px;
+        }
+        .h3-details li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 4px;
+            font-size: 10pt;
+            color: #202124;
+        }
+        .h3-details li::before {
+            content: "•";
+            color: #000000ff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            font-size: 12pt;
+            line-height: 1;
+            vertical-align: middle;
+        }
+        h4 {
+            color: #000000ff;
+            margin-top: 20px;
+            margin-bottom: 4px;
+            font-size: 10pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .main-content p { 
+            font-size: 11pt; 
+            line-height: 1.65;
+            color: #202124;
+            margin-bottom: 18px;
+        }
         .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        table, th, td { border: 1px solid #000; }
-        th, td { padding: 8px; text-align: center; }
-        .note { font-size: 14px; margin-top: 10px; }
-        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #020202; font-style: italic; }
+        
+        /* Modern Data Table Styling */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+            margin-bottom: 6px;
+        }
+        .data-table th {
+            background: linear-gradient(135deg, #0d47a1 0%, #1b5aa1 100%);
+            color: #ffffff;
+            font-size: 8.5pt;
+            font-weight: 600;
+            padding: 10px 8px;
+            border: 1px solid #e2e8f0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .data-table td {
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            font-size: 9pt;
+            color: #202124;
+            text-align: center;
+        }
+        .data-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        
+        /* Custom List Styling */
+        .plan-details ul {
+            list-style-type: none;
+            padding-left: 15px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+        }
+        .plan-details li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            color: #202124;
+        }
+        .plan-details li::before {
+            content: "•";
+            color: #000000ff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            font-size: 12pt;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .note { font-size: 9pt; color: #64748b; font-style: italic; margin-top: 2px; margin-bottom: 10px; }
+        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #202124; font-style: italic; }
         .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
         .page-break { page-break-before: always; }
         .logo { 
@@ -121,8 +248,8 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
         }
         .header-table strong {
             display: block;
-            color: #000;
-            font-size: 10pt;
+            color: #202124;
+            font-size: 11pt;
             text-transform: uppercase;
             margin-bottom: 0;
         }
@@ -248,7 +375,7 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
 </head>
 <body>
     ${
-        Number(application.status?.id || application.status_id) !== 7 && logoDataUri
+        false && logoDataUri
             ? `<div class="watermark"></div>`
             : ""
     }
@@ -275,11 +402,6 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
                     <td><strong>Presented To:</strong><br>${capitalize(application.group_name)}</td>
                     <td><strong>Proposal Status:</strong><br>${capitalize(application.proposal_status_name || application.status?.name || "New")}</td>
                     <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
-                </tr>
-                <tr>
-                    <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || "")}</td>
-                    <td><strong>Total Annual Premium:</strong><br>Php ${formatNumber(totalAnnualPremium)}</td>
-                    <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || "")}</td>
                 </tr>
             </table>
         </div>
@@ -310,7 +432,7 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
             ${application.group_name || ""} <br>
             ${application.business_address || ""}
         </p>
-        <p>Dear ${application.addressee_designation || ""} ${addresseeLastName},</p>
+        <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
         <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
         <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
             <p>
@@ -335,35 +457,21 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
         <tbody><tr><td>
 
     <h2>Group Credit Life Insurance – Outstanding Loan Balance</h2>
-    <h3>Prototype Plan</h3>
-    <h3>Prospects</h3>
-    <p>Rural Banks, Credit Unions / Associations, Lending and Financial Institutions</p>
+    <div class="benefit-item" style="margin-top: 15px;">
+        <h4 style="margin-bottom: 0;">Prototype Plan</h4>
+    </div>
+    <div class="benefit-item" style="margin-top: 15px;">
+        <h4 style="margin-bottom: 0;">Prospects:</h4>
+        <p style="margin: 0; font-size: 11pt; text-indent: 10px;">Rural Banks, Credit Unions / Associations, Lending and Financial Institutions.</p>
+    </div>
     <h3>Benefits (Php)</h3>
     <h4>Maximum Outstanding Loan</h4>
-    <table>
+    <table class="data-table">
         <tr><th>Classification</th><th>Outstanding Loan Balance (Php)</th></tr>
         <tr><td>All eligible individuals</td><td>Outstanding loan balance maximum of 1,500,000.00</td></tr>
     </table>
     <h4>Single Rate per 1,000</h4>
-    <!--
-    <table>
-        <tr><th>Collection Fee %</th><th>0%</th><th>10%</th><th>20%</th><th>30%</th><th>35%</th></tr>
-        <tr><td>1 month</td><td>0.70</td><td>0.83</td><td>1.03</td><td>1.35</td><td>1.60</td></tr>
-        <tr><td>2 months</td><td>1.05</td><td>1.25</td><td>1.54</td><td>2.02</td><td>2.39</td></tr>
-        <tr><td>3 months</td><td>1.40</td><td>1.66</td><td>2.06</td><td>2.69</td><td>3.19</td></tr>
-        <tr><td>4 months</td><td>1.74</td><td>2.08</td><td>2.57</td><td>3.36</td><td>3.98</td></tr>
-        <tr><td>5 months</td><td>2.09</td><td>2.49</td><td>3.08</td><td>4.03</td><td>4.77</td></tr>
-        <tr><td>6 months</td><td>2.44</td><td>2.90</td><td>3.59</td><td>4.70</td><td>5.57</td></tr>
-        <tr><td>7 months</td><td>2.78</td><td>3.31</td><td>4.10</td><td>5.37</td><td>6.36</td></tr>
-        <tr><td>8 months</td><td>3.13</td><td>3.73</td><td>4.61</td><td>6.04</td><td>7.14</td></tr>
-        <tr><td>9 months</td><td>3.47</td><td>4.14</td><td>5.12</td><td>6.70</td><td>7.93</td></tr>
-        <tr><td>10 months</td><td>3.82</td><td>5.55</td><td>5.62</td><td>7.37</td><td>8.72</td></tr>
-        <tr><td>11 months</td><td>4.16</td><td>4.96</td><td>6.13</td><td>8.03</td><td>9.50</td></tr>
-        <tr><td>12 months</td><td>4.50</td><td>5.36</td><td>6.63</td><td>8.69</td><td>10.29</td></tr>
-    </table>
-    -->
-
-    <table>
+    <table class="data-table">
         <tr>
             <th>Term of Loan</th>
             <th>0%</th>
@@ -575,51 +683,67 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
             <td>24.44</td>
         </tr>
     </table>
-    <p class="note">Rates are inclusive of government-mandated taxes and 15.00% commission.</p>
+    <p class="note">Rates are inclusive of government-mandated taxes.</p>
     <h3>Eligibility</h3>
-    <p>Any in good health and actively-at-work debtor of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
-    <p>The term of their obligation should not exceed twelve (12) months.</p>
-    <p>Actively-at-work means:</p>
-    <ul>
-        <li>Performing usual duties of occupation</li>
-        <li>Performing activities of daily living</li>
-    </ul>
+    <div class="h3-details">
+        <p>Any in good health and actively-at-work debtor of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
+        <p>The term of their obligation should not exceed twelve (12) months.</p>
+        <p>Actively-at-work means:</p>
+        <ul>
+            <li>Performing usual duties of occupation</li>
+            <li>Performing activities of daily living</li>
+        </ul>
+    </div>
 
     <h3>Termination Age</h3>
-    <p><strong>GCLIP:</strong> Coverage terminates at age 65.</p>
+    <div class="h3-details">
+        <p><strong>GCLIP:</strong> Coverage terminates at age 65.</p>
+    </div>
 
     <h3>Termination of Insurance</h3>
-    <p>Insurance coverage automatically terminates on the earliest of the following dates:</p>
-    <ul>
-        <li>The date the policy terminates</li>
-        <li>The policy anniversary immediately succeeding the date the Debtor attains the termination age</li>
-        <li>The date the Insured Debtor enters military, naval, or air service</li>
-        <li>The date any one payment towards the Insured's loan becomes six (6) months overdue, notwithstanding payments
-            for insurance</li>
-        <li>The Insured Debtor ceases to be a debtor of the Creditor</li>
-    </ul>
+    <div class="h3-details">
+        <p>Insurance coverage automatically terminates on the earliest of the following dates:</p>
+        <ul>
+            <li>The date the policy terminates</li>
+            <li>The policy anniversary immediately succeeding the date the Debtor attains the termination age</li>
+            <li>The date the Insured Debtor enters military, naval, or air service</li>
+            <li>The date any one payment towards the Insured's loan becomes six (6) months overdue, notwithstanding payments
+                for insurance</li>
+            <li>The Insured Debtor ceases to be a debtor of the Creditor</li>
+        </ul>
+    </div>
 
     <h3>Participation Requirements</h3>
-    <ul>
-        <li>100% of all eligible individuals</li>
-        <li>At least 100 individuals during the policy year</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li>100% of all eligible individuals</li>
+            <li>At least 100 individuals during the policy year</li>
+        </ul>
+    </div>
 
     <h3>Premium Requirement</h3>
-    <p>Minimum of Php 10,000.00 annual premium (net of collection fee) during the policy year</p>
+    <div class="h3-details">
+        <p>Minimum of Php 10,000.00 annual premium (net of collection fee) during the policy year</p>
+    </div>
 
     <h3>NML (Non-Medical Limit)</h3>
-    <p>Non-medical limit is Php 500,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
+    <div class="h3-details">
+        <p>Non-medical limit is Php 500,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
+    </div>
 
     <h3>Payment of Benefits</h3>
-    <p>Upon approval of proof of death of the Debtor while the Insurance is in force, PhilLife shall pay to the
-        Policyholder the outstanding balance of the Debtor's loan.</p>
+    <div class="h3-details">
+        <p>Upon approval of proof of death of the Debtor while the Insurance is in force, PhilLife shall pay to the
+            Policyholder the outstanding balance of the Debtor's loan.</p>
+    </div>
 
     <h3>Other Terms</h3>
-    <ul>
-        <li>Rates beyond 36 months are subject to management approval</li>
-        <li>Initially, only 0%-35% Collection Fee can be offered</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li>Rates beyond 36 months are subject to management approval</li>
+            <li>Initially, only 0%-35% Collection Fee can be offered</li>
+        </ul>
+    </div>
 
 <div class="page-break"></div>
 <div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">

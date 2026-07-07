@@ -41,24 +41,34 @@ export const generateGroupAssociationsPDFContent = (
     } = details || {};
 
     const planName = (application.basic_plan?.name || "").trim();
-    const lastSpaceIndex =
-        planName.lastIndexOf(" ") !== -1
-        ? planName.lastIndexOf(" ")
-        : planName.length;
-
+    const openParenIndex = planName.indexOf("(");
     let displayTitle = "";
-    if (planName.lastIndexOf(" ") !== -1) {
+    if (openParenIndex !== -1) {
         displayTitle = `
-                <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+                <span style="color:#0d47a1;">${planName.substring(0, openParenIndex).trim()}</span>
                 <br>
-                <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+                <span style="color:#2e7d32;">${planName.substring(openParenIndex).trim()} PROPOSAL</span>
             `;
     } else {
-        displayTitle = `
-                <span style="color:#0d47a1;">${planName}</span>
-                <br>
-                <span style="color:#2e7d32;">PROPOSAL</span>
-            `;
+        const lastSpaceIndex =
+            planName.lastIndexOf(" ") !== -1
+            ? planName.lastIndexOf(" ")
+            : planName.length;
+
+        if (planName.lastIndexOf(" ") !== -1) {
+            displayTitle = `
+                    <span style="color:#0d47a1;">${planName.substring(0, lastSpaceIndex)}</span>
+                    <br>
+                    <span style="color:#2e7d32;">${planName.substring(lastSpaceIndex + 1)} PROPOSAL</span>
+                `;
+        } else {
+            // Fallback for single-word plan names
+            displayTitle = `
+                    <span style="color:#0d47a1;">${planName}</span>
+                    <br>
+                    <span style="color:#2e7d32;">PROPOSAL</span>
+                `;
+        }
     }
 
     return `
@@ -74,24 +84,141 @@ export const generateGroupAssociationsPDFContent = (
         }
 
         html, body {
-            margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; 
+            margin: 0; padding: 0; font-family: 'Inter', sans-serif; line-height: 1.6; color: #202124; 
         }
         h2 {
             color: #0d47a1;
-            margin-top: 30px;
+            margin-top: 35px;
             margin-bottom: 15px;
             border-bottom: 2px solid #0d47a1;
-            padding-bottom: 5px;
+            padding-bottom: 8px;
+            font-size: 15pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
             break-after: avoid;
             page-break-after: avoid;
         }
-        h2, h3 { margin-top: 30px; break-after: avoid; page-break-after: avoid; }
+        h3 {
+            color: #000000ff;
+            margin-top: 25px;
+            margin-bottom: 4px;
+            font-size: 11pt;
+            font-weight: 600;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .h3-details {
+            padding-left: 0;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .h3-details p {
+            margin-top: 0;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            color: #202124;
+            text-indent: 15px;
+        }
+        .h3-details ul {
+            list-style-type: none;
+            padding-left: 15px;
+            margin-top: 0;
+            margin-bottom: 6px;
+        }
+        .h3-details li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 4px;
+            font-size: 10pt;
+            color: #202124;
+        }
+        .h3-details li::before {
+            content: "•";
+            color: #000000ff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            font-size: 12pt;
+            line-height: 1;
+            vertical-align: middle;
+        }
+        h4 {
+            color: #000000ff;
+            margin-top: 20px;
+            margin-bottom: 4px;
+            font-size: 10pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+        .main-content p { 
+            font-size: 11pt; 
+            line-height: 1.65;
+            color: #202124;
+            margin-bottom: 18px;
+        }
         .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        table, th, td { border: 1px solid #000; }
-        th, td { padding: 8px; text-align: center; }
-        .note { font-size: 14px; margin-top: 10px; }
-        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #020202; font-style: italic; }
+        
+        /* Modern Data Table Styling */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 4px;
+            margin-bottom: 6px;
+        }
+        .data-table th {
+            background: linear-gradient(135deg, #0d47a1 0%, #1b5aa1 100%);
+            color: #ffffff;
+            font-size: 8.5pt;
+            font-weight: 600;
+            padding: 10px 8px;
+            border: 1px solid #e2e8f0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .data-table td {
+            padding: 8px 10px;
+            border: 1px solid #e2e8f0;
+            font-size: 9pt;
+            color: #202124;
+            text-align: center;
+        }
+        .data-table tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        
+        /* Custom List Styling */
+        .plan-details ul {
+            list-style-type: none;
+            padding-left: 15px;
+            margin-top: 8px;
+            margin-bottom: 15px;
+        }
+        .plan-details li {
+            position: relative;
+            padding-left: 15px;
+            margin-bottom: 6px;
+            font-size: 10pt;
+            color: #202124;
+        }
+        .plan-details li::before {
+            content: "•";
+            color: #000000ff;
+            font-weight: bold;
+            display: inline-block;
+            width: 1em;
+            margin-left: -1em;
+            font-size: 12pt;
+            line-height: 1;
+            vertical-align: middle;
+        }
+
+        .note { font-size: 9pt; color: #64748b; font-style: italic; margin-top: 2px; margin-bottom: 10px; }
+        .footer-contact { display: flex; justify-content: left; gap: 20px; width: 100%; font-size: 10pt; color: #202124; font-style: italic; }
         .footer-link { color: inherit; text-decoration: none; cursor: pointer; }
         .page-break { page-break-before: always; }
         .logo { 
@@ -121,8 +248,8 @@ export const generateGroupAssociationsPDFContent = (
         }
         .header-table strong {
             display: block;
-            color: #000;
-            font-size: 10pt;
+            color: #202124;
+            font-size: 11pt;
             text-transform: uppercase;
             margin-bottom: 0;
         }
@@ -248,7 +375,7 @@ export const generateGroupAssociationsPDFContent = (
 </head>
 <body>
     ${
-        Number(application.status?.id || application.status_id) !== 7 && logoDataUri
+        false && logoDataUri
             ? `<div class="watermark"></div>`
             : ""
     }
@@ -276,11 +403,6 @@ export const generateGroupAssociationsPDFContent = (
                     <td><strong>Proposal Status:</strong><br>${capitalize(application.proposal_status_name || application.status?.name || "New")}</td>
                     <td><strong>Date of Proposal:</strong><br>${formatDate(proposalDate)}</td>
                 </tr>
-                <tr>
-                    <td><strong>Base Plan:</strong><br>${capitalize(application.basic_plan?.name || "")}</td>
-                    <td><strong>Total Annual Premium:</strong><br>Php ${formatNumber(totalAnnualPremium)}</td>
-                    <td><strong>Payment Terms:</strong><br>${capitalize(application.payment_mode?.name || "N/A")}</td>
-                </tr>
             </table>
         </div>
         <div class="cover-bottom">
@@ -304,13 +426,13 @@ export const generateGroupAssociationsPDFContent = (
 
     <div class="subsequent-header-gradient"></div>
         <p>
-            ${formatDate(proposalDate)} <br><br><br>
-            ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
+            ${formatDate(proposalDate)} <br><br>
+            ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
             ${application.addressee_designation || ""} <br>
             ${application.group_name || ""} <br>
             ${application.business_address || ""}
         </p>
-        <p>Dear ${application.addressee_designation || ""} ${addresseeLastName},</p>
+        <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
         <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
         <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
             <p>
@@ -335,84 +457,88 @@ export const generateGroupAssociationsPDFContent = (
         <tbody><tr><td>
 
     <h2>Group Associations Plan</h2>
-    <h3>Packaged Prototype Plan</h3>
+    <div class="benefit-item" style="margin-top: 15px;">
+        <h4 style="margin-bottom: 0;">Prototype Plan:</h4>
+    </div>
 
     <h3>Prospects</h3>
-    <ul>
-        <li><strong>Class A: </strong>Religious, Civic, Homeowners, Consumers, Health, Mass Media, Entertainment (No
-            Stunts), Farmers, Bellboys,
-            Waiters, Cooks, Janitors</li>
-        <li><strong>Class B: </strong>Credit Cooperatives, Market Vendors, Warehousemen, Bakers, Employees Association
-            of Refineries, Employees
-            Association of Paint & Varnish, Employees Association of Fertilizers, Employees Association of Manufacturing
-            Firms</li>
-        <li><strong>Class C: </strong>Jeepney Drivers, Tricycle Drivers, Bus Drivers, Taxi Drivers, Labor Unions,
-            Political Groups, Stevedores,
-            Cement Manufacturing Employees, Security Guards</li>
-        <li><strong>Excluded</strong>Sports/Athletes, Pilots, Metro Aide, Miners</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li><strong>Class A: </strong>Religious, Civic, Homeowners, Consumers, Health, Mass Media, Entertainment (No Stunts), Farmers, Bellboys, Waiters, Cooks, Janitors</li>
+            <li><strong>Class B: </strong>Credit Cooperatives, Market Vendors, Warehousemen, Bakers, Employees Association of Refineries, Employees Association of Paint & Varnish, Employees Association of Fertilizers, Employees Association of Manufacturing Firms</li>
+            <li><strong>Class C: </strong>Jeepney Drivers, Tricycle Drivers, Bus Drivers, Taxi Drivers, Labor Unions, Political Groups, Stevedores, Cement Manufacturing Employees, Security Guards</li>
+            <li><strong>Excluded: </strong>Sports/Athletes, Pilots, Metro Aide, Miners</li>
+        </ul>
+    </div>
 
     <h3>Benefits (Php) – 1 Unit</h3>
-    <table>
-        <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR (Annual Limit)</th></tr>
-        <tr><td>All Eligible Individuals</td><td>20,000.00</td><td>20,000.00</td><td>10,000.00</td></tr>
-    </table>
-    <p class="note">*Maximum of 5 units. Uniform coverage for all members.</p>
+    <div class="h3-details">
+        <table class="data-table">
+            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR (Annual Limit)</th></tr>
+            <tr><td>All Eligible Individuals</td><td>20,000.00</td><td>20,000.00</td><td>10,000.00</td></tr>
+        </table>
+        <p class="note">*Maximum of 5 units. Uniform coverage for all members.</p>
+    </div>
+
     <h3>Single Premium Per Head (Php) – 1 Unit</h3>
-    <table>
-        <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR</th><th>Total</th></tr>
-        <tr><td>Class A</td><td>73.00</td><td>48.00</td><td>79.00</td><td>200.00</td></tr>
-        <tr><td>Class B</td><td>92.00</td><td>67.00</td><td>91.00</td><td>250.00</td></tr>
-        <tr><td>Class C</td><td>145.00</td><td>111.00</td><td>144.00</td><td>400.00</td></tr>
-    </table>
-    <p class="note">Rates are inclusive of government-mandated taxes and 15.00% commission and 5.00% collection fee.</p>
+    <div class="h3-details">
+        <table class="data-table">
+            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR</th><th>Total</th></tr>
+            <tr><td>Class A</td><td>73.00</td><td>48.00</td><td>79.00</td><td>200.00</td></tr>
+            <tr><td>Class B</td><td>92.00</td><td>67.00</td><td>91.00</td><td>250.00</td></tr>
+            <tr><td>Class C</td><td>145.00</td><td>111.00</td><td>144.00</td><td>400.00</td></tr>
+        </table>
+        <p class="note">Rates are inclusive of government-mandated taxes.</p>
+    </div>
 
     <h3>Eligibility</h3>
-    <p>
-        Any in good health and actively-at-work bona fide member of the Policyholder
-        who is at least eighteen (18) years old and has not attained his 65th birth anniversary.
-    </p>
-    <p>
-        Individuals engaged in hazardous activities such as deep-sea diving, mountain climbing,
-        and underground mining are not eligible for coverage.
-    </p>
+    <div class="h3-details">
+        <p>Any in good health and actively-at-work bona fide member of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
+        <p>Individuals engaged in hazardous activities such as deep-sea diving, mountain climbing, and underground mining are not eligible for coverage.</p>
+    </div>
 
     <h3>Termination Age</h3>
-    <ul>
-        <li><strong>GTLIP:</strong> Coverage terminates at age 65.</li>
-        <li><strong>GADDR:</strong> Coverage terminates at age 65.</li>
-        <li><strong>GAMERR:</strong> Coverage terminates at age 65.</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li><strong>GTLIP:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GADDR:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GAMERR:</strong> Coverage terminates at age 65.</li>
+        </ul>
+    </div>
 
     <h3>Participation Requirements</h3>
-    <ul>
-        <li>100% of all eligible individuals.</li>
-        <li>At least 100 individuals at policy inception and throughout the policy period.</li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li>100% of all eligible individuals.</li>
+            <li>At least 100 individuals at policy inception and throughout the policy period.</li>
+        </ul>
+    </div>
 
     <h3>Premium Requirement</h3>
-    <p>
-        Minimum of Php 10,000.00 annual premium (net of collection fee) shall be required to install the plan.
-    </p>
+    <div class="h3-details">
+        <p>Minimum of Php 10,000.00 annual premium (net of collection fee) shall be required to install the plan.</p>
+    </div>
 
     <h3>NEL (1 Unit)</h3>
-    <p>
-        No-evidence limit is Php 20,000.00 provided eligible individual has not attained his 55th birth anniversary.
-    </p>
+    <div class="h3-details">
+        <p>No-evidence limit is Php 20,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
+    </div>
 
     <h3>Term of Coverage</h3>
-    <p>
-        Each eligible individual will be covered for a maximum of one year.
-    </p>
+    <div class="h3-details">
+        <p>Each eligible individual will be covered for a maximum of one year.</p>
+    </div>
 
     <h3>Other Terms</h3>
-    <ul>
-        <li>Unprovoked Murder and Assault (UMA) is not covered.</li>
-        <li>May be offered as GTLIP with ADD only, subject to the same terms and conditions.</li>
-        <li>Participation requirements remain the same regardless of the number of units purchased.</li>
-        <li>Benefits, Rates, and NEL will be adjusted accordingly based on the number of units purchased.</li>
-        <li><em><strong>(Groups are subject for review before proposal is released.)</strong></em></li>
-    </ul>
+    <div class="h3-details">
+        <ul>
+            <li>Unprovoked Murder and Assault (UMA) is not covered.</li>
+            <li>May be offered as GTLIP with ADD only, subject to the same terms and conditions.</li>
+            <li>Participation requirements remain the same regardless of the number of units purchased.</li>
+            <li>Benefits, Rates, and NEL will be adjusted accordingly based on the number of units purchased.</li>
+            <li><em><strong>(Groups are subject for review before proposal is released.)</strong></em></li>
+        </ul>
+    </div>
 
 <div class="page-break"></div>
 <div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
