@@ -42,14 +42,20 @@ export const createApplication = async (req, res) => {
         const userId = req.user.user_id;
         let dataToSave = { ...req.body };
 
-        // Determine initial status: Approved (14) for Prototypes (30), Pending (8) otherwise
+        // Determine initial status: Booked (7) for Prototypes (30), Pending (8) otherwise
         const STATUS_PENDING = 8;
-        const STATUS_APPROVED = 14;
+        const STATUS_BOOKED = 7;
         const PROTOTYPE_TYPE_ID = 30;
 
-        dataToSave.status_id = Number(dataToSave.type_of_proposal_id) === PROTOTYPE_TYPE_ID 
-            ? STATUS_APPROVED 
-            : STATUS_PENDING;
+        if (Number(dataToSave.type_of_proposal_id) === PROTOTYPE_TYPE_ID) {
+            dataToSave.status_id = STATUS_BOOKED;
+            const oneYearLater = new Date();
+            // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+            oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+            dataToSave.expiry_date = oneYearLater;
+        } else {
+            dataToSave.status_id = STATUS_PENDING;
+        }
 
         dataToSave = Helper.cleanProposalFields(dataToSave);
         const cleanedData = await Helper.cleanupOtherFields(dataToSave);
@@ -1366,10 +1372,10 @@ export const updateApplication = async (req, res) => {
         
         const { agent_code, ...updateData } = req.body;
         
-        // Automatically transition from Draft: Approved (14) for Prototypes (30), Pending (8) otherwise
+        // Automatically transition from Draft: Booked (7) for Prototypes (30), Pending (8) otherwise
         const STATUS_DRAFT = 11;
         const STATUS_PENDING = 8;
-        const STATUS_APPROVED = 14;
+        const STATUS_BOOKED = 7;
         const PROTOTYPE_TYPE_ID = 30;
 
         if (Number(existingApplication.status_id) === STATUS_DRAFT) {
@@ -1377,7 +1383,15 @@ export const updateApplication = async (req, res) => {
                 ? Number(updateData.type_of_proposal_id) 
                 : Number(existingApplication.type_of_proposal_id);
             
-            updateData.status_id = typeId === PROTOTYPE_TYPE_ID ? STATUS_APPROVED : STATUS_PENDING;
+            if (typeId === PROTOTYPE_TYPE_ID) {
+                updateData.status_id = STATUS_BOOKED;
+                const oneYearLater = new Date();
+                // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+                oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+                updateData.expiry_date = oneYearLater;
+            } else {
+                updateData.status_id = STATUS_PENDING;
+            }
         }
 
         const cleanedProposal = Helper.cleanProposalFields(updateData);
@@ -1582,12 +1596,12 @@ export const setStatusChecking = async (req, res) => {
     }
 };
 
-// Change status to Approved (2) - No body required
+// Change status to Booked (7) for Prototypes - No body required
 export const setStatusApproved = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
-        const STATUS_APPROVED = 14;
+        const STATUS_BOOKED = 7;
 
         const loggedInUser = await User.getUserById(userId);
         const isAuthorized = loggedInUser && (Number(loggedInUser.role_id) === 15 || Number(loggedInUser.role_id) === 2);
@@ -1609,14 +1623,17 @@ export const setStatusApproved = async (req, res) => {
             return error(res, 'Action Denied: This operation is strictly for Prototype applications.', 400);
         }
 
-        const updated = await Model.updateApplication(appId, { status_id: STATUS_APPROVED }, userId);
+        const oneYearLater = new Date();
+        // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+        oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+        const updated = await Model.updateApplication(appId, { status_id: STATUS_BOOKED, expiry_date: oneYearLater }, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
         broadcastApplicationUpdate(appId, response);
 
-        return success(res, response, 'Status successfully updated to Approved.');
+        return success(res, response, 'Status successfully updated to Booked.');
     } catch (err) {
-        console.error('Set Status Approved Error:', err);
+        console.error('Set Status Booked Error:', err);
         return error(res, err.message);
     }
 };
