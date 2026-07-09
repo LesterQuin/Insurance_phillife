@@ -5,6 +5,7 @@ import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
 import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus } from '../../middlewares/helper.js';
 import { broadcastApplicationUpdate } from '../../websocket.js';
+import XLSX from 'xlsx';
 
 export const saveRates = async (req, res) => {
     try {
@@ -233,6 +234,162 @@ export const getApplicationsPendingTotalPremium = async (req, res) => {
         return success(res, list, 'Applications pending total annual premium fetched successfully.');
     } catch (err) {
         console.error('Pending Total Premium Queue Error:', err);
+        return error(res, err.message);
+    }
+};
+
+export const downloadRatesTemplate = async (req, res) => {
+    try {
+        const applicationId = req.params.id;
+        const app = await MainModel.getApplicationById(applicationId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const planId = Number(app.plan_id);
+        const numLives = Number(app.number_of_lives);
+
+        const selectedRiders = await MainModel.getApplicationRiders(applicationId);
+
+        const basicHeader = app.basic_plan_name || 'Base Premium Rate';
+
+        // Build Excel columns: Age Bracket, Attained Age / Band, [Loan Term (Months) (if planId === 1)], basic plan name, Rider_<acronyms...>
+        const columns = ['Age Bracket', 'Attained Age / Band'];
+        if (planId === 1) {
+            columns.push('Loan Term (Months)');
+        }
+        columns.push(basicHeader);
+
+        selectedRiders.forEach(r => {
+            const acronym = r.acronym || `Rider_${r.rider_id}`;
+            columns.push(`Rider_${acronym.trim()}`);
+        });
+
+        const rows = [];
+
+        // Helper to add a row
+        const addRow = (bracket, ageOrBand, term = null) => {
+            const row = {
+                'Age Bracket': bracket,
+                'Attained Age / Band': ageOrBand
+            };
+            if (planId === 1) {
+                row['Loan Term (Months)'] = term;
+            }
+            row[basicHeader] = ''; // Pre-fill blank for rate input
+            selectedRiders.forEach(r => {
+                const acronym = r.acronym || `Rider_${r.rider_id}`;
+                row[`Rider_${acronym.trim()}`] = '';
+            });
+            rows.push(row);
+        };
+
+        const maturity = planId === 1 ? Number(app.sub_payment_term_id) : 0;
+
+        // Generate rows based on plan
+        if (planId === 1) { // GCLI
+            // 1. Bracket 18-65 Basic Plan: month 1 to maturity
+            if (maturity > 0) {
+                for (let m = 1; m <= maturity; m++) {
+                    addRow('18-65', 'basic_plan', m);
+                }
+                // Optional: add rows for rates if separate (but basic_plan is standard)
+                if (selectedRiders.length > 0) {
+                    for (let m = 1; m <= maturity; m++) {
+                        addRow('18-65', 'rates', m);
+                    }
+                }
+            }
+
+            // 2. Active Senior Brackets for GCLI: individual ages and month 1 to Math.min(maturity, 12)
+            const seniorBrackets = ['66-70', '71-75', '76-80'];
+            seniorBrackets.forEach(bracket => {
+                const bracketFlag = `borrower_age_${bracket.replace('-', '_')}`;
+                if (app[bracketFlag]) {
+                    const [startAge, endAge] = bracket.split('-').map(Number);
+                    const seniorMaturity = Math.min(maturity, 12);
+                    for (let age = startAge; age <= endAge; age++) {
+                        for (let m = 1; m <= seniorMaturity; m++) {
+                            addRow(bracket, `age_${age}`, m);
+                        }
+                    }
+                }
+            });
+        } else { // GYRT (2) or GPA (3)
+            const isDetailed = numLives <= 30; // Scale 1
+
+            if (isDetailed) {
+                // Bracket 18-65: age bands and individual ages 35-65
+                addRow('18-65', '18-24');
+                addRow('18-65', '25-29');
+                addRow('18-65', '30-34');
+                for (let age = 35; age <= 65; age++) {
+                    addRow('18-65', `age_${age}`);
+                }
+            } else {
+                // Bracket 18-65: flat rates row
+                addRow('18-65', 'rates');
+            }
+
+            // Active Senior Brackets: individual ages (only active in GYRT)
+            if (planId === 2) {
+                const seniorBrackets = ['66-70', '71-75', '76-80'];
+                seniorBrackets.forEach(bracket => {
+                    const bracketFlag = `borrower_age_${bracket.replace('-', '_')}`;
+                    if (app[bracketFlag]) {
+                        const [startAge, endAge] = bracket.split('-').map(Number);
+                        for (let age = startAge; age <= endAge; age++) {
+                            addRow(bracket, `age_${age}`);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Generate worksheet and workbook using XLSX
+        const worksheet = XLSX.utils.json_to_sheet(rows, { header: columns });
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Rates');
+
+        // Add App Metadata sheet for import validation
+        const metadataRows = [
+            { 'Metadata Key': 'Application ID', 'Value': applicationId },
+            { 'Metadata Key': 'Company Name', 'Value': app.group_name || '' },
+            { 'Metadata Key': 'Generated At', 'Value': new Date().toISOString().split('T')[0] }
+        ];
+        const metadataWorksheet = XLSX.utils.json_to_sheet(metadataRows);
+        XLSX.utils.book_append_sheet(workbook, metadataWorksheet, 'App Metadata');
+
+        // Fetch all plan riders to build a reference sheet
+        const allPlanRiders = await MainModel.getRidersByProductId(app.plan_id);
+        const appRiderIds = new Set(selectedRiders.map(r => r.rider_id.toString()));
+
+        const riderRows = allPlanRiders.map(r => ({
+            'Rider ID': r.rider_id,
+            'Acronym': r.acronym || '',
+            'Rider Name': r.rider_name || '',
+            'Selected Riders': appRiderIds.has(r.rider_id.toString()) ? 'Yes' : 'No'
+        }));
+
+        const riderWorksheet = XLSX.utils.json_to_sheet(riderRows, { header: ['Rider ID', 'Acronym', 'Rider Name', 'Selected Riders'] });
+        XLSX.utils.book_append_sheet(workbook, riderWorksheet, 'Rider Reference');
+
+        // Write to buffer
+        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename=Rates_Template_App_${applicationId}.xlsx`);
+        res.send(buffer);
+    } catch (err) {
+        console.error('Download Rates Template Error:', err);
+        return error(res, err.message);
+    }
+};
+
+export const parseRatesOnly = async (req, res) => {
+    try {
+        // Return the parsed and validated rates (populated by middlewares)
+        return success(res, req.body, 'Excel template parsed successfully.');
+    } catch (err) {
+        console.error('Parse Excel Error:', err);
         return error(res, err.message);
     }
 };
