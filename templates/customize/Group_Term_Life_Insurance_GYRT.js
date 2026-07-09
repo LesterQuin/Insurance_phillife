@@ -386,7 +386,7 @@ const renderGYRTTables = (application, rates18_65, details) => {
     // Grand Total Premium
     let grandTotalHtml = `
       <div style="margin-top: 15px; text-align: left; font-size: 11pt; font-weight: bold; color: #0d47a1; border-top: 2px solid #0d47a1; padding-top: 10px;">
-        Grand Total Premium: Php ${formatNumber(details?.totalAnnualPremium || 0)}
+        Total Premium: Php ${formatNumber(details?.totalAnnualPremium || 0)}
       </div>
     `;
 
@@ -430,7 +430,7 @@ const renderGYRTTables = (application, rates18_65, details) => {
     // Grand Total Premium
     let grandTotalHtml = `
       <div style="margin-top: 15px; text-align: left; font-size: 11pt; font-weight: bold; color: #0d47a1; border-top: 2px solid #0d47a1; padding-top: 10px;">
-        Grand Total Premium: Php ${formatNumber(details?.totalAnnualPremium || 0)}
+        Total Premium: Php ${formatNumber(details?.totalAnnualPremium || 0)}
       </div>
     `;
 

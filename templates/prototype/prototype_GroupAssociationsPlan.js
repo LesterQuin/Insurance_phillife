@@ -1,4 +1,3 @@
-// prototype_BarangayProtectPlan.js
 const capitalize = (str) => {
     if (!str) return "";
     const s = String(str);
@@ -22,7 +21,11 @@ const formatDate = (date) => {
     });
 };
 
-export const generateBarangayPDFContent = (application, user, details) => {
+export const generateGroupAssociationsPDFContent = (
+    application,
+    user,
+    details,
+    ) => {
     const proposalDate = new Date(application.updated_at);
     const expiryDate = new Date(proposalDate);
     expiryDate.setDate(expiryDate.getDate() + 30);
@@ -71,10 +74,9 @@ export const generateBarangayPDFContent = (application, user, details) => {
     return `
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Barangay Protect Plan</title>
+    <title>Group Associations Plan</title>
     <style>
         @page {
             size: A4;
@@ -159,7 +161,10 @@ export const generateBarangayPDFContent = (application, user, details) => {
             color: #202124;
             margin-bottom: 18px;
         }
-        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
+        .section-group, .notes, .installation-requirements, .signature-section { 
+            break-inside: auto; page-break-inside: auto; 
+        }
+        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         
         /* Modern Data Table Styling */
         .data-table {
@@ -424,13 +429,12 @@ export const generateBarangayPDFContent = (application, user, details) => {
 
     <div class="subsequent-header-gradient"></div>
         <p>
-            ${formatDate(proposalDate)} <br><br><br>
+            ${formatDate(proposalDate)} <br><br>
             ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
             ${application.addressee_designation || ""} <br>
             ${application.group_name || ""} <br>
             ${application.business_address || ""}
         </p>
-
         <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
         <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
         <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
@@ -455,90 +459,40 @@ export const generateBarangayPDFContent = (application, user, details) => {
         </td></tr></thead>
         <tbody><tr><td>
 
-    <h2>Barangay Protect Plan</h2>
-    <div class="benefit-item" style="margin-top: 15px;">
-        <h4 style="margin-bottom: 0;">Prototype Plan:</h4>
-    </div>
-
-    <h3>Prospects</h3>
-    <div class="h3-details">
-        <ul>
-            <li><strong>Class 1:</strong> Barangay Officials and Barangay Office Workers</li>
-            <li><strong>Class 2:</strong> Barangay Officials and Barangay Tanods</li>
-            <li><strong>Class 3:</strong> Barangay Tanods</li>
-        </ul>
-    </div>
+    <h2>Group Associations Plan</h2>
 
     <h3>Benefits (Php) – 1 Unit</h3>
     <div class="h3-details">
         <table class="data-table">
-            <tr>
-                <th>Classification</th>
-                <th>GTLIP</th>
-                <th>GADDR</th>
-                <th>GAMERR (Annual Limit)</th>
-            </tr>
-            <tr>
-                <td>All eligible individuals</td>
-                <td>20,000.00</td>
-                <td>20,000.00</td>
-                <td>10,000.00</td>
-            </tr>
+            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR (Annual Limit)</th></tr>
+            <tr><td>All Eligible Individuals</td><td>20,000.00</td><td>20,000.00</td><td>10,000.00</td></tr>
         </table>
-        <p class="note">*Maximum of 2 units. Uniform coverage for all members.</p>
+        <p class="note">*Maximum of 5 units. Uniform coverage for all members.</p>
     </div>
 
-    <h3>Single Premium per Head (Php) – 1 Unit</h3>
+    <h3>Single Premium Per Head (Php) – 1 Unit</h3>
     <div class="h3-details">
         <table class="data-table">
-            <tr>
-                <th>Classification</th>
-                <th>GTLIP</th>
-                <th>GADDR</th>
-                <th>GAMERR</th>
-                <th>Total</th>
-            </tr>
-            <tr>
-                <td>Class 1</td>
-                <td>134.00</td>
-                <td>108.00</td>
-                <td>158.00</td>
-                <td>400.00</td>
-            </tr>
-            <tr>
-                <td>Class 2</td>
-                <td>152.00</td>
-                <td>126.00</td>
-                <td>222.00</td>
-                <td>500.00</td>
-            </tr>
-            <tr>
-                <td>Class 3</td>
-                <td>203.00</td>
-                <td>172.00</td>
-                <td>275.00</td>
-                <td>650.00</td>
-            </tr>
+            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR</th><th>Total</th></tr>
+            <tr><td>Class A</td><td>73.00</td><td>48.00</td><td>79.00</td><td>200.00</td></tr>
+            <tr><td>Class B</td><td>92.00</td><td>67.00</td><td>91.00</td><td>250.00</td></tr>
+            <tr><td>Class C</td><td>145.00</td><td>111.00</td><td>144.00</td><td>400.00</td></tr>
         </table>
         <p class="note">Rates are inclusive of government-mandated taxes.</p>
     </div>
 
     <h3>Eligibility</h3>
     <div class="h3-details">
-        <ul>
-            <li>Any in good health and actively-at-work individual who is in the regular roster of the Barangay.</li>
-            <li>At least 18 years old and has not attained 65th birth anniversary.</li>
-            <li>Excludes individuals engaged in hazardous activities such as deep-sea diving, mountain climbing, and
-                underground mining.</li>
-        </ul>
+        <p>Any in good health and actively-at-work bona fide member of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
+        <p>Individuals engaged in hazardous activities such as deep-sea diving, mountain climbing, and underground mining are not eligible for coverage.</p>
     </div>
 
     <h3>Termination Age</h3>
     <div class="h3-details">
         <ul>
-            <li>GTLIP: Coverage terminates at age 65.</li>
-            <li>GADDR: Coverage terminates at age 65.</li>
-            <li>GAMERR: Coverage terminates at age 65.</li>
+            <li><strong>GTLIP:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GADDR:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GAMERR:</strong> Coverage terminates at age 65.</li>
         </ul>
     </div>
 
@@ -546,18 +500,18 @@ export const generateBarangayPDFContent = (application, user, details) => {
     <div class="h3-details">
         <ul>
             <li>100% of all eligible individuals.</li>
-            <li>At least 15 individuals at policy inception and throughout the policy period.</li>
+            <li>At least 100 individuals at policy inception and throughout the policy period.</li>
         </ul>
     </div>
 
     <h3>Premium Requirement</h3>
     <div class="h3-details">
-        <p>Minimum of Php 10,000.00 annual premium (net of collection fee) required to install the plan.</p>
+        <p>Minimum of Php 10,000.00 annual premium (net of collection fee) shall be required to install the plan.</p>
     </div>
 
     <h3>NEL (1 Unit)</h3>
     <div class="h3-details">
-        <p>No evidence limit is Php 20,000.00 provided eligible individual has not attained 55th birth anniversary.</p>
+        <p>No-evidence limit is Php 20,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
     </div>
 
     <h3>Term of Coverage</h3>
@@ -568,19 +522,16 @@ export const generateBarangayPDFContent = (application, user, details) => {
     <h3>Other Terms</h3>
     <div class="h3-details">
         <ul>
-            <li>Unprovoked Murder and Assault (UMA) not covered.</li>
-            <li>Can be offered as GTLIP with ADD only, subject to same terms and conditions.</li>
-            <li>Elective members not accepted 6 months prior to and after elections.</li>
-            <li>Not to be offered in Masbate.</li>
+            <li>Unprovoked Murder and Assault (UMA) is not covered.</li>
+            <li>May be offered as GTLIP with ADD only, subject to the same terms and conditions.</li>
             <li>Participation requirements remain the same regardless of the number of units purchased.</li>
-            <li><em>*Number of units can be increased up to the maximum to meet annual premium requirement.</em></li>
-            <li>Benefits, Rates, and NEL will be adjusted based on number of units purchased.</li>
-            <li><em><strong>(Area for offering will be subject for review before proposal release.)</strong></em></li>
+            <li>Benefits, Rates, and NEL will be adjusted accordingly based on the number of units purchased.</li>
+            <li><em><strong>(Groups are subject for review before proposal is released.)</strong></em></li>
         </ul>
     </div>
 
 <div class="page-break"></div>
-<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
+<div class="installation-requirements" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
     <p style="font-size: 10pt; margin-bottom: 10px;">
         Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
@@ -601,7 +552,7 @@ export const generateBarangayPDFContent = (application, user, details) => {
     </p>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
     
@@ -636,7 +587,7 @@ export const generateBarangayPDFContent = (application, user, details) => {
     </table>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
     
@@ -677,7 +628,6 @@ export const generateBarangayPDFContent = (application, user, details) => {
     </table>
     </div>
 </body>
-
 </html>
-`;
+    `;
 };

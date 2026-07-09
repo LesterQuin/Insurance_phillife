@@ -21,7 +21,7 @@ const formatDate = (date) => {
     });
 };
 
-export const generateStudentsGPAPDFContent = (application, user, details) => {
+export const generateStudentsGTLIPPDFContent = (application, user, details) => {
     const proposalDate = new Date(application.updated_at);
     const expiryDate = new Date(proposalDate);
     expiryDate.setDate(expiryDate.getDate() + 30);
@@ -29,7 +29,12 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
         application.proposal_addressee?.split(" ").pop() || "";
     const totalAnnualPremium = details?.totalAnnualPremium || 0;
     const cfeFullName = `${user.firstname} ${user.lastname}`;
-    const { logoDataUri = null, centerPhotoUri = null, footerPhotoUri = null, page2FooterPhotoUri = null } = details || {};
+    const {
+        logoDataUri = null,
+        centerPhotoUri = null,
+        footerPhotoUri = null,
+        page2FooterPhotoUri = null,
+    } = details || {};
 
     const planName = (application.basic_plan?.name || "").trim();
     const openParenIndex = planName.indexOf("(");
@@ -67,7 +72,7 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Student's Group Personal Accident Plan</title>
+    <title>Students' Group Term Life Insurance Plan</title>
     <style>
         @page {
             size: A4;
@@ -152,7 +157,10 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
             color: #202124;
             margin-bottom: 18px;
         }
-        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
+        .section-group, .notes, .installation-requirements, .signature-section { 
+            break-inside: auto; page-break-inside: auto; 
+        }
+        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         
         /* Modern Data Table Styling */
         .data-table {
@@ -365,25 +373,28 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     </style>
 </head>
 <body>
-    <!-- To disable the watermark entirely, you can comment out the line below: -->
     ${
         false && logoDataUri
             ? `<div class="watermark"></div>`
             : ""
     }
 
-    ${footerPhotoUri ? `
+    ${
+        footerPhotoUri
+        ? `
         <div class="subsequent-footer">
             <div class="plan-name-footer">${planName}</div>
             <img src="${footerPhotoUri}" style="width: 101%; display: block;" />
         </div>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="cover-page">
         <div class="cover-top">
             <div class="gradient-bar"></div>
-        ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ""}
-    </div>
+            ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="logo" />` : ""}
+        </div>
         <div class="cover-middle">
             <div class="cover-proposal-title">
                 ${displayTitle}
@@ -417,28 +428,29 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     ` : ""}
 
     <div class="subsequent-header-gradient"></div>
-    <p>
-        ${formatDate(proposalDate)} <br><br>
-        ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
-        ${application.addressee_designation || ""} <br>
-        ${application.group_name || ""} <br>
-        ${application.business_address || ""}
-    </p>
-    <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
-    <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
-    <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
+        <p>
+            ${formatDate(proposalDate)} <br><br>
+            ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
+            ${application.addressee_designation || ""} <br>
+            ${application.group_name || ""} <br>
+            ${application.business_address || ""}
+        </p>
+        <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
+        <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
+        <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
             <p>
             We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
             </p>
-    <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
-    <p>
-        Sincerely,<br><br>
-        <strong>${cfeFullName}</strong> <br>
-        ${user.departmentName || "N/A"} <br>
-        <strong>${user.locationName || "N/A"}</strong>
-    </p>
+        <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
+        <p>
+            Sincerely,<br><br>
+            <strong>${cfeFullName}</strong> <br>
+            ${user.departmentName || "N/A"} <br>
+            <strong>${user.locationName || "N/A"}</strong>
+        </p>
     </div>
 
+    <div class="page-break"></div>
     <div class="plan-details">
     <table class="layout-table">
         <thead><tr><td>
@@ -448,21 +460,13 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
         </td></tr></thead>
         <tbody><tr><td>
 
-    <h2>Student's Group Personal Accident Plan</h2>
-    <div class="benefit-item" style="margin-top: 15px;">
-        <h4 style="margin-bottom: 0;">Prototype Plan:</h4>
-    </div>
-
-    <h3>Prospects</h3>
-    <div class="h3-details">
-        <p>Elementary, Secondary Schools, Universities & Colleges, Vocational Schools & Special Training Schools (minimum of six months)</p>
-    </div>
+    <h2>Students' Group Term Life Insurance Plan</h2>
 
     <h3>Benefits (Php) – 1 Unit</h3>
     <div class="h3-details">
         <table class="data-table">
-            <tr><th>Classification</th><th>GADDP</th><th>GAMERR (Annual Limit)</th></tr>
-            <tr><td>Student</td><td>100,000.00</td><td>10,000.00</td></tr>
+            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR (Annual Limit)</th></tr>
+            <tr><td>Student</td><td>5,000.00</td><td>10,000.00</td><td>7,000.00</td></tr>
         </table>
         <p class="note">*Maximum of 5 units. Uniform coverage for all students.</p>
     </div>
@@ -470,23 +474,29 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     <h3>Single Premium Per Head (Php) – 1 Unit</h3>
     <div class="h3-details">
         <table class="data-table">
-            <tr><th>Classification</th><th>GADDP</th><th>GAMERR</th><th>Total</th></tr>
-            <tr><td>Student</td><td>60.00</td><td>40.00</td><td>100.00</td></tr>
+            <tr><th>Count</th><th>GTLIP</th><th>GADDR</th><th>GAMERR</th><th>Total</th></tr>
+            <tr><td>50 - 99</td><td>28.42</td><td>34.93</td><td>156.65</td><td>220.00</td></tr>
+            <tr><td>100 - 199</td><td>14.21</td><td>17.46</td><td>78.33</td><td>110.00</td></tr>
+            <tr><td>200 - 299</td><td>6.46</td><td>7.94</td><td>35.6</td><td>50.00</td></tr>
+            <tr><td>300 - 399</td><td>5.17</td><td>6.35</td><td>28.48</td><td>40.00</td></tr>
+            <tr><td>400 - 599</td><td>3.88</td><td>4.76</td><td>21.36</td><td>30.00</td></tr>
+            <tr><td>600 and above</td><td>2.58</td><td>3.18</td><td>14.24</td><td>20.00</td></tr>
         </table>
         <p class="note">Rates are inclusive of government-mandated taxes.</p>
     </div>
 
     <h3>Eligibility</h3>
     <div class="h3-details">
-        <p>Any in good health and actively-at-work bona fide enrolled student of the Policyholder who is at least five (5) years old and who has not attained his 60th birth anniversary.</p>
-        <p>Any regular, in good health and actively-at-work employee of the Policyholder who is at least eighteen (18) years old and who has not attained his 65th birth anniversary.</p>
+        <p>Any in good health and actively-at-work bona fide enrolled student of the Policyholder who is at least five (5) years old and has not attained his 25th birth anniversary.</p>
+        <p>Any regular, in good health and actively-at-work employee of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
     </div>
 
     <h3>Termination Age</h3>
     <div class="h3-details">
         <ul>
-            <li><strong>GADDP:</strong> Coverage terminates at age 65.</li>
-            <li><strong>GAMERR:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GADDR:</strong> Coverage terminates at age 65.</li>
+            <li><strong>Other Riders:</strong> Coverage terminates at age 65.</li>
+            <li><strong>Students:</strong> Coverage automatically terminates at age 25.</li>
         </ul>
     </div>
 
@@ -497,29 +507,43 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
 
     <h3>Participation Requirements</h3>
     <div class="h3-details">
-        <ul>
-            <li>100% of all eligible individuals.</li>
-            <li>At least 150 individuals at policy inception and throughout the policy year.</li>
-        </ul>
+        <p><strong>100% of all eligible individuals</strong></p>
+        <p class="note">
+            <strong>Annual Premium During Policy Inception (Net of Collection Fee):</strong><br>
+            N/A – Since our objective is to offer a competitive plan for this type of group.
+        </p>
     </div>
 
-    <h3>Premium Requirement</h3>
+    <h3>Minimum Number Requirements</h3>
     <div class="h3-details">
-        <p>Minimum of Php 10,000.00 annual premium (net of collection fee) shall be required to install the plan.</p>
+        <table class="data-table">
+            <tr><th>Count</th><th>Annual Premium During Policy Inception<br>(Net of Collection Fee)</th><th>Minimum During Inception</th><th>Minimum Within Policy Period</th></tr>
+            <tr><td>50 - 99</td><td rowspan="6">N/A – Since our objective is to offer a competitive plan for this type of group.</td><td>50</td><td>50</td></tr>
+            <tr><td>100 - 199</td><td>100</td><td>100</td></tr>
+            <tr><td>200 - 299</td><td>200</td><td>210</td></tr>
+            <tr><td>300 - 399</td><td>300</td><td>300</td></tr>
+            <tr><td>400 - 599</td><td>400</td><td>400</td></tr>
+            <tr><td>600 and above</td><td>600</td><td>600</td></tr>
+        </table>
+    </div>
+
+    <h3>NEL (1 Unit)</h3>
+    <div class="h3-details">
+        <p>No-evidence limit is Php 5,000.00 provided eligible individual has not attained his 25th birth anniversary.</p>
     </div>
 
     <h3>Other Terms</h3>
     <div class="h3-details">
         <ul>
-            <li>Free GADDR coverage of Php 100,000 for employees (Teaching and Non-Teaching), regardless of the unit/s purchased, provided their number does not exceed 10% of the total participating students.</li>
-            <li>Unprovoked Murder and Assault (UMA) is covered.</li>
+            <li>Free GADDR coverage of Php 10,000 for employees (Teaching and Non-Teaching), regardless of the unit/s purchased, provided their number does not exceed 10% of the total participating students.</li>
+            <li>Unprovoked Murder and Assault (UMA) is not covered.</li>
             <li>Participation requirements remain the same, regardless of the number of units purchased.</li>
             <li>Benefits, Rates, and NEL will be adjusted accordingly based on the number of units purchased.</li>
         </ul>
     </div>
 
 <div class="page-break"></div>
-<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
+<div class="installation-requirements" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
     <p style="font-size: 10pt; margin-bottom: 10px;">
         Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
@@ -540,7 +564,7 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     </p>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
     
@@ -575,7 +599,7 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     </table>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
     
@@ -615,8 +639,7 @@ export const generateStudentsGPAPDFContent = (application, user, details) => {
     <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
     </table>
     </div>
-
 </body>
 </html>
-    `;
+  `;
 };

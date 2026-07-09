@@ -4,18 +4,18 @@ import puppeteer from 'puppeteer';
 import * as Model from '../models/financial_Insurance_form.model.js';
 import * as ActuarialModel from '../models/actuarial_api/actuarial.model.js';
 import * as User from '../models/user/user_model.js';
-import { generateGCLIPDFContent } from '../templates/Group_Credit_Life_Insurance_GCLI.js';
-import { generateGPAPDFContent } from '../templates/Group_Personal_Accident_Insurance_GPA.js';
-import { generateGYRTPDFContent } from '../templates/Group_Term_Life_Insurance_GYRT.js';
-import { generateBarangayPDFContent } from '../templates/prototype_BarangayProtectPlan.js';
-import { generateStudentsGTLIPPDFContent } from '../templates/prototype_StudentsGroupTermLifeInsurancePlan.js';
-import { generateStudentsGPAPDFContent } from '../templates/prototype_StudentsGroupPersonalAccidentPlan.js';
-import { generateGroupAssociationsPDFContent } from '../templates/prototype_GroupAssociationsPlan.js';
-import { generateSecurityGuardsPDFContent } from '../templates/prototype_SecurityGuardsProtectionPlan.js';
-import { generateGCLIInitialLoanPDFContent } from '../templates/prototype_GroupCreditLifePrototypePlanInitialLoan.js';
-import { generateGCLIOutstandingLoanBalancePDFContent } from '../templates/prototype_GroupCreditLifeInsuranceOutstandingLoanBalance.js';
-import { generateHotelEmployeesPDFContent } from '../templates/prototype_HotelEmployeesGroupTermLifeInsurancePlan.js';
-import { generateSmallGroupsPDFContent } from '../templates/prototype_PlanforSmallGroups.js';
+import { generateGCLIPDFContent } from '../templates/customize/Group_Credit_Life_Insurance_GCLI.js';
+import { generateGPAPDFContent } from '../templates/customize/Group_Personal_Accident_Insurance_GPA.js';
+import { generateGYRTPDFContent } from '../templates/customize/Group_Term_Life_Insurance_GYRT.js';
+import { generateBarangayPDFContent } from '../templates/prototype/prototype_BarangayProtectPlan.js';
+import { generateStudentsGTLIPPDFContent } from '../templates/prototype/prototype_StudentsGroupTermLifeInsurancePlan.js';
+import { generateStudentsGPAPDFContent } from '../templates/prototype/prototype_StudentsGroupPersonalAccidentPlan.js';
+import { generateGroupAssociationsPDFContent } from '../templates/prototype/prototype_GroupAssociationsPlan.js';
+import { generateSecurityGuardsPDFContent } from '../templates/prototype/prototype_SecurityGuardsProtectionPlan.js';
+import { generateGCLIInitialLoanPDFContent } from '../templates/prototype/prototype_GroupCreditLifePrototypePlanInitialLoan.js';
+import { generateGCLIOutstandingLoanBalancePDFContent } from '../templates/prototype/prototype_GroupCreditLifeInsuranceOutstandingLoanBalance.js';
+import { generateHotelEmployeesPDFContent } from '../templates/prototype/prototype_HotelEmployeesGroupTermLifeInsurancePlan.js';
+import { generateSmallGroupsPDFContent } from '../templates/prototype/prototype_PlanforSmallGroups.js';
 
 // Helper to generate a human-readable timestamp (DDMMYYYY-HHMMSS) for filenames
 export const getFileTimestamp = () => {

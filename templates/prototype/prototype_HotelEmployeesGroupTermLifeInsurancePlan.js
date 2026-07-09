@@ -21,7 +21,7 @@ const formatDate = (date) => {
     });
 };
 
-export const generateGroupAssociationsPDFContent = (
+export const generateHotelEmployeesPDFContent = (
     application,
     user,
     details,
@@ -76,7 +76,7 @@ export const generateGroupAssociationsPDFContent = (
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Group Associations Plan</title>
+    <title>Hotel Employees' Group Term Life Insurance Plan</title>
     <style>
         @page {
             size: A4;
@@ -161,7 +161,10 @@ export const generateGroupAssociationsPDFContent = (
             color: #202124;
             margin-bottom: 18px;
         }
-        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
+        .section-group, .notes, .installation-requirements, .signature-section { 
+            break-inside: auto; page-break-inside: auto; 
+        }
+        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         
         /* Modern Data Table Styling */
         .data-table {
@@ -456,37 +459,23 @@ export const generateGroupAssociationsPDFContent = (
         </td></tr></thead>
         <tbody><tr><td>
 
-    <h2>Group Associations Plan</h2>
-    <div class="benefit-item" style="margin-top: 15px;">
-        <h4 style="margin-bottom: 0;">Prototype Plan:</h4>
-    </div>
+    <h2>Hotel Employees' Group Term Life Insurance Plan</h2>
 
-    <h3>Prospects</h3>
-    <div class="h3-details">
-        <ul>
-            <li><strong>Class A: </strong>Religious, Civic, Homeowners, Consumers, Health, Mass Media, Entertainment (No Stunts), Farmers, Bellboys, Waiters, Cooks, Janitors</li>
-            <li><strong>Class B: </strong>Credit Cooperatives, Market Vendors, Warehousemen, Bakers, Employees Association of Refineries, Employees Association of Paint & Varnish, Employees Association of Fertilizers, Employees Association of Manufacturing Firms</li>
-            <li><strong>Class C: </strong>Jeepney Drivers, Tricycle Drivers, Bus Drivers, Taxi Drivers, Labor Unions, Political Groups, Stevedores, Cement Manufacturing Employees, Security Guards</li>
-            <li><strong>Excluded: </strong>Sports/Athletes, Pilots, Metro Aide, Miners</li>
-        </ul>
-    </div>
-
-    <h3>Benefits (Php) – 1 Unit</h3>
+    <h3>Benefits (Php)</h3>
     <div class="h3-details">
         <table class="data-table">
-            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR (Annual Limit)</th></tr>
-            <tr><td>All Eligible Individuals</td><td>20,000.00</td><td>20,000.00</td><td>10,000.00</td></tr>
+            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GADBR</th><th>GHIR</th><th>GTIR</th></tr>
+            <tr><td>Level 1</td><td>50,000.00</td><td>50,000.00</td><td>50,000.00</td><td>300.00</td><td>50% OF GTLIP</td></tr>
+            <tr><td>Level 2</td><td>100,000.00</td><td>100,000.00</td><td>100,000.00</td><td>500.00</td><td>50% OF GTLIP</td></tr>
         </table>
-        <p class="note">*Maximum of 5 units. Uniform coverage for all members.</p>
     </div>
 
-    <h3>Single Premium Per Head (Php) – 1 Unit</h3>
+    <h3>Annual Premium per Head (Php)</h3>
     <div class="h3-details">
         <table class="data-table">
-            <tr><th>Classification</th><th>GTLIP</th><th>GADDR</th><th>GAMERR</th><th>Total</th></tr>
-            <tr><td>Class A</td><td>73.00</td><td>48.00</td><td>79.00</td><td>200.00</td></tr>
-            <tr><td>Class B</td><td>92.00</td><td>67.00</td><td>91.00</td><td>250.00</td></tr>
-            <tr><td>Class C</td><td>145.00</td><td>111.00</td><td>144.00</td><td>400.00</td></tr>
+            <tr><th>Classification</th><th>Annual Premium per Head</th></tr>
+            <tr><td>Level 1</td><td>934.62</td></tr>
+            <tr><td>Level 2</td><td>1,694.01</td></tr>
         </table>
         <p class="note">Rates are inclusive of government-mandated taxes.</p>
     </div>
@@ -494,54 +483,46 @@ export const generateGroupAssociationsPDFContent = (
     <h3>Eligibility</h3>
     <div class="h3-details">
         <p>Any in good health and actively-at-work bona fide member of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
-        <p>Individuals engaged in hazardous activities such as deep-sea diving, mountain climbing, and underground mining are not eligible for coverage.</p>
     </div>
 
     <h3>Termination Age</h3>
     <div class="h3-details">
         <ul>
-            <li><strong>GTLIP:</strong> Coverage terminates at age 65.</li>
-            <li><strong>GADDR:</strong> Coverage terminates at age 65.</li>
-            <li><strong>GAMERR:</strong> Coverage terminates at age 65.</li>
+            <li>GTLIP: Coverage terminates at age 65.</li>
+            <li>GADDR: Coverage terminates at age 65.</li>
+            <li>Other Riders: Coverage terminates at age 65.</li>
         </ul>
     </div>
 
     <h3>Participation Requirements</h3>
     <div class="h3-details">
         <ul>
-            <li>100% of all eligible individuals.</li>
-            <li>At least 100 individuals at policy inception and throughout the policy period.</li>
+            <li>100% of all eligible individuals</li>
+            <li>At least 12 individuals at policy inception and throughout the policy period</li>
         </ul>
     </div>
 
     <h3>Premium Requirement</h3>
     <div class="h3-details">
-        <p>Minimum of Php 10,000.00 annual premium (net of collection fee) shall be required to install the plan.</p>
+        <p>Minimum of Php 10,000.00 annual premium shall be required to install the plan.</p>
     </div>
 
-    <h3>NEL (1 Unit)</h3>
+    <h3>Underwriting</h3>
     <div class="h3-details">
-        <p>No-evidence limit is Php 20,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
-    </div>
-
-    <h3>Term of Coverage</h3>
-    <div class="h3-details">
-        <p>Each eligible individual will be covered for a maximum of one year.</p>
+        <p>All employees must submit accomplished health statement form.</p>
     </div>
 
     <h3>Other Terms</h3>
     <div class="h3-details">
         <ul>
-            <li>Unprovoked Murder and Assault (UMA) is not covered.</li>
-            <li>May be offered as GTLIP with ADD only, subject to the same terms and conditions.</li>
-            <li>Participation requirements remain the same regardless of the number of units purchased.</li>
-            <li>Benefits, Rates, and NEL will be adjusted accordingly based on the number of units purchased.</li>
-            <li><em><strong>(Groups are subject for review before proposal is released.)</strong></em></li>
+            <li>GADBR: Pays out the amount of insurance in case of death due to accident during official working shift and during official business of the employee.</li>
+            <li>GHIR: 0 days waiting period for death due to accident.</li>
+            <li>GHIR: 1 day waiting period for death due to illness.</li>
         </ul>
     </div>
 
 <div class="page-break"></div>
-<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
+<div class="installation-requirements" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
     <p style="font-size: 10pt; margin-bottom: 10px;">
         Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
@@ -562,7 +543,7 @@ export const generateGroupAssociationsPDFContent = (
     </p>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
     
@@ -597,7 +578,7 @@ export const generateGroupAssociationsPDFContent = (
     </table>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
     
@@ -637,6 +618,7 @@ export const generateGroupAssociationsPDFContent = (
     <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
     </table>
     </div>
+
 </body>
 </html>
     `;

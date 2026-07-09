@@ -21,7 +21,11 @@ const formatDate = (date) => {
     });
 };
 
-export const generateSmallGroupsPDFContent = (application, user, details) => {
+export const generateSecurityGuardsPDFContent = (
+    application,
+    user,
+    details,
+    ) => {
     const proposalDate = new Date(application.updated_at);
     const expiryDate = new Date(proposalDate);
     expiryDate.setDate(expiryDate.getDate() + 30);
@@ -70,9 +74,10 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     return `
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <title>Prototype Plan for Small Groups</title>
+    <title>Security Guards Protection Plan</title>
     <style>
         @page {
             size: A4;
@@ -157,7 +162,10 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
             color: #202124;
             margin-bottom: 18px;
         }
-        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: avoid; page-break-inside: avoid; }
+        .section-group, .notes, .installation-requirements, .signature-section { 
+            break-inside: auto; page-break-inside: auto; 
+        }
+        .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         
         /* Modern Data Table Styling */
         .data-table {
@@ -376,12 +384,16 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
             : ""
     }
 
-    ${footerPhotoUri ? `
+    ${
+        footerPhotoUri
+        ? `
         <div class="subsequent-footer">
             <div class="plan-name-footer">${planName}</div>
             <img src="${footerPhotoUri}" style="width: 101%; display: block;" />
         </div>
-    ` : ""}
+    `
+        : ""
+    }
 
     <div class="cover-page">
         <div class="cover-top">
@@ -428,6 +440,7 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
             ${application.group_name || ""} <br>
             ${application.business_address || ""}
         </p>
+        
         <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
         <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
         <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
@@ -452,237 +465,96 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         </td></tr></thead>
         <tbody><tr><td>
 
-    <h2>Prototype Plan for Small Groups</h2>
-    <div class="benefit-item" style="margin-top: 15px;">
-        <h4 style="margin-bottom: 0;">Prototype Plan:</h4>
-    </div>
-    <div class="h3-details">
-        <p>Group Size: 10 to 50 lives per group</p>
-    </div>
+    <h2>Security Guards Protection Plan</h2>
 
-    <h3>Class I</h3>
+    <h3>Benefits (Php)</h3>
     <div class="h3-details">
-        <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
         <table class="data-table">
             <tr>
-                <th>Group Size</th>
-                <th>10,000.00</th>
-                <th>15,000.00</th>
-                <th>20,000.00</th>
-                <th>25,000.00</th>
-                <th>30,000.00</th>
+                <th>Classification</th>
+                <th>GTLIP</th>
+                <th>GADDR</th>
+                <th>GAMERR (Annual Limit)</th>
             </tr>
-            <tr><td>10-15</td><td>266,000.00</td><td>399,000.00</td><td>532,000.00</td><td>665,000.00</td><td>798,000.00</td></tr>
-            <tr><td>16-20</td><td>192,000.00</td><td>288,000.00</td><td>384,000.00</td><td>480,000.00</td><td>576,000.00</td></tr>
-            <tr><td>21-25</td><td>150,000.00</td><td>225,000.00</td><td>301,000.00</td><td>376,000.00</td><td>451,000.00</td></tr>
-            <tr><td>26-30</td><td>123,000.00</td><td>185,000.00</td><td>247,000.00</td><td>308,000.00</td><td>370,000.00</td></tr>
-            <tr><td>31-35</td><td>105,000.00</td><td>157,000.00</td><td>210,000.00</td><td>262,000.00</td><td>314,000.00</td></tr>
-            <tr><td>35-40</td><td>91,000.00</td><td>136,000.00</td><td>182,000.00</td><td>227,000.00</td><td>273,000.00</td></tr>
-            <tr><td>41-50</td><td>80,000.00</td><td>120,000.00</td><td>161,000.00</td><td>201,000.00</td><td>241,000.00</td></tr>
+            <tr>
+                <td>All Eligible Individuals</td>
+                <td>40,000.00</td>
+                <td>40,000.00</td>
+                <td>15,000.00</td>
+            </tr>
         </table>
-
-        <ul>
-            <li>Office/Clerical Jobs/Professional</li>
-            <li>Finance/Investment/Insurance/Banking/Holding Company/Real Estate</li>
-            <li>Developer Semi-Conductor/Call Center</li>
-            <li>Retail Trading/Distributors/Dealers (not including Drivers)</li>
-            <li>Manufacturing Food, Textile Mill Products, Apparels</li>
-            <li>Manufacturing Electrical Products, Electric Equipment, Instruments</li>
-        </ul>
     </div>
 
-    <h3>Class II</h3>
+    <h3>Single Premium Per Head (Php)</h3>
     <div class="h3-details">
-        <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
         <table class="data-table">
             <tr>
-                <th>Group Size</th>
-                <th>10,000.00</th>
-                <th>15,000.00</th>
-                <th>20,000.00</th>
-                <th>25,000.00</th>
-                <th>30,000.00</th>
+                <th>Classification</th>
+                <th>GTLIP</th>
+                <th>GADDR</th>
+                <th>GAMERR</th>
+                <th>Total</th>
             </tr>
             <tr>
-                <td>10-15</td>
-                <td>222,000.00</td>
-                <td>332,000.00</td>
-                <td>443,000.00</td>
-                <td>554,000.00</td>
-                <td>665,000.00</td>
-            </tr>
-            <tr>
-                <td>16-20</td>
-                <td>160,000.00</td>
-                <td>240,000.00</td>
-                <td>320,000.00</td>
-                <td>400,000.00</td>
-                <td>480,000.00</td>
-            </tr>
-            <tr>
-                <td>21-25</td>
-                <td>125,000.00</td>
-                <td>188,000.00</td>
-                <td>250,000.00</td>
-                <td>313,000.00</td>
-                <td>376,000.00</td>
-            </tr>
-            <tr>
-                <td>26-30</td>
-                <td>103,000.00</td>
-                <td>154,000.00</td>
-                <td>206,000.00</td>
-                <td>257,000.00</td>
-                <td>309,000.00</td>
-            </tr>
-            <tr>
-                <td>31-35</td>
-                <td>87,000.00</td>
-                <td>131,000.00</td>
-                <td>175,000.00</td>
-                <td>218,000.00</td>
-                <td>262,000.00</td>
-            </tr>
-            <tr>
-                <td>35-40</td>
-                <td>76,000.00</td>
-                <td>113,000.00</td>
-                <td>151,000.00</td>
-                <td>189,000.00</td>
-                <td>227,000.00</td>
-            </tr>
-            <tr>
-                <td>41-50</td>
-                <td>67,000.00</td>
-                <td>100,000.00</td>
-                <td>134,000.00</td>
-                <td>167,000.00</td>
-                <td>201,000.00</td>
+                <td>All Eligible Individuals</td>
+                <td>219.00</td>
+                <td>168.00</td>
+                <td>163.00</td>
+                <td>550.00</td>
             </tr>
         </table>
-
-        <ul>
-            <li>Manufacturing Glass, Cement, & Plaster Products</li>
-            <li>Manufacturing Miscellaneous Wood Products (Furniture & Fixtures)</li>
-            <li>Manufacturing Fabricated Metal Products (Cutlery / Hand Tools / Metal Cans / Bolts)</li>
-            <li>Manufacturing Machineries (Office & Computing Machines / Farm & Garden Machineries)</li>
-            <li>Manufacturing Transportation Equipment & Parts (Motor Vehicles / Aircraft / Ship & Boat)</li>
-            <li>Manufacturing Paper & Allied Products (Paper Mills / Pulp Mills / Building Paper)</li>
-            <li>Manufacturing Rubber & Miscellaneous Products (Tires / Rubbers / Plastic Products)</li>
-            <li>Manufacturing Leather & Leather Products (Luggage / Footwear / Handbags)</li>
-            <li>Hotel & Resort Management</li>
-            <li>Business Services (Service to Building / Advertising / Personnel Supply Services; Auto Repair, Services and Garages)</li>
-        </ul>
+        <p class="note">Rates are inclusive of government-mandated taxes.</p>
     </div>
 
-    <h3>Class III</h3>
-    <div class="h3-details">
-        <p>Coverage per Head for GTLIP/GADDR/GTPDR</p>
-        <table class="data-table">
-            <tr>
-                <th>Group Size</th>
-                <th>10,000.00</th>
-                <th>15,000.00</th>
-                <th>20,000.00</th>
-                <th>25,000.00</th>
-                <th>30,000.00</th>
-            </tr>
-            <tr>
-                <td>10-15</td>
-                <td>190,000.00</td>
-                <td>285,000.00</td>
-                <td>380,000.00</td>
-                <td>475,000.00</td>
-                <td>570,000.00</td>
-            </tr>
-            <tr>
-                <td>16-20</td>
-                <td>137,000.00</td>
-                <td>206,000.00</td>
-                <td>274,000.00</td>
-                <td>343,000.00</td>
-                <td>412,000.00</td>
-            </tr>
-            <tr>
-                <td>21-25</td>
-                <td>107,000.00</td>
-                <td>161,000.00</td>
-                <td>215,000.00</td>
-                <td>268,000.00</td>
-                <td>322,000.00</td>
-            </tr>
-            <tr>
-                <td>26-30</td>
-                <td>88,000.00</td>
-                <td>132,000.00</td>
-                <td>176,000.00</td>
-                <td>220,000.00</td>
-                <td>264,000.00</td>
-            </tr>
-            <tr>
-                <td>31-35</td>
-                <td>75,000.00</td>
-                <td>112,000.00</td>
-                <td>150,000.00</td>
-                <td>187,000.00</td>
-                <td>224,000.00</td>
-            </tr>
-            <tr>
-                <td>35-40</td>
-                <td>65,000.00</td>
-                <td>97,000.00</td>
-                <td>130,000.00</td>
-                <td>162,000.00</td>
-                <td>195,000.00</td>
-            </tr>
-            <tr>
-                <td>41-50</td>
-                <td>57,000.00</td>
-                <td>86,000.00</td>
-                <td>115,000.00</td>
-                <td>143,000.00</td>
-                <td>172,000.00</td>
-            </tr>
-        </table>
-
-        <ul>
-            <li>Construction (General Building Contractors / Special Trade Contractors)</li>
-            <li>Manufacturing Primary Metal Industries (Iron & Steel)</li>
-            <li>Manufacturing Lumber</li>
-        </ul>
-    </div>
-    
     <h3>Eligibility</h3>
     <div class="h3-details">
-        <p>Any regular, in good health and actively-at-work employee of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
+        <p>Any in good health and actively-at-work Security Guard of the Policyholder who is at least eighteen (18) years old and has not attained his 65th birth anniversary.</p>
     </div>
 
     <h3>Termination Age</h3>
     <div class="h3-details">
         <ul>
-            <li>GTLIP: Coverage terminates at age 65.</li>
-            <li>GTPDR: Coverage terminates at age 65.</li>
-            <li>GADDR: Coverage terminates at age 65.</li>
-            <li>Other Riders: Coverage terminates at age 65.</li>
+            <li><strong>GTLIP:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GADDR:</strong> Coverage terminates at age 65.</li>
+            <li><strong>GAMERR:</strong> Coverage terminates at age 65.</li>
         </ul>
     </div>
 
     <h3>Participation Requirements</h3>
     <div class="h3-details">
         <ul>
-            <li>100% of all eligible individuals</li>
-            <li>At least 10 individuals at policy inception</li>
+            <li>100% of all eligible individuals.</li>
+            <li>At least 17 individuals at policy inception.</li>
+            <li>At least 100 individuals before policy renewal.</li>
         </ul>
     </div>
 
-    <h3>Underwriting</h3>
+    <h3>NEL</h3>
     <div class="h3-details">
-        <p>Each eligible individual must submit an accomplished health questionnaire and application form.</p>
-        <p>Non-medical limit is Php 500,000.00 provided eligible individual has not attained his 55th birth anniversary.</p>
+        <p>
+            No evidence limit is Php 40,000.00 provided eligible individual has not attained his 55th birth anniversary.
+        </p>
+    </div>
+
+    <h3>Term of Coverage</h3>
+    <div class="h3-details">
+        <p>
+            Each eligible individual will be covered for a maximum of one year.
+        </p>
+    </div>
+
+    <h3>Other Terms</h3>
+    <div class="h3-details">
+        <ul>
+            <li>Other Units: not applicable.</li>
+            <li>Unprovoked Murder and Assault (UMA) is not covered.</li>
+            <li>Can be offered as GTLIP with ADD only, subject to the same terms and conditions.</li>
+            <li><em><strong>(Area of the insured will be reviewed before proposal is released.)</strong></em></li>
+        </ul>
     </div>
 
 <div class="page-break"></div>
-<div class="installation-requirements" style="margin-top: 50px; break-inside: avoid;">
+<div class="installation-requirements" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Installation requirements:</h3>
     <p style="font-size: 10pt; margin-bottom: 10px;">
         Should this proposal merits your approval, the following requirements are to be submitted to PHILLIFE prior to policy inception for evaluation and acceptance.
@@ -703,7 +575,7 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     </p>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Conforme:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">I have read the benefits, premium and terms stated in this proposal. As the authorized representative of my company, I hereby confirm my acceptance on the proposal provided by Philippines Life Financial Assurance, Corp.(PhilLife) subject to the complete provisions to be provided in the Policy.</p>
     
@@ -738,7 +610,7 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     </table>
 </div>
 
-<div class="signature-section" style="margin-top: 50px; break-inside: avoid;">
+<div class="signature-section" style="margin-top: 20px; break-inside: avoid;">
     <h3 style="border-bottom: 2px solid #0d47a1; color: #0d47a1; padding-bottom: 5px; text-transform: uppercase; font-size: 14pt;">Proposed by:</h3>
     <p style="font-size: 10pt; margin-bottom: 20px;">This proposal is prepared and submitted for your consideration by:</p>
     
@@ -773,11 +645,11 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         </tr>
     </table>
 </div>
+
     </td></tr></tbody>
     <tfoot><tr><td><div class="spacer-bottom"></div></td></tr></tfoot>
     </table>
     </div>
-
 </body>
 </html>
     `;
