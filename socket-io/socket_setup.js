@@ -1,46 +1,42 @@
-import { Server } from 'socket.io';
-import http from 'http';
-import express from 'express';
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import allowedOrigins from "../config/allowed-origins.js";
 
-const app = express();
-const server = http.createServer(app);
+export const app = express();
+export const server = http.createServer(app);
 
-const corsOptions = {
-    origin: [
-        'http://192.168.101.22:3000',
-        'http://localhost:3000',
-        'http://192.5.5.142:93',
-        'https://192.5.5.142:95',
-        'http://192.5.5.142:85'
-        // 'https://www.yoursite.com'
-    ],
+// Export corsOptions for server.js
+export const corsOptions = {
+    origin: allowedOrigins,
     credentials: true,
 };
 
-const users = {};
-
-const io = new Server(server, {
+export const io = new Server(server, {
     cors: {
-        origin: corsOptions.origin,
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
         credentials: true,
     },
 });
 
-io.on('connection', (socket) => {
+const users = {};
 
-    socket.on('registerUser', (userId) => {
+io.on("connection", (socket) => {
+    console.log("Socket connected:", socket.id);
+
+    socket.on("registerUser", (userId) => {
         users[userId] = socket.id;
     });
 
-    socket.on('sendMessage', (data) => {
-        socket.emit('receiveMessage', {
-            message: 'Message received by server',
+    socket.on("sendMessage", (data) => {
+        socket.emit("receiveMessage", {
+            message: "Message received by server",
             data,
         });
     });
 
-    socket.on('disconnect', () => {
+    socket.on("disconnect", () => {
         for (const userId in users) {
             if (users[userId] === socket.id) {
                 delete users[userId];
@@ -49,5 +45,3 @@ io.on('connection', (socket) => {
         }
     });
 });
-
-export { app, io, server, corsOptions };

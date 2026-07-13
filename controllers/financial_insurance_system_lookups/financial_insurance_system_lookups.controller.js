@@ -1,5 +1,6 @@
 import * as Model from '../../models/financial_insurance_system_lookups/financial_insurance_system_lookups.model.js';
 import { success, error } from '../../utils/response.js';
+import { io } from '../../socket-io/socket_setup.js';
 
 export const getAll = async (req, res) => {
     try {
@@ -70,6 +71,9 @@ export const create = async (req, res) => {
             return error(res, 'Code is required and must be a valid string', 400);
         }
         const data = await Model.create(req.body);
+
+        io.emit('createSystemLookup', data);
+
         return success(res, data, 'System lookup created successfully', 201);
     } catch (err) {
         return error(res, err.message);
@@ -96,6 +100,9 @@ export const update = async (req, res) => {
 
         const updatedData = { ...existing, ...req.body };
         const result = await Model.update(id, updatedData);
+
+        io.emit('updateSystemLookup', result);
+
         return success(res, result, 'System lookup updated successfully');
     } catch (err) {
         return error(res, err.message);
@@ -105,6 +112,9 @@ export const update = async (req, res) => {
 export const deleteLookup = async (req, res) => {
     try {
         await Model.deleteLookup(req.params.id);
+
+        io.emit('deleteSystemLookup', { id: req.params.id });
+
         return success(res, null, 'System lookup deleted successfully');
     } catch (err) {
         return error(res, err.message);

@@ -821,8 +821,17 @@ export const validateFinancialApplication = [
         }),
     body('channel_name')
         .if(body('channel_type_id').custom(val => [56, 57, 58].includes(Number(val))))
-        .notEmpty().withMessage('Channel name is required for Agent, Booker and General Agency.')
+        .notEmpty().withMessage('Channel name is required for Agent, Broker and General Agency.')
         .isLength({ max: 255 }).withMessage('Channel name must not exceed 255 characters'),
+    body('channel_number')
+        .if(body('channel_type_id').custom(val => [56, 57, 58].includes(Number(val))))
+        .notEmpty().withMessage('Channel contact number is required for Agent, Broker and General Agency.')
+        .isLength({ max: 50 }).withMessage('Channel contact number must not exceed 50 characters'),
+    body('channel_email')
+        .if(body('channel_type_id').custom(val => [56, 57, 58].includes(Number(val))))
+        .notEmpty().withMessage('Channel email is required for Agent, Broker and General Agency.')
+        .isEmail().withMessage('Channel email must be a valid email address')
+        .isLength({ max: 255 }).withMessage('Channel email must not exceed 255 characters'),
 
     body('commission_rate')
         .if(body('type_of_proposal_id').equals('31'))
@@ -2064,10 +2073,33 @@ export const validateUpdateFinancialApplication = [
         .custom((value, { req }) => {
             const channelId = Number(req.body.channel_type_id);
             if ([56, 57, 58].includes(channelId) && (!value || value.trim() === '')) {
-                throw new Error('Channel name is required for Agent, Booker and General Agency.');
+                throw new Error('Channel name is required for Agent, Broker and General Agency.');
             }
             return true;
         }),
+    body('channel_number')
+        .if(body('channel_type_id').exists())
+        .custom((value, { req }) => {
+            const channelId = Number(req.body.channel_type_id);
+            if ([56, 57, 58].includes(channelId) && (!value || value.trim() === '')) {
+                throw new Error('Channel contact number is required for Agent, Broker and General Agency.');
+            }
+            return true;
+        })
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Channel contact number must not exceed 50 characters'),
+    body('channel_email')
+        .if(body('channel_type_id').exists())
+        .custom((value, { req }) => {
+            const channelId = Number(req.body.channel_type_id);
+            if ([56, 57, 58].includes(channelId) && (!value || value.trim() === '')) {
+                throw new Error('Channel email is required for Agent, Broker and General Agency.');
+            }
+            return true;
+        })
+        .optional({ nullable: true, checkFalsy: true })
+        .isEmail().withMessage('Channel email must be a valid email address')
+        .isLength({ max: 255 }).withMessage('Channel email must not exceed 255 characters'),
 
     body('commission_rate').optional().isFloat({ min: 0 }).withMessage('Commission Rate must be 0 or a positive number'),
     body('service_fee').optional().isFloat({ min: 0 }).withMessage('Service Fee must be 0 or a positive number'),

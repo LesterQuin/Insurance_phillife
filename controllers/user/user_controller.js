@@ -11,6 +11,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { auditLog, AuditStatus, AuditActions } from '../../utils/logger.js';
+import { io } from '../../socket-io/socket_setup.js';
 import dns from 'node:dns';
 
 // Fix for Node.js 18+ where IPv6 is prioritized over IPv4.
@@ -248,6 +249,8 @@ export const register = async (req, res) => {
             metadata: { email, role_id, agent_code },
             status: AuditStatus.INFO
         });
+
+        io.emit('register', newAgent);
 
         res.status(201).json({
             status: true,
@@ -558,6 +561,8 @@ export const resetPassword = async (req, res) => {
             metadata: { email }
         });
 
+        io.emit('resetPassword', { email });
+
         res.json({
             status: true,
             message: 'Password updated successfully.'
@@ -719,6 +724,8 @@ export const updateProfile = async (req, res) => {
             metadata: { fields: Object.keys(req.body).filter(key => key  !== 'password' && key !== 'newPassword') }
         });
 
+        io.emit('updateProfile', updatedUser);
+
         res.json({
             status: true,
             message: "Profile updated successfully",
@@ -779,6 +786,8 @@ export const adminUpdateUser = async (req, res) => {
             metadata: { role_id, department_id, location_id, reporting_to_id }
         });
 
+        io.emit('adminUpdateUser', updatedUser);
+
         res.json({
             status: true,
             message: "User profile updated successfully by admin.",
@@ -813,6 +822,8 @@ export const deactivateAccount = async (req, res) => {
             status: AuditStatus.WARNING
         });
 
+        io.emit('deactivateAccount', { userId });
+
         res.status(200).json({ 
             status: true, 
             message: 'User account has been successfully deactivated.' 
@@ -845,6 +856,8 @@ export const activateAccount = async (req, res) => {
             entityId: userId,
             metadata: { status: 'activated' }
         });
+
+        io.emit('activateAccount', { userId });
 
         res.status(200).json({ 
             status: true, 
@@ -959,6 +972,8 @@ export const adminResetPassword = async (req, res) => {
             entityId: userId,
             status: AuditStatus.WARNING
         });
+
+        io.emit('adminResetPassword', { userId });
 
         res.json({
             status: true,

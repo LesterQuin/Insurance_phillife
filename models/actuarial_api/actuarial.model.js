@@ -25,7 +25,11 @@ export const saveApplicationRates = async (applicationId, ratesData, userId) => 
                 ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' 
                 : planId === 3 
                     ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa' 
-                    : 'DHUB_UAT.sg.financial_insurance_application_rates';
+                    : null;
+
+        if (!tableName) {
+            throw new Error(`Invalid plan_id (${planId}) for saving rates. Valid plan IDs are 1 (GCLI), 2 (GYRT), or 3 (GPA).`);
+        }
 
         await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
@@ -149,16 +153,16 @@ export const getApplicationRates = async (applicationId) => {
                  LEFT JOIN DHUB_UAT.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
                  LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
-    } else {
+    } else if (planId === 1) {
         // Standard rates table
-        const targetTable = planId === 1 
-            ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli' 
-            : 'DHUB_UAT.sg.financial_insurance_application_rates';
+        const targetTable = 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli';
         query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
                  LEFT JOIN DHUB_UAT.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
                  LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
+    } else {
+        return [];
     }
 
     const result = await pool.request()

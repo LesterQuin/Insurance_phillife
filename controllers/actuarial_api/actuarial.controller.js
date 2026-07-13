@@ -4,7 +4,7 @@ import * as User from '../../models/user/user_model.js';
 import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
 import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus } from '../../middlewares/helper.js';
-import { broadcastApplicationUpdate } from '../../websocket.js';
+import { io } from '../../socket-io/socket_setup.js';
 import XLSX from 'xlsx';
 
 export const saveRates = async (req, res) => {
@@ -31,8 +31,7 @@ export const saveRates = async (req, res) => {
         const updatedApp = await MainModel.getApplicationById(application_id);
         const response = await buildApplicationResponse(updatedApp);
 
-        // Real-time sync: Notify all users viewing this application that rates/status changed
-        broadcastApplicationUpdate(application_id, response);
+        io.emit('saveRates', response);
 
         return success(res, response, 'Rates saved successfully.');
     } catch (err) {
@@ -61,8 +60,7 @@ export const saveEvidenceNotes = async (req, res) => {
         const updatedApp = await MainModel.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
 
-        // Real-time sync: Notify users of updated evidence notes
-        broadcastApplicationUpdate(id, response);
+        io.emit('saveEvidenceNotes', response);
 
         return success(res, response, 'Evidence of insurability notes saved successfully.');
     } catch (err) {
@@ -91,8 +89,7 @@ export const saveTotalAnnualPremium = async (req, res) => {
         const updatedApp = await MainModel.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
 
-        // Real-time sync: Notify users of updated total premium
-        broadcastApplicationUpdate(id, response);
+        io.emit('saveTotalAnnualPremium', response);
 
         return success(res, response, 'Total Annual Premium saved successfully.');
     } catch (err) {
@@ -131,8 +128,7 @@ export const releaseApplication = async (req, res) => {
         const updatedApp = await MainModel.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
 
-        // Real-time sync: Critical for the UI to show the "Released" state immediately
-        broadcastApplicationUpdate(id, response);
+        io.emit('releaseApplication', response);
 
         return success(res, response, 'Application has been successfully finalized and released.');
     } catch (err) {
@@ -170,8 +166,7 @@ export const rejectApplication = async (req, res) => {
         const updatedApp = await MainModel.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
 
-        // Real-time sync: Notify users that the application was rejected
-        broadcastApplicationUpdate(id, response);
+        io.emit('rejectApplication', response);
 
         return success(res, response, 'Application has been successfully rejected.');
     } catch (err) {
@@ -208,8 +203,7 @@ export const unrejectApplication = async (req, res) => {
         const updatedApp = await MainModel.getApplicationById(id);
         const response = await buildApplicationResponse(updatedApp);
 
-        // Real-time sync: Notify users that the rejection was reversed
-        broadcastApplicationUpdate(id, response);
+        io.emit('unrejectApplication', response);
 
         return success(res, response, 'Application has been successfully un-rejected and set to Pending.');
     } catch (err) {

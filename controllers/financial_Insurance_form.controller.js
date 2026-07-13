@@ -8,7 +8,7 @@ import { success, error } from '../utils/response.js';
 import { auditLog, AuditStatus, AuditActions, normalizeIp } from '../utils/logger.js';
 import sanitizeHtml from 'sanitize-html';
 import * as Helper from '../middlewares/helper.js';
-import { broadcastApplicationUpdate, broadcastApplicationDelete } from '../websocket.js';
+import { io } from '../socket-io/socket_setup.js';
 import { transporter } from './user/user_controller.js';
 import { expirationNotificationTemplate } from '../templates/expirationNotificationTemplate.js';
 import { bookedNotificationTemplate } from '../templates/bookedNotificationTemplate.js';
@@ -105,8 +105,7 @@ export const createApplication = async (req, res) => {
         // Format it to match the standard response structure
         const response = await Helper.buildApplicationResponse(app);
 
-        // Real-time sync: Notify any listeners that a new application was created
-        broadcastApplicationUpdate(appId, response);
+        io.emit('createApplication', response);
 
         return success(res, response, 'Application submitted successfully', 201);
     } catch (err) {
@@ -338,7 +337,8 @@ export const updateApplicationStatus = async (req, res) => {
             }
         }
 
-        broadcastApplicationUpdate(appId, response);
+        io.emit('updateApplicationStatus', response);
+
         return success(res, response, `Status successfully updated to ${response.status.name}.`);
     } catch (err) {
         return error(res, err.message);
@@ -409,7 +409,8 @@ export const approveExtension = async (req, res) => {
         const updated = await Model.getApplicationById(appId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        broadcastApplicationUpdate(appId, response); // Real-time sync
+        io.emit('approveExtension', response);
+
         return success(res, response, 'Extension approved successfully.');
     } catch (err) {
         return error(res, err.message);
@@ -449,8 +450,7 @@ export const rejectExtension = async (req, res) => {
         const updated = await Model.getApplicationById(appId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        // Real-time sync: Update the UI to show the request is no longer pending
-        broadcastApplicationUpdate(appId, response);
+        io.emit('rejectExtension', response);
 
         return success(res, response, 'Extension request denied.');
     } catch (err) {
@@ -470,7 +470,8 @@ export const requestExtension = async (req, res) => {
         const updated = await Model.getApplicationById(appId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        broadcastApplicationUpdate(appId, response);
+        io.emit('requestExtension', response);
+
         return success(res, response, 'Extension request submitted to your Team Leader/Admin.');
     } catch (err) {
         console.error('Request Extension Error:', err);
@@ -696,7 +697,8 @@ export const getRenewalLookup = async (req, res) => {
             if (Number(app.status_id) !== 6) {
                 await Model.updateApplication(app.application_id, { status_id: 6 }, userId);
                 const updatedApp = await Model.getApplicationById(app.application_id);
-                broadcastApplicationUpdate(app.application_id, await Helper.buildApplicationResponse(updatedApp));
+                const response = await Helper.buildApplicationResponse(updatedApp);
+                io.emit('checkRenewalEligibility', response);
             }
             return error(res, `Renewal period has expired. The 1-month grace period ended on ${gracePeriodDate.toLocaleDateString()}. This application is now Closed.`, 400);
         }
@@ -878,8 +880,7 @@ export const saveDraft = async (req, res) => {
         
         const response = await Helper.buildApplicationResponse(app);
 
-        // Real-time sync: Update UI for anyone viewing this draft
-        broadcastApplicationUpdate(finalAppId, response);
+        io.emit('saveDraft', response);
 
         return success(res, response, 'Application saved as draft successfully', applicationId ? 200 : 201);
     } catch (err) {
@@ -1437,8 +1438,7 @@ export const updateApplication = async (req, res) => {
         const updated = await Model.updateApplication(req.params.id, processedData, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        // Real-time sync: Critical for the UI to show the updated data (status, amounts, etc.) immediately
-        broadcastApplicationUpdate(req.params.id, response);
+        io.emit('updateApplication', response);
 
         await auditLog(req, {
             userId: userId,
@@ -1512,8 +1512,7 @@ export const uploadExcelFile = async (req, res) => {
         const updated = await Model.getApplicationById(appId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        // Real-time sync: Notify that the Excel file is now available for download
-        broadcastApplicationUpdate(appId, response);
+        io.emit('uploadExcelFile', response);
 
         await auditLog(req, {
             userId: userId,
@@ -1547,8 +1546,7 @@ export const deleteApplication = async (req, res) => {
 
         await Model.deleteApplication(appId);
 
-        // Real-time sync: Notify users that this application no longer exists
-        broadcastApplicationDelete(appId);
+        io.emit('deleteApplication', { application_id: appId });
 
         return success(res, null, 'Application deleted successfully.');
     } catch (err) {
@@ -1587,7 +1585,7 @@ export const setStatusChecking = async (req, res) => {
         const updated = await Model.updateApplication(appId, { status_id: STATUS_CHECKING }, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        broadcastApplicationUpdate(appId, response);
+        io.emit('setStatusChecking', response);
 
         return success(res, response, 'Status successfully updated to Checking.');
     } catch (err) {
@@ -1629,7 +1627,7 @@ export const setStatusApproved = async (req, res) => {
         const updated = await Model.updateApplication(appId, { status_id: STATUS_BOOKED, expiry_date: oneYearLater }, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
-        broadcastApplicationUpdate(appId, response);
+        io.emit('setStatusApproved', response);
 
         return success(res, response, 'Status successfully updated to Booked.');
     } catch (err) {
@@ -1743,7 +1741,8 @@ export const setStatusBooked = async (req, res) => {
             console.error('Booked Notification Error:', emailErr);
         }
 
-        broadcastApplicationUpdate(appId, response);
+        io.emit('setStatusBooked', response);
+
         return success(res, response, 'Application successfully marked as Booked. The 30-day window is now closed.');
     } catch (err) {
         console.error('Set Status Booked Error:', err);

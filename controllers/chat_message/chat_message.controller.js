@@ -2,7 +2,6 @@ import * as Model from '../../models/chat_message/chat_message.model.js';
 import * as AppModel from '../../models/financial_Insurance_form.model.js';
 import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
-import { broadcastComment } from '../../websocket.js';
 import { sanitizeOptions } from '../../middlewares/helper.js';
 import { io } from '../../socket-io/socket_setup.js';
 
@@ -50,12 +49,8 @@ export const createComment = async (req, res) => {
 
         // Return the single created item to the requester
         const created = await Model.getCommentById(newComment.comment_id);
-
-        // Real-time broadcast: Fetch the entire updated list and sync all clients
-        // const comments = await Model.getCommentsByApplicationId(applicationId); // This line is not needed if we only broadcast the new comment
-        //broadcastComment(applicationId, comments);
-        return success(res, created, 'Comment added successfully.', 201);
         io.emit('addNewComment', created);
+        return success(res, created, 'Comment added successfully.', 201);
     } catch (err) {
         console.error('Create Comment Error:', err);
         return error(res, err.message);
@@ -78,14 +73,9 @@ export const updateComment = async (req, res) => {
 
         comment_text = sanitizeHtml(comment_text, sanitizeOptions);
         const updated = await Model.updateComment(commentId, comment_text);
-
-        // Real-time broadcast: Fetch updated list after edit
-        // const applicationId = existing.application_id;
-        // const comments = await Model.getCommentsByApplicationId(applicationId);
-        //broadcastComment(applicationId, comments);
+        io.emit('updateComment', updated);
 
         return success(res, updated, 'Comment updated successfully.');
-        io.emit('updateComment', updated);
     } catch (err) {
         console.error('Update Comment Error:', err);
         return error(res, err.message);
@@ -111,16 +101,12 @@ export const deleteComment = async (req, res) => {
         }
 
         const isDeleted = await Model.deleteComment(commentId);
+        io.emit('deletedComment', { comment_id: commentId, is_deleted: isDeleted });
 
-        // Real-time broadcast: Fetch remaining comments after deletion
-        // const applicationId = existing.application_id;
-        // const comments = await Model.getCommentsByApplicationId(applicationId);
-        //broadcastComment(applicationId, comments);
         return success(res, { 
             is_deleted: isDeleted,
             deleted_at: isDeleted ? new Date().toLocaleString('en-PH', { timeZone: 'Asia/Manila' }) : null
         }, isDeleted ? 'Comment deleted successfully.' : 'Comment could not be deleted.');
-        io.emit('deletedComment', isDeleted);
     } catch (err) {
         console.error('Delete Comment Error:', err);
         return error(res, err.message);

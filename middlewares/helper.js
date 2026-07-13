@@ -180,6 +180,8 @@ export const handleChannelType = (data, user) => {
     if (mutableData.channel_type_id !== undefined) {
         if (Number(mutableData.channel_type_id) === 55 && user) {
             mutableData.channel_name = [user.firstname, user.middlename, user.lastname, user.suffix].filter(Boolean).join(' ');
+            mutableData.channel_number = user.phoneNumber || null;
+            mutableData.channel_email = user.email || null;
         }
     }
     return mutableData;
@@ -206,21 +208,56 @@ export const preprocessRiders = (data) => {
             if (rider.values[0].unit !== undefined) baseUnit = Number(rider.values[0].unit);
         }
 
-        if (riderId === 8 && baseAmount !== undefined && (baseAmount < 100 || baseAmount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
-        if (riderId === 9 && baseAmount !== undefined && baseAmount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
-        if (riderId === 11) baseAmount = 50000;
-        if (riderId === 13) {
+        const GHIR_IDS = [8];
+        const GAMERR_IDS = [9, 14];
+        const BMSR_IDS = [11];
+        const GDR_IDS = [13];
+
+        if (GHIR_IDS.includes(riderId) && baseAmount !== undefined && (baseAmount < 100 || baseAmount > 300)) {
+            throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+        }
+        if (GAMERR_IDS.includes(riderId) && baseAmount !== undefined && baseAmount < 500) {
+            throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+        }
+        if (BMSR_IDS.includes(riderId)) {
+            baseAmount = 50000;
+        }
+        if (GDR_IDS.includes(riderId)) {
             if (baseUnit === 1) baseAmount = 30000;
             if (baseUnit === 2) baseAmount = 60000;
         }
 
         const isSingular = (rider.values && rider.values.length === 1) || (!rider.values && (baseAmount !== undefined || baseUnit !== undefined));
+        
+        let processedRider = { ...rider };
         if (designations.length > 0 && isSingular) {
-            return { ...rider, values: designations.map(d => ({ designation: d, amount: baseAmount, unit: baseUnit })) };
+            processedRider.values = designations.map(d => ({ designation: d, amount: baseAmount, unit: baseUnit }));
         }
-        if (riderId === 11 && rider.values) rider.values = rider.values.map(v => ({ ...v, amount: 50000 }));
-        if (riderId === 13 && rider.values) rider.values = rider.values.map(v => ({ ...v, amount: v.unit === 1 ? 30000 : (v.unit === 2 ? 60000 : v.amount) }));
-        return rider;
+
+        if (processedRider.values && Array.isArray(processedRider.values)) {
+            processedRider.values = processedRider.values.map(v => {
+                const updatedVal = { ...v };
+                const valAmount = updatedVal.amount !== undefined ? Number(updatedVal.amount) : undefined;
+                const valUnit = updatedVal.unit !== undefined ? Number(updatedVal.unit) : undefined;
+
+                if (GHIR_IDS.includes(riderId) && valAmount !== undefined && (valAmount < 100 || valAmount > 300)) {
+                    throw new Error(`Group Hospital Income Rider amount for ${v.designation} must be between 100 and 300.`);
+                }
+                if (GAMERR_IDS.includes(riderId) && valAmount !== undefined && valAmount < 500) {
+                    throw new Error(`Group Accidental Medical Expense Reimbursement Rider amount for ${v.designation} must be at least 500.`);
+                }
+                if (BMSR_IDS.includes(riderId)) {
+                    updatedVal.amount = 50000;
+                }
+                if (GDR_IDS.includes(riderId)) {
+                    if (valUnit === 1) updatedVal.amount = 30000;
+                    else if (valUnit === 2) updatedVal.amount = 60000;
+                }
+                return updatedVal;
+            });
+        }
+
+        return processedRider;
     });
     return data;
 };

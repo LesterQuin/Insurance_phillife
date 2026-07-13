@@ -2,6 +2,7 @@ import * as ApplicationModel from '../../models/financial_Insurance_form.model.j
 import * as Model from '../../models/requirements/installation_requirements.model.js';
 import { success, error } from '../../utils/response.js';
 import { ensureRequirementsDir } from '../../middlewares/helper.js';
+import { io } from '../../socket-io/socket_setup.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -73,6 +74,8 @@ export const uploadInstallationRequirements = async (req, res) => {
         if (Object.keys(updateData).length > 0) {
             await Model.upsertInstallationRequirements(applicationId, updateData, userId);
         }
+
+        io.emit('uploadInstallationRequirements', { applicationId, uploaded: Object.keys(updateData) });
 
         return res.status(200).json({
             status: true,
@@ -146,6 +149,8 @@ export const updateInstallationRequirements = async (req, res) => {
             await Model.upsertInstallationRequirements(applicationId, updateData, userId);
         }
 
+        io.emit('updateInstallationRequirements', { applicationId, uploaded: Object.keys(updateData) });
+
         return res.status(200).json({
             status: true,
             message: `Requirements updated successfully for Application #${applicationId}.`,
@@ -208,6 +213,9 @@ export const updateApplicationStatus = async (req, res) => {
         }
 
         await ApplicationModel.updateApplication(applicationId, { status_id }, userId);
+
+        io.emit('updateApplicationStatus', { applicationId, status_id });
+
         return success(res, null, 'Status updated successfully.');
     } catch (err) {
         return error(res, err.message, 500);
