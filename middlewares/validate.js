@@ -963,11 +963,11 @@ body('basic_plan_id')
                             const amount = val.amount != null ? Number(val.amount) : 0;
                             const unit = val.unit != null ? Number(val.unit) : 0;
 
-                            if (rId === 8 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300 for all ranks.');
-                            if (rId === 9 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500 for all ranks.');
-                            if (rId === 11 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000 for all ranks.');
-                            if (rId === 13 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 or 2 Units for all ranks.');
-                            if (['6', '7', '10', '12'].includes(rId) && amount <= 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
+                            if (rId === 8 && amount !== 0 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300 for all ranks.');
+                            if (rId === 9 && amount !== 0 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500 for all ranks.');
+                            if (rId === 11 && amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000 for all ranks.');
+                            if (rId === 13 && unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 or 2 Units for all ranks.');
+                            if (['6', '7', '10', '12'].includes(rId) && amount < 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
                         }
                     }
                 }
@@ -987,24 +987,24 @@ body('basic_plan_id')
                     // GYRT (Plan 2) Specific Validations based on IDs
                     if (planId === 2) {
                         if (riderId === 8) { // Group Hospital Income Rider
-                            if (amount < 100 || amount > 300) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+                            if (amount !== 0 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
                         } else if (riderId === 9) { // Group Accidental Medical Expense Reimbursement Rider
-                            if (amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+                            if (amount !== 0 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
                         } else if (riderId === 11) { // Burial (Memorial/Service)
-                            if (amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
+                            if (amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
                         } else if (riderId === 13) { // Group Dengue Rider
-                            if (![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
+                            if (unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
                         } else if (['6', '7', '10', '12'].includes(riderId)) { // Valid Amount Required for these riders
-                            if (amount <= 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
+                            if (amount < 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
                         }
                     } else {
                         // General Validation for other plans (fallback to name checks if ID not specific)
                         const name = riderDef.rider_name.trim();
-                        if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
+                        if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount !== 0 && amount < 500) {
                             throw new Error(`${name} amount must be least 500 minimum.`);
-                        } else if (name === 'Group Hospital Income Rider' && (amount < 100 || amount > 300)) {
+                        } else if (name === 'Group Hospital Income Rider' && amount !== 0 && (amount < 100 || amount > 300)) {
                             throw new Error(`${name} amount must be between 100 and 300.`);
-                        } else if (name === 'Burial (Memorial/Service)' && amount !== 50000) {
+                        } else if (name === 'Burial (Memorial/Service)' && amount !== 0 && amount !== 50000) {
                             throw new Error(`${name} amount must be fixed at 50,000.`);
                         }
                     }
@@ -2239,18 +2239,18 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
                 const riderDef = validRiders.find(r => r.rider_id === riderId);
                 if (riderDef) {
                     if (planId === 2) {
-                        if (riderId === 8 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
-                        if (riderId === 9 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
-                        if (riderId === 11 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
-                        if (riderId === 13 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
-                        if ([6, 7, 10, 12].includes(riderId) && amount <= 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
+                        if (riderId === 8 && amount !== 0 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+                        if (riderId === 9 && amount !== 0 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+                        if (riderId === 11 && amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
+                        if (riderId === 13 && unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
+                        if ([6, 7, 10, 12].includes(riderId) && amount < 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
                     } else {
                         const name = riderDef.rider_name.trim();
-                        if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount < 500) {
+                        if (name === 'Group Accidental Medical Expense Reimbursement Rider' && amount !== 0 && amount < 500) {
                             throw new Error(`${name} amount must be least 500 minimum.`);
-                        } else if (name === 'Group Hospital Income Rider' && (amount < 100 || amount > 300)) {
+                        } else if (name === 'Group Hospital Income Rider' && amount !== 0 && (amount < 100 || amount > 300)) {
                             throw new Error(`${name} amount must be between 100 and 300.`);
-                        } else if (name === 'Burial (Memorial/Service)' && amount !== 50000) {
+                        } else if (name === 'Burial (Memorial/Service)' && amount !== 0 && amount !== 50000) {
                             throw new Error(`${name} amount must be fixed at 50,000.`);
                         }
                     }

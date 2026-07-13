@@ -466,6 +466,7 @@ export const generateGCLIOutstandingLoanBalancePDFContent = (
         <tr><th>Classification</th><th>Outstanding Loan Balance (Php)</th></tr>
         <tr><td>All eligible individuals</td><td>Outstanding loan balance maximum of 1,500,000.00</td></tr>
     </table>
+    <br>
     <h4>Single Rate per 1,000</h4>
     <div class="benefit-item" style="margin-top: 15px;">
         <h4 style="margin-bottom: 0;">Collection Fee Percentage</h4>

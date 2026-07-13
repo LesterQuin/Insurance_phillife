@@ -1,5 +1,7 @@
 import { poolPromise, sql } from '../config/db.js';
 
+const valueOrNull = (val) => (val !== undefined && val !== null && val !== '') ? val : null;
+
 // Helper to log application actions
 const logApplicationAction = async (transaction, { applicationId, userId, actionType, changes, ipAddress }) => {
     const request = new sql.Request(transaction);
@@ -28,62 +30,62 @@ export const createApplication = async (data, userId) => {
         const appResult = await appRequest
             .input('user_id', sql.Int, userId)
             .input('group_name', sql.NVarChar, data.group_name)
-            .input('business_nature', sql.NVarChar, data.business_nature || null)
-            .input('business_nature_id', sql.Int, data.business_nature_id || null)
+            .input('business_nature', sql.NVarChar, valueOrNull(data.business_nature))
+            .input('business_nature_id', sql.Int, valueOrNull(data.business_nature_id))
             .input('sub_business_nature_id', sql.Int, data.sub_business_nature_id ? Number(data.sub_business_nature_id) : null)
             .input('number_of_lives', sql.Int, data.number_of_lives)
             .input('business_address', sql.NVarChar, data.business_address)
-            .input('contact_number', sql.NVarChar, data.contact_number || null)
-            .input('fax_number', sql.NVarChar, data.fax_number || null)
+            .input('contact_number', sql.NVarChar, valueOrNull(data.contact_number))
+            .input('fax_number', sql.NVarChar, valueOrNull(data.fax_number))
             .input('email', sql.NVarChar, data.email)
             .input('contact_person_salutation', sql.NVarChar, data.contact_person_salutation)
             .input('contact_person_firstname', sql.NVarChar, data.contact_person_firstname)
-            .input('contact_person_mi', sql.NVarChar, data.contact_person_mi || null)
+            .input('contact_person_mi', sql.NVarChar, valueOrNull(data.contact_person_mi))
             .input('contact_person_lastname', sql.NVarChar, data.contact_person_lastname)
             .input('designation', sql.NVarChar, data.designation)
             .input('proposal_addressee', sql.NVarChar, data.proposal_addressee)
             .input('addressee_designation', sql.NVarChar, data.addressee_designation)
             .input('group_classification_id', sql.Int, data.group_classification_id)
-            .input('other_group_classification', sql.NVarChar, data.other_group_classification || null)
+            .input('other_group_classification', sql.NVarChar, valueOrNull(data.other_group_classification))
             .input('business_type_id', sql.Int, data.business_type_id)
-            .input('other_business_type', sql.NVarChar, data.other_business_type || null)
+            .input('other_business_type', sql.NVarChar, valueOrNull(data.other_business_type))
             .input('group_type_id', sql.Int, data.group_type_id)
-            .input('other_group_type', sql.NVarChar, data.other_group_type || null)
+            .input('other_group_type', sql.NVarChar, valueOrNull(data.other_group_type))
             .input('minimum_age', sql.Int, data.minimum_age)
             .input('maximum_age', sql.Int, data.maximum_age)
             .input('payment_mode_id', sql.Int, data.payment_mode_id)
-            .input('plan_id', sql.Int, data.plan_id || null)
-            .input('basic_plan_id', sql.Int, data.basic_plan_id || null)
+            .input('plan_id', sql.Int, valueOrNull(data.plan_id))
+            .input('basic_plan_id', sql.Int, valueOrNull(data.basic_plan_id))
             .input('type_of_proposal_id', sql.Int, data.type_of_proposal_id)
-            .input('prototype_id', sql.Int, data.prototype_id || null)
+            .input('prototype_id', sql.Int, valueOrNull(data.prototype_id))
             .input('status_id', sql.Int, data.status_id || 8)
-            .input('amount_loans_id', sql.Int, data.amount_loans_id || null)
-            .input('max_loan_amount', sql.Decimal(18, 2), data.max_loan_amount || null)
-            .input('min_loan_amount', sql.Decimal(18, 2), data.min_loan_amount || null)
-            .input('loan_portfolio_amount', sql.Decimal(18, 2), data.loan_portfolio_amount || null)
-            .input('loans_amount', sql.Decimal(18, 2), data.loans_amount || null)
-            .input('coverage_type_id', sql.Int, data.coverage_type_id || null)
+            .input('amount_loans_id', sql.Int, valueOrNull(data.amount_loans_id))
+            .input('max_loan_amount', sql.Decimal(18, 2), valueOrNull(data.max_loan_amount))
+            .input('min_loan_amount', sql.Decimal(18, 2), valueOrNull(data.min_loan_amount))
+            .input('loan_portfolio_amount', sql.Decimal(18, 2), valueOrNull(data.loan_portfolio_amount))
+            .input('loans_amount', sql.Decimal(18, 2), valueOrNull(data.loans_amount))
+            .input('coverage_type_id', sql.Int, valueOrNull(data.coverage_type_id))
             .input('payment_term_id', sql.Int, paymentTerm ? paymentTerm.payment_term_id : null)
             .input('sub_payment_term_id', sql.Int, paymentTerm ? paymentTerm.sub_payment_term_id : null)
             .input('borrower_age_66_70', sql.Bit, data.borrower_age_66_70 || false)
-            .input('borrower_amount_66_70', sql.Decimal(18, 2), data.borrower_amount_66_70 || null)
+            .input('borrower_amount_66_70', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_66_70))
             .input('borrower_age_71_75', sql.Bit, data.borrower_age_71_75 || false)
-            .input('borrower_amount_71_75', sql.Decimal(18, 2), data.borrower_amount_71_75 || null)
+            .input('borrower_amount_71_75', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_71_75))
             .input('borrower_age_76_80', sql.Bit, data.borrower_age_76_80 || false)
-            .input('borrower_amount_76_80', sql.Decimal(18, 2), data.borrower_amount_76_80 || null)
-            .input('borrower_amount_18_65', sql.Decimal(18, 2), data.borrower_amount_18_65 || null)
-            .input('channel_type_id', sql.Int, data.channel_type_id || null)
-            .input('channel_name', sql.NVarChar, data.channel_name || null)
-            .input('channel_number', sql.NVarChar, data.channel_number || null)
-            .input('channel_email', sql.NVarChar, data.channel_email || null)
-            .input('commission_rate', sql.NVarChar, data.commission_rate || null)
-            .input('service_fee', sql.NVarChar, data.service_fee || null)
-            .input('total_annual_premium', sql.Decimal(18, 2), data.total_annual_premium || null)
-            .input('proposal_status_id', sql.Int, data.proposal_status_id || null)
-            .input('notes', sql.NVarChar(sql.MAX), data.notes || null)
-            .input('evidence_notes', sql.NVarChar(sql.MAX), data.evidence_notes || null)
-            .input('expiry_date', sql.DateTime, data.expiry_date || null)
-            .input('excel_file_path', sql.NVarChar(sql.MAX), data.excel_file_path || null)
+            .input('borrower_amount_76_80', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_76_80))
+            .input('borrower_amount_18_65', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_18_65))
+            .input('channel_type_id', sql.Int, valueOrNull(data.channel_type_id))
+            .input('channel_name', sql.NVarChar, valueOrNull(data.channel_name))
+            .input('channel_number', sql.NVarChar, valueOrNull(data.channel_number))
+            .input('channel_email', sql.NVarChar, valueOrNull(data.channel_email))
+            .input('commission_rate', sql.NVarChar, valueOrNull(data.commission_rate))
+            .input('service_fee', sql.NVarChar, valueOrNull(data.service_fee))
+            .input('total_annual_premium', sql.Decimal(18, 2), valueOrNull(data.total_annual_premium))
+            .input('proposal_status_id', sql.Int, valueOrNull(data.proposal_status_id))
+            .input('notes', sql.NVarChar(sql.MAX), valueOrNull(data.notes))
+            .input('evidence_notes', sql.NVarChar(sql.MAX), valueOrNull(data.evidence_notes))
+            .input('expiry_date', sql.DateTime, valueOrNull(data.expiry_date))
+            .input('excel_file_path', sql.NVarChar(sql.MAX), valueOrNull(data.excel_file_path))
             .query(`
                 INSERT INTO DHUB_UAT.sg.financial_insurance_application (
                     user_id, group_name, business_nature, business_nature_id, sub_business_nature_id, number_of_lives, business_address, contact_number, fax_number, email,
@@ -152,8 +154,8 @@ export const createApplication = async (data, userId) => {
                         await new sql.Request(transaction)
                             .input('coverage_ranking_id', sql.Int, rankingId)
                             .input('rider_id', sql.Int, rider.rider_id)
-                            .input('rider_amount', sql.Decimal(18, 2), finalValue.amount || null)
-                            .input('rider_unit', sql.Int, finalValue.unit || null)
+                            .input('rider_amount', sql.Decimal(18, 2), valueOrNull(finalValue.amount))
+                            .input('rider_unit', sql.Int, valueOrNull(finalValue.unit))
                             .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
@@ -207,8 +209,8 @@ export const createApplication = async (data, userId) => {
                 await riderRequest
                     .input('application_id', sql.Int, applicationId)
                     .input('rider_id', sql.Int, rider.rider_id)
-                    .input('rider_amount', sql.Decimal(18, 2), rider.amount || null)
-                    .input('rider_unit', sql.Int, rider.unit || null)
+                    .input('rider_amount', sql.Decimal(18, 2), valueOrNull(rider.amount))
+                    .input('rider_unit', sql.Int, valueOrNull(rider.unit))
                     .query(`
                         INSERT INTO DHUB_UAT.sg.financial_insurance_application_rider
                         (application_id, rider_id, rider_amount, rider_unit)
@@ -705,8 +707,8 @@ export const updateApplication = async (id, data, userId) => {
                         await new sql.Request(transaction)
                             .input('coverage_ranking_id', sql.Int, rankingId)
                             .input('rider_id', sql.Int, rider.rider_id)
-                            .input('rider_amount', sql.Decimal(18, 2), finalValue.amount || null)
-                            .input('rider_unit', sql.Int, finalValue.unit || null)
+                            .input('rider_amount', sql.Decimal(18, 2), valueOrNull(finalValue.amount))
+                            .input('rider_unit', sql.Int, valueOrNull(finalValue.unit))
                             .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
@@ -836,8 +838,8 @@ export const updateApplication = async (id, data, userId) => {
                     await insertRiderRequest
                         .input('application_id', sql.Int, id)
                         .input('rider_id', sql.Int, rider.rider_id)
-                        .input('rider_amount', sql.Decimal(18, 2), rider.amount || null)
-                        .input('rider_unit', sql.Int, rider.unit || null)
+                        .input('rider_amount', sql.Decimal(18, 2), valueOrNull(rider.amount))
+                        .input('rider_unit', sql.Int, valueOrNull(rider.unit))
                         .query(`
                             INSERT INTO DHUB_UAT.sg.financial_insurance_application_rider
                             (application_id, rider_id, rider_amount, rider_unit)
