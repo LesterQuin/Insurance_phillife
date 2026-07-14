@@ -12,6 +12,7 @@ import insuranceDropdownRoutes from './routes/insurance_dropdown/insurance_dropd
 import actuarialRoutes from './routes/actuarial_api/actuarial.routes.js';
 import chatMessageRoutes from './routes/chat_message/chat_message.routes.js';
 import installationRequirementsRoutes from './routes/requirements/installation_requirements.route.js';
+import ebamRoutes from './routes/ebam_api/ebam_api.routes.js';
 import { server, app, corsOptions } from './socket-io/socket_setup.js'; // // Mar: 05/14/2025 added
 
 dotenv.config();
@@ -44,6 +45,8 @@ app.use('/api/actuarial', actuarialRoutes);
 app.use('/api/chat-messages', chatMessageRoutes);
 // Installation requirements routes
 app.use('/api/installation-requirements', installationRequirementsRoutes);
+// EBAM API routes
+app.use('/api/ebam', ebamRoutes);
 
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
