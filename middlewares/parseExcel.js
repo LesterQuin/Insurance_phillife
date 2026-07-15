@@ -102,6 +102,10 @@ export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
         for (const [key, val] of Object.entries(row)) {
             if (val === null || val === undefined || val === '') continue;
 
+            if (typeof val === 'string' && val.trim().toUpperCase() === 'N/A') {
+                continue;
+            }
+
             const normKey = key.trim().toLowerCase();
             let riderSearchKey = normKey;
             if (normKey.startsWith('rider_')) {
@@ -270,6 +274,7 @@ export const parseExcelRatesMiddleware = async (req, res, next) => {
             ...ratesData,
             application_id: parseInt(applicationId, 10)
         };
+        req.isExcelUpload = true;
 
         next();
     } catch (err) {

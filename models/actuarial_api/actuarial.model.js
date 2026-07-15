@@ -1,7 +1,22 @@
 import { poolPromise, sql } from '../../config/db.js';
 
+// Helper to log application actions
+const logApplicationAction = async (transaction, { applicationId, userId, actionType, changes, ipAddress }) => {
+    const request = new sql.Request(transaction);
+    await request
+        .input('application_id', sql.Int, applicationId)
+        .input('user_id', sql.Int, userId)
+        .input('action_type', sql.NVarChar, actionType)
+        .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(changes))
+        .input('ip_address', sql.NVarChar, ipAddress || null)
+        .query(`
+            INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+            VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
+        `);
+};
+
 // Save application rates to the normalized table
-export const saveApplicationRates = async (applicationId, ratesData, userId) => {
+export const saveApplicationRates = async (applicationId, ratesData, userId, ipAddress = null, diff = []) => {
     const pool = await poolPromise;
     const transaction = new sql.Transaction(pool);
     try {
@@ -125,6 +140,17 @@ export const saveApplicationRates = async (applicationId, ratesData, userId) => 
             }
         }
 
+        // Log the rates change action
+        if (diff && diff.length > 0) {
+            await logApplicationAction(transaction, {
+                applicationId,
+                userId,
+                actionType: 'UPDATE_RATES',
+                changes: diff,
+                ipAddress
+            });
+        }
+
         await transaction.commit();
         return true;
     } catch (err) {
@@ -210,4 +236,70 @@ export const getApplicationsPendingTotalPremium = async () => {
             ORDER BY fia.created_at ASC
         `);
     return result.recordset ?? [];
+};
+
+// Get rate change history logs for all applications matching the same company name
+export const getRatesHistoryByApplicationId = async (applicationId) => {
+    const pool = await poolPromise;
+    
+    // 1. Get the group name of the current application
+    const appRes = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query('SELECT group_name FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @application_id');
+        
+    const groupName = appRes.recordset[0]?.group_name;
+    if (!groupName) return [];
+
+    // 2. Fetch all rate log entries for all applications sharing the same group name
+    const result = await pool.request()
+        .input('group_name', sql.NVarChar, groupName)
+        .query(`
+            SELECT 
+                l.log_id, 
+                l.application_id, 
+                l.user_id, 
+                l.action_type, 
+                l.changes, 
+                l.ip_address, 
+                l.created_at,
+                u.firstname, 
+                u.lastname, 
+                u.email,
+                fia.group_name
+            FROM DHUB_UAT.sg.financial_insurance_application_history_logs l
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON l.user_id = u.user_id
+            JOIN DHUB_UAT.sg.financial_insurance_application fia ON l.application_id = fia.application_id
+            WHERE l.action_type = 'UPDATE_RATES'
+              AND REPLACE(UPPER(fia.group_name), ' ', '') = REPLACE(UPPER(@group_name), ' ', '')
+            ORDER BY l.created_at DESC
+        `);
+
+    return result.recordset.map(row => {
+        let parsedRates = null;
+        try {
+            parsedRates = row.changes ? JSON.parse(row.changes) : null;
+        } catch (e) {
+            parsedRates = row.changes;
+        }
+
+        const dateObj = new Date(row.created_at);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+        const formattedTime = dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'UTC' });
+
+        return {
+            log_id: row.log_id,
+            application_id: row.application_id,
+            group_name: row.group_name,
+            created_at: row.created_at,
+            change_date: formattedDate,
+            change_time: formattedTime,
+            ip_address: row.ip_address,
+            user: {
+                id: row.user_id,
+                name: [row.firstname, row.lastname].filter(Boolean).join(' '),
+                email: row.email
+            },
+            rates: parsedRates
+        };
+    }) ?? [];
 };

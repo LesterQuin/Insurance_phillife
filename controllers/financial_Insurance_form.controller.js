@@ -51,7 +51,7 @@ export const createApplication = async (req, res) => {
             dataToSave.status_id = STATUS_BOOKED;
             const oneYearLater = new Date();
             // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-            oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+            oneYearLater.setDate(oneYearLater.getDate() + 8); // Testing: Valid for 8 days
             dataToSave.expiry_date = oneYearLater;
         } else {
             dataToSave.status_id = STATUS_PENDING;
@@ -183,7 +183,7 @@ export const updateApplicationStatus = async (req, res) => {
         if (Number(status_id) === 7) { // Booked: Policy is valid for 1 year
             const oneYearLater = new Date();
             // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1); 
-            oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+            oneYearLater.setDate(oneYearLater.getDate() + 8); // Testing: Valid for 8 days
             req.body.expiry_date = oneYearLater;
         } else if (Number(status_id) === 6) { // Closed: Proposal expired today
             req.body.expiry_date = new Date();
@@ -239,8 +239,9 @@ export const updateApplicationStatus = async (req, res) => {
                 }
             }
 
-            // Validity Check: Use stored expiry_date if available (e.g., from an extension), otherwise default to 30 days from creation
-            const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+            // Validity Check: Use stored expiry_date if available (e.g., from an extension), otherwise default to 8 days from creation
+            // const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000); // Production: default to 30 days
+            const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 8 * 24 * 60 * 60 * 1000);
             if (!canBypass && new Date() > expiryDate) {
                 return error(res, `Proposal expired on ${expiryDate.toLocaleDateString()}. Cannot Book.`, 400);
             }
@@ -395,8 +396,9 @@ export const approveExtension = async (req, res) => {
             return error(res, 'This application does not have a pending extension request.', 400);
         }
 
-        // Calculate new expiry: Current expiry + 30 days
-        const currentExpiry = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+        // Calculate new expiry: Current expiry + 8 days
+        // const currentExpiry = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000); // Production: default to 30 days
+        const currentExpiry = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 8 * 24 * 60 * 60 * 1000);
         const newExpiry = new Date(currentExpiry);
         newExpiry.setDate(newExpiry.getDate() + 30);
 
@@ -491,7 +493,8 @@ export const notifyExpiringProposals = async (req, res) => {
 
             const createdAt = new Date(app.created_at);
             const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(createdAt);
-            if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30);
+            // if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30); // Production: default to 30 days
+            if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 8); // Testing: Valid for 8 days
 
             const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
 
@@ -1388,7 +1391,7 @@ export const updateApplication = async (req, res) => {
                 updateData.status_id = STATUS_BOOKED;
                 const oneYearLater = new Date();
                 // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-                oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+                oneYearLater.setDate(oneYearLater.getDate() + 8); // Testing: Valid for 8 days
                 updateData.expiry_date = oneYearLater;
             } else {
                 updateData.status_id = STATUS_PENDING;
@@ -1623,7 +1626,7 @@ export const setStatusApproved = async (req, res) => {
 
         const oneYearLater = new Date();
         // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-        oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+        oneYearLater.setDate(oneYearLater.getDate() + 8); // Testing: Valid for 8 days
         const updated = await Model.updateApplication(appId, { status_id: STATUS_BOOKED, expiry_date: oneYearLater }, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
@@ -1680,8 +1683,9 @@ export const setStatusBooked = async (req, res) => {
         }
 
         // 3. Expiry Check
-        // Use stored expiry_date if available (e.g., from an extension), otherwise default to 30 days from creation
-        const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000);
+        // Use stored expiry_date if available (e.g., from an extension), otherwise default to 8 days from creation
+        // const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 30 * 24 * 60 * 60 * 1000); // Production: default to 30 days
+        const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(new Date(app.created_at).getTime() + 8 * 24 * 60 * 60 * 1000);
         if (!canBypass && new Date() > expiryDate) {
             return error(res, `Action Denied: This proposal expired on ${expiryDate.toLocaleDateString()}. You cannot book an expired proposal.`, 400);
         }
@@ -1689,7 +1693,7 @@ export const setStatusBooked = async (req, res) => {
         // 4. Update Status (Status ID 7)
         const oneYearLater = new Date();
         // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-        oneYearLater.setDate(oneYearLater.getDate() + 1); // Testing: Valid for 1 day
+        oneYearLater.setDate(oneYearLater.getDate() + 8); // Testing: Valid for 8 days
         const updated = await Model.updateApplication(appId, { status_id: STATUS_BOOKED, expiry_date: oneYearLater }, userId);
         
         // 4. Return updated data (the validity object will now show as stopped)

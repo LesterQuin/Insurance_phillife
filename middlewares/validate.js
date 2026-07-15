@@ -1324,6 +1324,41 @@ body('basic_plan_id')
         .optional({ nullable: true })
         .isString().withMessage('Notes must be a string'),
 
+    body('affiliates')
+        .optional({ nullable: true })
+        .isArray().withMessage('affiliates must be an array of objects')
+        .custom((affiliates) => {
+            if (!affiliates) return true;
+            for (const affiliate of affiliates) {
+                if (typeof affiliate !== 'object' || affiliate === null) {
+                    throw new Error('Each affiliate item must be an object');
+                }
+                if (!affiliate.company_name || typeof affiliate.company_name !== 'string' || affiliate.company_name.trim() === '') {
+                    throw new Error('company_name is required for each affiliate and must be a non-empty string');
+                }
+                if (affiliate.company_name.length > 255) {
+                    throw new Error('company_name must not exceed 255 characters');
+                }
+                if (affiliate.tin_number !== undefined && affiliate.tin_number !== null) {
+                    if (typeof affiliate.tin_number !== 'string' && typeof affiliate.tin_number !== 'number') {
+                        throw new Error('tin_number must be a string or number');
+                    }
+                    if (affiliate.tin_number.toString().length > 50) {
+                        throw new Error('tin_number must not exceed 50 characters');
+                    }
+                }
+                if (affiliate.address !== undefined && affiliate.address !== null) {
+                    if (typeof affiliate.address !== 'string') {
+                        throw new Error('address must be a string');
+                    }
+                    if (affiliate.address.length > 500) {
+                        throw new Error('address must not exceed 500 characters');
+                    }
+                }
+            }
+            return true;
+        }),
+
     // Validation result
     (req, res, next) => {
         const errors = validationResult(req);
@@ -2520,6 +2555,41 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
     body('notes')
         .optional({ nullable: true })
         .isString().withMessage('Notes must be a string'),
+
+    body('affiliates')
+        .optional({ nullable: true })
+        .isArray().withMessage('affiliates must be an array of objects')
+        .custom((affiliates) => {
+            if (!affiliates) return true;
+            for (const affiliate of affiliates) {
+                if (typeof affiliate !== 'object' || affiliate === null) {
+                    throw new Error('Each affiliate item must be an object');
+                }
+                if (!affiliate.company_name || typeof affiliate.company_name !== 'string' || affiliate.company_name.trim() === '') {
+                    throw new Error('company_name is required for each affiliate and must be a non-empty string');
+                }
+                if (affiliate.company_name.length > 255) {
+                    throw new Error('company_name must not exceed 255 characters');
+                }
+                if (affiliate.tin_number !== undefined && affiliate.tin_number !== null) {
+                    if (typeof affiliate.tin_number !== 'string' && typeof affiliate.tin_number !== 'number') {
+                        throw new Error('tin_number must be a string or number');
+                    }
+                    if (affiliate.tin_number.toString().length > 50) {
+                        throw new Error('tin_number must not exceed 50 characters');
+                    }
+                }
+                if (affiliate.address !== undefined && affiliate.address !== null) {
+                    if (typeof affiliate.address !== 'string') {
+                        throw new Error('address must be a string');
+                    }
+                    if (affiliate.address.length > 500) {
+                        throw new Error('address must not exceed 500 characters');
+                    }
+                }
+            }
+            return true;
+        }),
 
     // Validation result
     (req, res, next) => {

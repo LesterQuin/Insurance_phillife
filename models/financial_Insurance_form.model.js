@@ -219,6 +219,23 @@ export const createApplication = async (data, userId) => {
             }
         }
 
+        // Insert affiliates if applicable
+        if (data.affiliates && Array.isArray(data.affiliates) && data.affiliates.length > 0) {
+            for (const affiliate of data.affiliates) {
+                if (affiliate.company_name) {
+                    await new sql.Request(transaction)
+                        .input('application_id', sql.Int, applicationId)
+                        .input('company_name', sql.NVarChar(255), affiliate.company_name)
+                        .input('tin_number', sql.NVarChar(50), valueOrNull(affiliate.tin_number))
+                        .input('address', sql.NVarChar(500), valueOrNull(affiliate.address))
+                        .query(`
+                            INSERT INTO DHUB_UAT.sg.financial_insurance_application_affiliate (application_id, company_name, tin_number, address)
+                            VALUES (@application_id, @company_name, @tin_number, @address);
+                        `);
+                }
+            }
+        }
+
         await transaction.commit();
         return { application_id: applicationId };
     } catch (err) {
@@ -343,6 +360,8 @@ export const getAllApplications = async (userId = null) => {
                 fia.proposal_status_id,
                 fia.channel_type_id,
                 fia.channel_name,
+                fia.channel_number,
+                fia.channel_email,
                 fia.commission_rate,
                 fia.service_fee,
                 fia.total_annual_premium,
@@ -499,6 +518,8 @@ export const getPrototypes = async (userId = null) => {
                 fia.proposal_status_id,
                 fia.channel_type_id,
                 fia.channel_name,
+                fia.channel_number,
+                fia.channel_email,
                 fia.commission_rate,
                 fia.service_fee,
                 fia.total_annual_premium,
@@ -845,6 +866,31 @@ export const updateApplication = async (id, data, userId) => {
                             (application_id, rider_id, rider_amount, rider_unit)
                             VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
                         `);
+                }
+            }
+        }
+
+        // Handle affiliates update
+        if (data.affiliates !== undefined) {
+            const deleteAffiliatesRequest = new sql.Request(transaction);
+            await deleteAffiliatesRequest
+                .input('application_id', sql.Int, id)
+                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_affiliate WHERE application_id = @application_id');
+            
+            if (data.affiliates && Array.isArray(data.affiliates) && data.affiliates.length > 0) {
+                for (const affiliate of data.affiliates) {
+                    if (affiliate.company_name) {
+                        const insertAffiliateRequest = new sql.Request(transaction);
+                        await insertAffiliateRequest
+                            .input('application_id', sql.Int, id)
+                            .input('company_name', sql.NVarChar(255), affiliate.company_name)
+                            .input('tin_number', sql.NVarChar(50), valueOrNull(affiliate.tin_number))
+                            .input('address', sql.NVarChar(500), valueOrNull(affiliate.address))
+                            .query(`
+                                INSERT INTO DHUB_UAT.sg.financial_insurance_application_affiliate (application_id, company_name, tin_number, address)
+                                VALUES (@application_id, @company_name, @tin_number, @address);
+                            `);
+                    }
                 }
             }
         }
@@ -1249,6 +1295,39 @@ export const getBulkApplicationRiders = async (applicationIds) => {
         FROM DHUB_UAT.sg.financial_insurance_application_rider ar
         JOIN DHUB_UAT.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
         WHERE ar.application_id IN (${idParams})
+    `);
+    return result.recordset ?? [];
+};
+
+// Get affiliates for a single application
+export const getApplicationAffiliates = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT id, company_name, tin_number, address 
+            FROM DHUB_UAT.sg.financial_insurance_application_affiliate 
+            WHERE application_id = @application_id
+        `);
+    return result.recordset ?? [];
+};
+
+// Get affiliates for multiple applications in bulk
+export const getBulkApplicationAffiliates = async (applicationIds) => {
+    if (!applicationIds || applicationIds.length === 0) return [];
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    const idParams = applicationIds.map((id, i) => {
+        const paramName = `appId${i}`;
+        request.input(paramName, sql.Int, id);
+        return `@${paramName}`;
+    }).join(',');
+
+    const result = await request.query(`
+        SELECT id, application_id, company_name, tin_number, address
+        FROM DHUB_UAT.sg.financial_insurance_application_affiliate
+        WHERE application_id IN (${idParams})
     `);
     return result.recordset ?? [];
 };

@@ -446,14 +446,16 @@ export const buildApplicationResponse = async (app) => {
     const rankings = await Model.getCoverageRankingsByAppId(app.application_id);
     const rankingRiders = await Model.getCoverageRankingRiders(app.application_id);
     const ratesRows = await ActuarialModel.getApplicationRates(app.application_id);
+    const affiliates = await Model.getApplicationAffiliates(app.application_id);
     const planId = Number(app.plan_id);
     const STATUS_BOOKED = 7;
     const STATUS_CLOSED = 6;
 
-    // Countdown Logic: Prioritizes explicit expiry_date, otherwise defaults to 30 days from creation
+    // Countdown Logic: Prioritizes explicit expiry_date, otherwise defaults to 8 days from creation
     const createdAt = new Date(app.created_at);
     const expiryDate = app.expiry_date ? new Date(app.expiry_date) : new Date(createdAt);
-    if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30);
+    // if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30); // Production: default to 30 days
+    if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 8); // Testing: default to 8 days
     
     const now = new Date();
     // Ensure 'now' isn't before 'createdAt' to avoid 31-day race conditions during creation
@@ -493,7 +495,7 @@ export const buildApplicationResponse = async (app) => {
         group_type_id, group_type_name, other_group_type,
         payment_mode_id, payment_mode_name,
         coverage_type_id, coverage_type_name,
-        channel_type_id, channel_type_name, channel_name,
+        channel_type_id, channel_type_name, channel_name, channel_number, channel_email,
         business_nature_name, sub_business_nature_name,
         proposal_status_id, proposal_status_name,
         type_of_proposal_id, type_of_proposal_name,
@@ -566,7 +568,9 @@ export const buildApplicationResponse = async (app) => {
         channel_type: {
             id: channel_type_id,
             name: channel_type_name,
-            channel_name: channel_name || null
+            channel_name: channel_name || null,
+            channel_number: channel_number || null,
+            channel_email: channel_email || null
         },
         business_nature: app.business_nature_id ? {
             id: app.business_nature_id,
@@ -577,6 +581,7 @@ export const buildApplicationResponse = async (app) => {
             } : null
         } : null,
         sub_group_types: subGroupTypes,
+        affiliates: affiliates,
         payment: paymentTermsRaw.map(p => ({ 
             payment_term: { id: p.payment_term_id, name: p.payment_term_name }, 
             sub_payment_term: { id: p.sub_payment_term_id, name: p.sub_payment_term_name || p.sub_payment_term_id?.toString() } 
@@ -714,7 +719,7 @@ export const generateProposalHtml = async (id) => {
 };
 
 // Helper for unified PDF generation logic
-export const generatePDFBuffer = async (htmlContent) => {
+export const generatePDFBuffer = async (htmlContent, options = {}) => {
     let browser;
     try {
         browser = await puppeteer.launch({
@@ -740,10 +745,19 @@ export const generatePDFBuffer = async (htmlContent) => {
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
+        const displayHeaderFooter = options.displayHeaderFooter !== false;
+
+        const margins = options.margin || {
+            top: '20mm',
+            bottom: '20mm',
+            left: '0mm',
+            right: '0mm'
+        };
+
         return await page.pdf({ 
             format: 'A4', 
             printBackground: true,
-            displayHeaderFooter: true,
+            displayHeaderFooter,
             headerTemplate: '<div></div>',
             footerTemplate: `
                 <div style="
@@ -755,14 +769,62 @@ export const generatePDFBuffer = async (htmlContent) => {
                 ">
                     Page <span class="pageNumber"></span>
                 </div>`,
-            margin: {
-                top: '20mm',
-                bottom: '20mm',
-                left: '0mm',
-                right: '0mm'
-            }
+            margin: margins
         });
     } finally {
         if (browser) await browser.close();
     }
+};
+
+// Generate COC letter HTML
+export const generateCOCHtml = async (id) => {
+    const appData = await Model.getApplicationById(id);
+    if (!appData) throw new Error("Application not found.");
+    
+    const riders = await Model.getApplicationRiders(id);
+    const planId = Number(appData.plan_id);
+    let user = appData.user_id ? await User.getUserById(appData.user_id) : { firstname: 'Phillife', lastname: 'Representative' };
+
+    const rankings = await Model.getCoverageRankingsByAppId(id);
+    const rankingRiders = await Model.getCoverageRankingRiders(id);
+
+    if ((appData.coverage_type_id === 32 || appData.coverage_type_id === 34) && rankingRiders.length > 0) {
+        riders.forEach(mainRider => {
+            const riderValues = rankingRiders.filter(rr => rr.rider_id === mainRider.rider_id).map(rr => ({ designation: rr.designation, acronym: rr.acronym, amount: rr.rider_amount, unit: rr.rider_unit }));
+            if (riderValues.length > 0) mainRider.values = riderValues;
+        });
+    }
+
+    const levelRanking = appData.coverage_type_id === 32 ? rankings.map(({ salary_multiplier, uniform_coverage_amount, ...rest }) => rest) : null;
+    const salaryRanking = appData.coverage_type_id === 34 ? rankings.map(({ uniform_coverage_amount, ...rest }) => rest) : null;
+
+    const application = { 
+        ...appData, 
+        riders,
+        level_ranking: levelRanking,
+        salary_ranking: salaryRanking,
+        uniform_coverage_amount: appData.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
+        status: { id: appData.status_id, name: appData.status_name || 'Pending' },
+        plan: { id: appData.plan_id, name: appData.plan_name && appData.plan_acronym ? `${appData.plan_name} (${appData.plan_acronym})` : appData.plan_name, acronym: appData.plan_acronym || null },
+        basic_plan: { 
+            id: appData.basic_plan_id, 
+            name: appData.basic_plan_name 
+                ? (appData.basic_plan_acronym ? `${appData.basic_plan_name} (${appData.basic_plan_acronym})` : appData.basic_plan_name)
+                : (appData.prototype_plan_name && appData.prototype_plan_acronym 
+                    ? `${appData.prototype_plan_name} (${appData.prototype_plan_acronym})` 
+                    : (appData.prototype_plan_name || 'N/A')),
+            acronym: appData.basic_plan_acronym || appData.prototype_plan_acronym || null
+        },
+        group_type: {
+            id: appData.group_type_id,
+            name: appData.group_type_name
+        }
+    };
+
+    const details = {
+        logoDataUri: getImageDataUri('img/phillife-logo-hd.png')
+    };
+
+    const { generateCOCTemplate } = await import('../templates/coc/cocTemplate.js');
+    return generateCOCTemplate(application, user, details);
 };

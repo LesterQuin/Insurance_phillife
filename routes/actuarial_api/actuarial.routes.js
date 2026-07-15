@@ -13,9 +13,10 @@ router.post('/rates/:id', authenticate, isActuarial, validateRates, Controller.s
 router.put('/rates/:id', authenticate, isActuarial, validateRates, Controller.saveRates);
 
 // Excel template download & upload for actuarial rates
-router.get('/rates/:id/download-template', Controller.downloadRatesTemplate); // new API
+router.get('/rates/:id/download-template', authenticate, isActuarial, Controller.downloadRatesTemplate); // new API
+router.get('/rates/:id/history', authenticate, isActuarial, Controller.getRatesHistory); // new API super admin
 router.post('/rates/:id/upload-excel', authenticate, isActuarial, parseMultipartForm, parseExcelRatesMiddleware, validateRates, Controller.saveRates); // new API
-router.post('/rates/:id/parse-excel', authenticate, isActuarial, parseMultipartForm, parseExcelRatesMiddleware, validateRates, Controller.parseRatesOnly); // new API
+router.post('/rates/:id/parse-excel', authenticate, isActuarial, parseMultipartForm, parseExcelRatesMiddleware, validateRates, Controller.parseRatesOnly); // new API not using 
 
 // API to input evidence of insurability notes (Section 5)
 router.post('/evidence-notes/:id', authenticate, isActuarial, validateEvidenceNotes, Controller.saveEvidenceNotes);

@@ -3,9 +3,118 @@ import * as ActuarialModel from '../../models/actuarial_api/actuarial.model.js';
 import * as User from '../../models/user/user_model.js';
 import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
-import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus } from '../../middlewares/helper.js';
+import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus, formatDbRatesForTemplate } from '../../middlewares/helper.js';
 import { io } from '../../socket-io/socket_setup.js';
-import XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
+
+const compareRiderArrays = (oldRiders, newRiders, pathLabel) => {
+    const changes = [];
+    const formatVal = (v) => {
+        if (v === null || v === undefined || v === '') return '0.000';
+        const num = parseFloat(String(v).replace(/,/g, ''));
+        return isNaN(num) ? String(v) : num.toFixed(3);
+    };
+
+    const oldMap = {};
+    oldRiders.forEach(r => { if (r.rider_id) oldMap[r.rider_id] = r; });
+    const newMap = {};
+    newRiders.forEach(r => { if (r.rider_id) newMap[r.rider_id] = r; });
+
+    const allRiderIds = new Set([...Object.keys(oldMap), ...Object.keys(newMap)]);
+
+    allRiderIds.forEach(rId => {
+        const oldR = oldMap[rId] || {};
+        const newR = newMap[rId] || {};
+
+        const oldRate = formatVal(oldR.rider_rate || oldR.rate || '0');
+        const newRate = formatVal(newR.rider_rate || newR.rate || '0');
+
+        const acronym = newR.acronym || oldR.acronym || `Rider ID ${rId}`;
+
+        if (oldRate !== newRate) {
+            changes.push(`${pathLabel} Rider ${acronym}: ${oldRate} -> ${newRate}`);
+        }
+    });
+
+    return changes;
+};
+
+const compareRates = (oldData, newData, planId) => {
+    const diff = [];
+    const brackets = ['18-65', '66-70', '71-75', '76-80'];
+
+    const formatVal = (v) => {
+        if (v === null || v === undefined || v === '') return '0.000';
+        const num = parseFloat(String(v).replace(/,/g, ''));
+        return isNaN(num) ? String(v) : num.toFixed(3);
+    };
+
+    brackets.forEach(bracket => {
+        const oldBr = oldData[bracket] || {};
+        const newBr = newData[bracket] || newData[bracket === '18-65' ? '18-64' : ''] || {};
+
+        // Compare keys (like 'basic_plan', 'rates', 'age_35', etc.)
+        const allKeys = new Set([
+            ...Object.keys(oldBr).filter(k => k !== 'basic_plan_id' && k !== 'basic_plan_name' && k !== 'basic_plan_acronym'),
+            ...Object.keys(newBr).filter(k => k !== 'basic_plan_id' && k !== 'basic_plan_name' && k !== 'basic_plan_acronym')
+        ]);
+
+        allKeys.forEach(key => {
+            const oldItems = Array.isArray(oldBr[key]) ? oldBr[key] : [];
+            const newItems = Array.isArray(newBr[key]) ? newBr[key] : [];
+
+            // GCLI (Plan 1) has arrays of months
+            if (planId === 1) {
+                // Map by month
+                const oldByMonth = {};
+                oldItems.forEach(item => { oldByMonth[item.term_of_months] = item; });
+                const newByMonth = {};
+                newItems.forEach(item => { newByMonth[item.term_of_months] = item; });
+
+                const allMonths = new Set([...Object.keys(oldByMonth), ...Object.keys(newByMonth)].map(Number).sort((a, b) => a - b));
+                allMonths.forEach(m => {
+                    const oldItem = oldByMonth[m] || {};
+                    const newItem = newByMonth[m] || {};
+
+                    const oldBasic = formatVal(oldItem.basic_rate || oldItem.rate || '0');
+                    const newBasic = formatVal(newItem.basic_rate || newItem.rate || '0');
+
+                    if (oldBasic !== newBasic) {
+                        diff.push(`[${bracket}] ${key} Month ${m} Basic Rate: ${oldBasic} -> ${newBasic}`);
+                    }
+
+                    // Compare riders
+                    const oldRiders = Array.isArray(oldItem.riders) ? oldItem.riders : [];
+                    const newRiders = Array.isArray(newItem.riders) ? newItem.riders : [];
+                    compareRiderArrays(oldRiders, newRiders, `[${bracket}] ${key} Month ${m}`).forEach(c => diff.push(c));
+                });
+            } else {
+                // GYRT/GPA (Plan 2/3) - items in array (usually 1 item per age/band key)
+                const maxLength = Math.max(oldItems.length, newItems.length);
+                for (let idx = 0; idx < maxLength; idx++) {
+                    const oldItem = oldItems[idx] || {};
+                    const newItem = newItems[idx] || {};
+
+                    const oldBasic = formatVal(oldItem.basic_rate || oldItem.rate || '0');
+                    const newBasic = formatVal(newItem.basic_rate || newItem.rate || '0');
+
+                    const label = key.startsWith('age_') ? `Age ${key.replace('age_', '').replace('_', '-')}` : key;
+
+                    if (oldBasic !== newBasic) {
+                        diff.push(`[${bracket}] ${label} Basic Rate: ${oldBasic} -> ${newBasic}`);
+                    }
+
+                    // Compare riders
+                    const oldRiders = Array.isArray(oldItem.riders) ? oldItem.riders : [];
+                    const newRiders = Array.isArray(newItem.riders) ? newItem.riders : [];
+                    compareRiderArrays(oldRiders, newRiders, `[${bracket}] ${label}`).forEach(c => diff.push(c));
+                }
+            }
+        });
+    });
+
+    return diff;
+};
 
 export const saveRates = async (req, res) => {
     try {
@@ -16,15 +125,26 @@ export const saveRates = async (req, res) => {
         const existingApplication = await MainModel.getApplicationById(application_id);
         if (!existingApplication) return error(res, 'Application not found', 404);
 
-        // Prevent multiple POST submissions if rates already exist
-        if (req.method === 'POST') {
-            const existingRates = await ActuarialModel.getApplicationRates(application_id);
+        const existingRates = await ActuarialModel.getApplicationRates(application_id);
+
+        // Prevent multiple POST submissions if rates already exist (except for Excel uploads)
+        if (req.method === 'POST' && !req.isExcelUpload) {
             if (existingRates && existingRates.length > 0) {
                 return error(res, 'Rates have already been defined for this application. Please use the PUT method to update existing rates.', 400);
             }
         }
 
-        await ActuarialModel.saveApplicationRates(application_id, ratesData, userId);
+        const planId = Number(existingApplication.plan_id);
+        const oldRatesFormatted = {
+            "18-65": formatDbRatesForTemplate(existingRates, '18_65', planId, existingApplication),
+            "66-70": formatDbRatesForTemplate(existingRates, '66_70', planId, existingApplication),
+            "71-75": formatDbRatesForTemplate(existingRates, '71_75', planId, existingApplication),
+            "76-80": formatDbRatesForTemplate(existingRates, '76_80', planId, existingApplication)
+        };
+
+        const diff = compareRates(oldRatesFormatted, ratesData, planId);
+
+        await ActuarialModel.saveApplicationRates(application_id, ratesData, userId, req.ip, diff);
 
         await updateActuarialStatus(application_id, userId);
         
@@ -238,10 +358,15 @@ export const downloadRatesTemplate = async (req, res) => {
         const app = await MainModel.getApplicationById(applicationId);
         if (!app) return error(res, 'Application not found', 404);
 
+        if (Number(app.type_of_proposal_id) === 30) {
+            return error(res, 'Rates templates can only be downloaded for customized proposals and not for in prototype proposals.', 400);
+        }
+
         const planId = Number(app.plan_id);
         const numLives = Number(app.number_of_lives);
 
         const selectedRiders = await MainModel.getApplicationRiders(applicationId);
+        const existingRates = await ActuarialModel.getApplicationRates(applicationId);
 
         const basicHeader = app.basic_plan_name || 'Base Premium Rate';
 
@@ -257,6 +382,73 @@ export const downloadRatesTemplate = async (req, res) => {
             columns.push(`Rider_${acronym.trim()}`);
         });
 
+        // Helper to find existing rate from DB to prefill the Excel sheet
+        const findExistingRate = (bracket, ageOrBand, term, riderId) => {
+            if (!existingRates || existingRates.length === 0) return '';
+
+            const isBase = bracket === '18-65';
+            
+            // For GCLI base bracket, basic rate and rider rates are split into separate rows in template
+            if (planId === 1 && isBase) {
+                if (ageOrBand === 'basic_plan' && riderId !== null) return '';
+                if (ageOrBand === 'rates' && riderId === null) return '';
+            }
+
+            const matchedRow = existingRates.find(row => {
+                // 1. Bracket check
+                const rowCat = (row.borrower_category || '').replace(/[-_]/g, '');
+                const targetCat = bracket.replace(/[-_]/g, '');
+                if (rowCat !== targetCat) return false;
+
+                // 2. Basic vs Rider check
+                const isBasicQuery = riderId === null || riderId === 0 || riderId === '0';
+                const isRowBasic = row.rider_id === null || row.rider_id === 0 || row.rider_id === '0';
+                if (isBasicQuery !== isRowBasic) return false;
+                if (!isBasicQuery) {
+                    if (String(row.rider_id) !== String(riderId)) return false;
+                }
+
+                // 3. Plan-specific checks
+                if (planId === 1) { // GCLI
+                    // Check term
+                    if (Number(row.term_months) !== Number(term)) return false;
+                    
+                    if (isBase) {
+                        return true; // Category, basic/rider, and term already matched
+                    } else {
+                        // Senior bracket: attained age check
+                        const ageNum = parseInt(ageOrBand.replace('age_', ''), 10);
+                        return Number(row.attained_age) === ageNum;
+                    }
+                } else { // GYRT/GPA
+                    // Check attained age / band
+                    if (ageOrBand === 'rates') {
+                        const isRowRates = !row.attained_age && (!row.age_band || row.age_band.toLowerCase() === 'rates' || row.age_band.toLowerCase() === 'basic');
+                        return isRowRates;
+                    } else if (ageOrBand.startsWith('age_')) {
+                        const ageNum = parseInt(ageOrBand.replace('age_', ''), 10);
+                        return Number(row.attained_age) === ageNum;
+                    } else {
+                        // Age band (e.g. '18-24', '25-29')
+                        const normalizedBand = ageOrBand.replace(/[\s_()/-]+/g, '');
+                        const normalizedRowBand = (row.age_band || '').replace(/[\s_()/-]+/g, '');
+                        return normalizedBand === normalizedRowBand;
+                    }
+                }
+            });
+
+            if (matchedRow) {
+                const val = matchedRow.premium_rate !== null && matchedRow.premium_rate !== undefined 
+                    ? matchedRow.premium_rate 
+                    : matchedRow.premium_amount;
+                if (val !== null && val !== undefined) {
+                    const num = parseFloat(String(val).replace(/,/g, ''));
+                    return isNaN(num) ? String(val) : num.toFixed(3);
+                }
+            }
+            return '';
+        };
+
         const rows = [];
 
         // Helper to add a row
@@ -268,10 +460,24 @@ export const downloadRatesTemplate = async (req, res) => {
             if (planId === 1) {
                 row['Loan Term (Months)'] = term;
             }
-            row[basicHeader] = ''; // Pre-fill blank for rate input
+            row[basicHeader] = findExistingRate(bracket, ageOrBand, term, null);
+            
+            const isSeniorBracket = bracket !== '18-65';
             selectedRiders.forEach(r => {
                 const acronym = r.acronym || `Rider_${r.rider_id}`;
-                row[`Rider_${acronym.trim()}`] = '';
+                const colName = `Rider_${acronym.trim()}`;
+                
+                if (isSeniorBracket) {
+                    // For senior brackets, only allow ALCR (rider_id 10) to be editable in GYRT (plan_id 2).
+                    // GCLI (plan_id 1) senior brackets don't allow riders at all.
+                    if (planId === 2 && r.rider_id.toString() === '10') {
+                        row[colName] = findExistingRate(bracket, ageOrBand, term, r.rider_id);
+                    } else {
+                        row[colName] = 'N/A';
+                    }
+                } else {
+                    row[colName] = findExistingRate(bracket, ageOrBand, term, r.rider_id);
+                }
             });
             rows.push(row);
         };
@@ -340,6 +546,45 @@ export const downloadRatesTemplate = async (req, res) => {
 
         // Generate worksheet and workbook using XLSX
         const worksheet = XLSX.utils.json_to_sheet(rows, { header: columns });
+
+        // Helper to convert column index to letter (0 -> A, 1 -> B, ...)
+        const getColumnLetter = (colIdx) => {
+            let letter = '';
+            let temp = colIdx;
+            while (temp >= 0) {
+                letter = String.fromCharCode((temp % 26) + 65) + letter;
+                temp = Math.floor(temp / 26) - 1;
+            }
+            return letter;
+        };
+
+        // Identify input column letters (basicHeader column and all columns starting with Rider_)
+        const inputColLetters = [];
+        columns.forEach((col, idx) => {
+            if (col === basicHeader || col.startsWith('Rider_')) {
+                inputColLetters.push(getColumnLetter(idx));
+            }
+        });
+
+        // Apply borders to cells that require input (non-'N/A' cells in data rows)
+        // Rows in worksheet are 1-indexed. Row 1 is header, data rows start at row 2.
+        for (let rIdx = 2; rIdx <= rows.length + 1; rIdx++) {
+            inputColLetters.forEach(colLetter => {
+                const cellKey = `${colLetter}${rIdx}`;
+                const cell = worksheet[cellKey];
+                if (cell && cell.v !== 'N/A') {
+                    cell.s = {
+                        border: {
+                            top: { style: 'medium', color: { rgb: '000000' } },
+                            bottom: { style: 'medium', color: { rgb: '000000' } },
+                            left: { style: 'medium', color: { rgb: '000000' } },
+                            right: { style: 'medium', color: { rgb: '000000' } }
+                        }
+                    };
+                }
+            });
+        }
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'Rates');
 
@@ -384,6 +629,17 @@ export const parseRatesOnly = async (req, res) => {
         return success(res, req.body, 'Excel template parsed successfully.');
     } catch (err) {
         console.error('Parse Excel Error:', err);
+        return error(res, err.message);
+    }
+};
+
+export const getRatesHistory = async (req, res) => {
+    try {
+        const applicationId = req.params.id;
+        const history = await ActuarialModel.getRatesHistoryByApplicationId(applicationId);
+        return success(res, history, 'Rates history fetched successfully.');
+    } catch (err) {
+        console.error('Get Rates History Error:', err);
         return error(res, err.message);
     }
 };
