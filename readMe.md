@@ -27,6 +27,19 @@ You can run this application inside a Docker container. This automatically confi
   docker compose up -d --build
   ```
 
+### Troubleshooting & Logs Debugging
+If the application crashes on startup (e.g., due to a runtime JavaScript error), the Docker build command will still show a success status, but the application will not load.
+
+* **Check error or startup logs:**
+  ```bash
+  docker compose logs app
+  ```
+  This will output the standard Node.js crash tracebacks (e.g., `ReferenceError: ... is not defined`).
+* **Check container status:**
+  ```bash
+  docker compose ps
+  ```
+
 ---
 
 ## Authentication

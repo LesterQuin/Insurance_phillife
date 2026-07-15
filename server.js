@@ -27,6 +27,11 @@ app.get("/api/hello", (req, res) => {
     res.json({ message: "Hello world! It's working your api" });
 });
 
+// Docker test endpoint
+app.get("/api/docker-test", (req, res) => {
+    res.json({ status: "success", message: "Docker container updated and running successfully!" });
+});
+
 // form routes
 app.use('/api/financial-insurance', financialInsuranceRoutes);
 // Group riders
