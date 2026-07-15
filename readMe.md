@@ -3,6 +3,32 @@
 ## Overview
 This API manages the lifecycle of Financial Insurance Applications, including creation, updates, rate management, and retrieval.
 
+## Getting Started with Docker
+
+You can run this application inside a Docker container. This automatically configures the Node.js environment and all required system dependencies (like Chromium/fonts for Puppeteer PDF generation).
+
+### Prerequisites
+1. Make sure you have [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+2. Ensure you have your `.env` file configured in the root directory.
+
+### How to Run
+* **Start the application in the background (Detached Mode):**
+  ```bash
+  docker compose up -d
+  ```
+* **Verify the application is active:**
+  Open `http://localhost:5000/api/hello` in your browser.
+* **Stop the application:**
+  ```bash
+  docker compose down
+  ```
+* **Rebuild the container (after updating code or package.json):**
+  ```bash
+  docker compose up -d --build
+  ```
+
+---
+
 ## Authentication
 Routes marked with **Auth Required** expect a valid Bearer Token in the header.
 - **Header:** `Authorization: Bearer <your_token>`
