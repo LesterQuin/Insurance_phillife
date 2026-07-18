@@ -1,6 +1,6 @@
 import express from "express";
 import * as Controller from "../../controllers/financial_insurance_system_lookups/financial_insurance_system_lookups.controller.js";
-import { validateSystemLookup } from "../../middlewares/validate.js";
+import { validateSystemLookup, injectCategory } from "../../middlewares/validate.js";
 import { authenticate, isSuperAdmin } from '../../middlewares/authenticate.js';
 
 const router = express.Router();
@@ -20,7 +20,9 @@ router.get("/category/LOCATION", Controller.getByLocation);
 router.get("/:id", Controller.getById);
 
 // Create - Restricted to Super Admin
-router.post("/", authenticate, isSuperAdmin, validateSystemLookup, Controller.create);
+router.post("/category/ROLE", authenticate, isSuperAdmin, injectCategory("ROLE"), validateSystemLookup, Controller.create);
+router.post("/category/DEPARTMENT", authenticate, isSuperAdmin, injectCategory("DEPARTMENT"), validateSystemLookup, Controller.create);
+router.post("/category/LOCATION", authenticate, isSuperAdmin, injectCategory("LOCATION"), validateSystemLookup, Controller.create);
 
 // Update - Restricted to Super Admin
 router.put("/:id", authenticate, isSuperAdmin, Controller.update);

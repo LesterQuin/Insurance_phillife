@@ -10,6 +10,8 @@ export const getCommentsByApplicationId = async (applicationId) => {
                 c.application_id,
                 c.user_id,
                 c.comment_text,
+                c.attachment_path,
+                c.attachment_name,
                 c.created_at,
                 c.updated_at,
                 c.is_deleted,
@@ -51,10 +53,12 @@ export const createComment = async (data) => {
     const result = await pool.request()
         .input('applicationId', sql.Int, data.application_id)
         .input('userId', sql.Int, data.user_id)
-        .input('commentText', sql.NVarChar(sql.MAX), data.comment_text)
+        .input('commentText', sql.NVarChar(sql.MAX), data.comment_text || null)
+        .input('attachmentPath', sql.NVarChar(500), data.attachment_path || null)
+        .input('attachmentName', sql.NVarChar(255), data.attachment_name || null)
         .query(`
-            INSERT INTO DHUB_UAT.sg.financial_insurance_application_comments (application_id, user_id, comment_text)
-            VALUES (@applicationId, @userId, @commentText);
+            INSERT INTO DHUB_UAT.sg.financial_insurance_application_comments (application_id, user_id, comment_text, attachment_path, attachment_name)
+            VALUES (@applicationId, @userId, @commentText, @attachmentPath, @attachmentName);
             SELECT SCOPE_IDENTITY() AS comment_id;
         `);
     return result.recordset[0];

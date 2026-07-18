@@ -2,7 +2,7 @@ import { sql, poolPromise } from "../../config/db.js";
 import * as bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
-export const createUser = async ({ firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, reporting_to_id }) => {
+export const createUser = async ({ firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, reporting_to_id, position }) => {
     const pool = await poolPromise;
     const tempPassword = crypto.randomBytes(6).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
@@ -22,11 +22,12 @@ export const createUser = async ({ firstname, middlename, lastname, suffix, emai
         .input('password_hash', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit,  1)
         .input('is_active', sql.Bit, 1) 
+        .input('position', sql.NVarChar, position || null)
         .query(`
             INSERT INTO DHUB_UAT.sg.financial_insurance_users
-            (firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, reporting_to_id, password_hash, mustChangePassword, is_active)
+            (firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, reporting_to_id, password_hash, mustChangePassword, is_active, position)
             OUTPUT INSERTED.user_id AS userId
-            VALUES (@firstname, @middlename, @lastname, @suffix, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @reporting_to_id, @password_hash, @mustChangePassword, @is_active)
+            VALUES (@firstname, @middlename, @lastname, @suffix, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @reporting_to_id, @password_hash, @mustChangePassword, @is_active, @position)
         `);
 
     return { ...result.recordset[0], tempPassword}
@@ -43,7 +44,8 @@ export const getUserByEmail = async (email) => {
                 u.role_id, r.name as roleName,
                 u.location_id, l.name as locationName,
                 u.department_id, d.name as departmentName, d.code as departmentCode,
-                u.reporting_to_id, m.firstname + ' ' + m.lastname as reportingToName
+                u.reporting_to_id, m.firstname + ' ' + m.lastname as reportingToName,
+                u.position
             FROM DHUB_UAT.sg.financial_insurance_users u
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
@@ -86,7 +88,8 @@ export const getUserById = async (userId) => {
                 u.role_id, r.name as roleName,
                 u.location_id, l.name as locationName,
                 u.department_id, d.name as departmentName, d.code as departmentCode,
-                u.reporting_to_id, m.firstname + ' ' + m.lastname as reportingToName
+                u.reporting_to_id, m.firstname + ' ' + m.lastname as reportingToName,
+                u.position
             FROM DHUB_UAT.sg.financial_insurance_users u
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
@@ -189,7 +192,7 @@ export const updateProfile = async (userId, { firstname, middlename, lastname, s
     return await getUserById(userId);
 }
 
-export const adminUpdateUser = async (userId, { role_id, department_id, location_id, reporting_to_id }) => {
+export const adminUpdateUser = async (userId, { role_id, department_id, location_id, reporting_to_id, position }) => {
     const pool = await poolPromise;
 
     // Build the SET part of the query dynamically
@@ -211,6 +214,10 @@ export const adminUpdateUser = async (userId, { role_id, department_id, location
     if (reporting_to_id !== undefined) {
         setClauses.push('reporting_to_id = @reporting_to_id');
         request.input('reporting_to_id', sql.Int, reporting_to_id || null);
+    }
+    if (position !== undefined) {
+        setClauses.push('position = @position');
+        request.input('position', sql.NVarChar, position || null);
     }
 
     // If no fields to update, just return the user without a DB call

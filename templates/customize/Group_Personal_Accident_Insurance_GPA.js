@@ -129,12 +129,16 @@ const generateChunkedRateTables = (
 const getRateForRider = (ratesObj, riderId, isBasic = false) => {
   if (isBasic) {
     const basicVal = ratesObj?.rates?.[0]?.basic_rate;
-    return basicVal != null ? parseFloat(String(basicVal).replace(/,/g, '')) : 0;
+    if (basicVal == null) return 0;
+    const parsed = parseFloat(String(basicVal).replace(/,/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
   }
   if (Number(riderId) === 7) return 0; // GTIR is Free
   const riderObj = ratesObj?.rates?.[0]?.riders?.find(r => Number(r.rider_id) === Number(riderId));
   const rateVal = riderObj?.rider_rate;
-  return rateVal != null ? parseFloat(String(rateVal).replace(/,/g, '')) : 0;
+  if (rateVal == null) return 0;
+  const parsed = parseFloat(String(rateVal).replace(/,/g, ''));
+  return isNaN(parsed) ? 0 : parsed;
 };
 
 // Helper to extract age-banded rate (when lives <= 30)
@@ -143,12 +147,16 @@ const getAgeBasedRateForRider = (ratesObj, ageKey, riderId, isBasic = false) => 
   if (!ageGroup || ageGroup.length === 0) return 0;
   if (isBasic) {
     const basicVal = ageGroup[0]?.basic_rate;
-    return basicVal != null ? parseFloat(String(basicVal).replace(/,/g, '')) : 0;
+    if (basicVal == null) return 0;
+    const parsed = parseFloat(String(basicVal).replace(/,/g, ''));
+    return isNaN(parsed) ? 0 : parsed;
   }
   if (Number(riderId) === 7) return 0; // GTIR is Free
   const riderObj = ageGroup[0]?.riders?.find(r => Number(r.rider_id) === Number(riderId));
   const rateVal = riderObj?.rider_rate;
-  return rateVal != null ? parseFloat(String(rateVal).replace(/,/g, '')) : 0;
+  if (rateVal == null) return 0;
+  const parsed = parseFloat(String(rateVal).replace(/,/g, ''));
+  return isNaN(parsed) ? 0 : parsed;
 };
 
 // Helper to extract benefit amount (numeric)
@@ -475,6 +483,11 @@ export const generateGPAPDFContent = (application, user, details) => {
   const maturity = details?.maturity || 0; // Get maturity from details
 
   const cfeFullName = `${user.firstname} ${user.lastname}`;
+
+  const isDirect = Number(application.channel_type_id) === 55;
+  const salesRepName = isDirect ? cfeFullName : (application.channel_name || "");
+  const salesRepNumber = isDirect ? (user.phoneNumber || application.channel_number || "") : (application.channel_number || "");
+  const salesRepEmail = isDirect ? (user.email || application.channel_email || "helpdesk@phillife.com.ph") : (application.channel_email || "helpdesk@phillife.com.ph");
 
   // Dynamic configuration based on Plan
   const isGCLI = Number(application.plan_id) === 1;
@@ -810,30 +823,63 @@ export const generateGPAPDFContent = (application, user, details) => {
         </p>
             <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
 
-            <p>
-            We are pleased to present our ${application.basic_plan?.name || "Group Personal Accident Insurance Proposal"}, designed to provide 
-            ${application.group_name || ""} and its valued members with comprehensive protection, financial security, and peace of mind.
+            <p style="text-align: justify; text-indent: 30px;">
+            We are pleased to submit our ${application.basic_plan?.name || "Group Personal Accident Insurance Proposal"} for the benefit of  
+            ${application.group_name || ""}.This proposal is designed to provide valuable financial protection for your employees/members while reinforcing your organization's commitment to their well-being and security.
             </p>
 
             <p>
-            Our program offers competitive premium rates, flexible coverage, and reliable benefits tailored to support your organization’s goals and strengthen the value you deliver to those you serve.
+            The proposed insurance package includes the following:
+            </p>
+            <ul style="margin-top: -10px; margin-bottom: 15px; padding-left: 20px;">
+                <li style="text-align: justify; font-size: 11pt; line-height: 1.6;">${planName}</li>
+                ${
+                  application.riders && application.riders.length > 0
+                    ? application.riders.map(r => {
+                        const hasAcronym = r.acronym && r.rider_name.toLowerCase().includes(r.acronym.toLowerCase());
+                        const displayName = hasAcronym || !r.acronym ? r.rider_name : `${r.rider_name} (${r.acronym})`;
+                        return `<li style="text-align: justify; font-size: 11pt; line-height: 1.6;">${displayName}</li>`;
+                      }).join('')
+                    : ""
+                }
+            </ul>
+
+            <p style="text-align: justify; text-indent: 30px;">Enclosed are the proposed premium rates, coverage details, benefits, terms and conditions, and other pertinent provisions for your review and evaluation. 
+            We have carefully developed this proposal to offer comprehensive life insurance protection that aligns with your organization's needs and objectives.</p>
+    </div>
+
+<div class="page-break"></div>
+    <div class="main-content">
+    ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+
+    ${
+      page2FooterPhotoUri
+        ? `
+        <div class="page2-footer">
+            <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
+        </div>
+    `
+        : ""
+    }
+
+    <div class="subsequent-header-gradient"></div> <br>
+            <p style="text-align: justify; text-indent: 30px;">We appreciate the opportunity to present this proposal and trust that it will meet your organization's life insurance requirements. We look forward to building a long-term, mutually beneficial partnership founded on trust, reliability, and excellent service.</p>
+
+            <p style="text-align: justify; text-indent: 30px;">
+            Should you require any additional information or wish to discuss any aspect of this proposal, please feel free to contact our Sales Representative ${salesRepName} at ${salesRepNumber} or via email at ${salesRepEmail}.
+            We will be pleased to assist you and discuss the proposal at your convenience.
             </p>
 
-            <p>
-            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
+            <p style="text-align: justify; text-indent: 30px;">
+            Thank you for your time and thoughtful consideration. We look forward to the opportunity to serve your organization and to receiving your favorable response.<br><br>
+            Sincerely yours,
             </p>
-
-            <p>
-            We look forward to partnering with ${application.group_name || ""} to protect what matters most—your people, your clients, and your organization’s future.
-            </p>
-        <p>
-            Sincerely,<br><br>
-
+        <p style="margin-bottom: 0;">
             <strong>${cfeFullName}</strong> <br>
-            ${user.roleName || "Corporate Financial Executive"} <br>
+            ${user.roleName || "Corporate Financial Executive"}${user.position ? ` - ${user.position}` : ""} <br>
             ${user.departmentName || "N/A"}
         </p>
-</div>
+    </div>
 
 <div class="page-break"></div>
     <div class="plan-details">

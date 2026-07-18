@@ -33,6 +33,12 @@ export const generateGCLIInitialLoanPDFContent = (
         application.proposal_addressee?.split(" ").pop() || "";
     const totalAnnualPremium = details?.totalAnnualPremium || 0;
     const cfeFullName = `${user.firstname} ${user.lastname}`;
+    
+    const isDirect = Number(application.channel_type_id) === 55;
+    const salesRepName = isDirect ? cfeFullName : (application.channel_name || "");
+    const salesRepNumber = isDirect ? (user.phoneNumber || application.channel_number || "") : (application.channel_number || "");
+    const salesRepEmail = isDirect ? (user.email || application.channel_email || "helpdesk@phillife.com.ph") : (application.channel_email || "helpdesk@phillife.com.ph");
+
     const {
         logoDataUri = null,
         centerPhotoUri = null,
@@ -159,7 +165,7 @@ export const generateGCLIInitialLoanPDFContent = (
             font-size: 11pt; 
             line-height: 1.65;
             color: #202124;
-            margin-bottom: 18px;
+            margin-bottom: 5px;
         }
         .section-group, .notes, .installation-requirements, .signature-section { 
             break-inside: auto; page-break-inside: auto; 
@@ -430,23 +436,42 @@ export const generateGCLIInitialLoanPDFContent = (
     <div class="subsequent-header-gradient"></div>
         <p>
             ${formatDate(proposalDate)} <br><br>
-            ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
-            ${application.addressee_designation || ""} <br>
-            ${application.group_name || ""} <br>
-            ${application.business_address || ""}
+            ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
+            ${application.addressee_designation} <br>
+            ${application.group_name} <br>
+            ${application.business_address}
         </p>
-        <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
-        <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
-        <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
-            <p>
-            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
+
+            <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
+
+            <p style="text-align: justify; text-indent: 30px;">
+            We are pleased to submit our Group Credit Life Insurance Proposal, designed to provide coverage based on the ${application.basic_plan?.name || ""}
+            for the benefit of the borrowers of ${application.group_name || ""}.
             </p>
-        <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
+
+            <p style="text-align: justify; text-indent: 30px;">
+            This proposal has been carefully prepared to offer financial protection for your borrowers while supporting your organization's commitment to responsible lending and customer security. 
+            Enclosed are the proposed premium rates, coverage details, benefits, terms, and other pertinent provisions for your review and evaluation.
+            </p>
+
+            <p style="text-align: justify; text-indent: 30px;">We sincerely appreciate the opportunity to present this proposal and hope it meets your organization's credit life insurance requirements. 
+            We look forward to establishing a long-term and mutually beneficial partnership with your esteemed company.
+            </p>
+
+            <p style="text-align: justify; text-indent: 30px;">
+            Should you have any questions or require further information or clarification, please do not hesitate to contact our Sales Representative, ${salesRepName} at ${salesRepNumber} or via email at ${salesRepEmail}.
+            We would be pleased to discuss the proposal at your convenience.
+            </p>
+
+            <p style="text-align: justify;">
+            Thank you for your time and consideration. We look forward to your favorable response.<br>
+            Sincerely yours,
+            </p>
         <p>
-            Sincerely,<br><br>
+
             <strong>${cfeFullName}</strong> <br>
-            ${user.departmentName || "N/A"} <br>
-            <strong>${user.locationName || "N/A"}</strong>
+            ${user.roleName || "Corporate Financial Executive"}${user.position ? ` - ${user.position}` : ""} <br>
+            ${user.departmentName || "N/A"}
         </p>
     </div>
 
@@ -471,7 +496,6 @@ export const generateGCLIInitialLoanPDFContent = (
     </div>
 
     <h3>Single Rate per 1,000</h3>
-    <div class="h3-details">
         <table class="data-table">
             <tr><th>Collection Fee %</th><th>0%</th><th>10%</th><th>20%</th><th>30%</th><th>35%</th><th>40%</th><th>50%</th></tr>
             <tr><td>1 month</td><td>0.70</td><td>0.78</td><td>0.87</td><td>1.00</td><td>1.08</td><td>1.17</td><td>1.40</td></tr>
@@ -495,8 +519,7 @@ export const generateGCLIInitialLoanPDFContent = (
             <tr><td>33 months</td><td>19.36</td><td>21.51</td><td>24.20</td><td>27.66</td><td>29.79</td><td>32.27</td><td>38.72</td></tr>
             <tr><td>36 months</td><td>20.97</td><td>23.30</td><td>26.21</td><td>29.96</td><td>32.26</td><td>34.95</td><td>41.94</td></tr>
         </table>
-        <p class="note">Rates are inclusive of government-mandated taxes.</p>
-    </div>
+    <p class="note">Rates are inclusive of government-mandated taxes.</p>
 
     <h3>Eligibility</h3>
     <div class="h3-details">

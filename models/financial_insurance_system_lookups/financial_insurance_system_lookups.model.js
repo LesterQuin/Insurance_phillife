@@ -2,7 +2,7 @@ import { poolPromise, sql } from '../../config/db.js';
 
 export const getAll = async () => {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE is_active = 1 ORDER BY category, name');
+    const result = await pool.request().query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups ORDER BY category, name');
     return result.recordset;
 };
 
@@ -18,13 +18,13 @@ export const getByCategory = async (category) => {
     const pool = await poolPromise;
     const result = await pool.request()
         .input('category', sql.NVarChar, category)
-        .query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE category = @category AND is_active = 1 ORDER BY name');
+        .query('SELECT * FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE category = @category ORDER BY name');
     return result.recordset;
 };
 
 export const getCategories = async () => {
     const pool = await poolPromise;
-    const result = await pool.request().query('SELECT DISTINCT category FROM DHUB_UAT.sg.financial_insurance_system_lookups WHERE is_active = 1 ORDER BY category');
+    const result = await pool.request().query('SELECT DISTINCT category FROM DHUB_UAT.sg.financial_insurance_system_lookups ORDER BY category');
     return result.recordset.map(row => row.category);
 };
 

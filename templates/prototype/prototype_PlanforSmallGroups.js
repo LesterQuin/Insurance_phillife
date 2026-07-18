@@ -29,6 +29,12 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
         application.proposal_addressee?.split(" ").pop() || "";
     const totalAnnualPremium = details?.totalAnnualPremium || 0;
     const cfeFullName = `${user.firstname} ${user.lastname}`;
+
+    const isDirect = Number(application.channel_type_id) === 55;
+    const salesRepName = isDirect ? cfeFullName : (application.channel_name || "");
+    const salesRepNumber = isDirect ? (user.phoneNumber || application.channel_number || "") : (application.channel_number || "");
+    const salesRepEmail = isDirect ? (user.email || application.channel_email || "helpdesk@phillife.com.ph") : (application.channel_email || "helpdesk@phillife.com.ph");
+    
     const {
         logoDataUri = null,
         centerPhotoUri = null,
@@ -155,7 +161,7 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
             font-size: 11pt; 
             line-height: 1.65;
             color: #202124;
-            margin-bottom: 18px;
+            margin-bottom: 5px;
         }
         .section-group, .notes, .installation-requirements, .signature-section { 
             break-inside: auto; page-break-inside: auto; 
@@ -426,23 +432,63 @@ export const generateSmallGroupsPDFContent = (application, user, details) => {
     <div class="subsequent-header-gradient"></div>
         <p>
             ${formatDate(proposalDate)} <br><br>
-            ${application.contact_person_salutation ? application.contact_person_salutation + ' ' : ''}${application.proposal_addressee || ""} <br>
-            ${application.addressee_designation || ""} <br>
-            ${application.group_name || ""} <br>
-            ${application.business_address || ""}
+            ${application.contact_person_salutation || ""} ${application.proposal_addressee || ""} <br>
+            ${application.addressee_designation} <br>
+            ${application.group_name} <br>
+            ${application.business_address}
         </p>
-        <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
-        <p>We are pleased to present to you our <strong>${application.basic_plan?.name || ""}</strong> for the benefit of <strong>${application.group_name || ""}</strong> - debtors.</p>
-        <p>Relative premium rates as well as other pertinent benefits and provisions are stated in the attached proposal.</p>
-            <p>
-            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
+            <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
+
+            <p style="text-align: justify; text-indent: 30px;">
+            We are pleased to submit our ${application.basic_plan?.name || "Group Personal Accident Insurance Proposal"} for the benefit of  
+            ${application.group_name || ""}.This proposal is designed to provide valuable financial protection for your employees/members while reinforcing your organization's commitment to their well-being and security.
             </p>
-        <p>Thank you and looking forward to have a mutually beneficial partnership with your company.</p>
-        <p>
-            Sincerely,<br><br>
+
+            <p>
+            The proposed insurance package includes the following:
+            </p><br>
+            <ul style="margin-top: -10px; margin-bottom: 15px; padding-left: 20px;">
+                <li style="text-align: justify; font-size: 11pt; line-height: 1.6;">Group Term Life Insurance Plan (GTLIP)</li>
+                <li style="text-align: justify; font-size: 11pt; line-height: 1.6;">Group Accidental Death, Dismemberment and Disability Rider (GADDR)</li>
+                <li style="text-align: justify; font-size: 11pt; line-height: 1.6;">Group Total and Permanent Disability Rider (GTPDR)</li>
+            </ul>
+
+            <p style="text-align: justify; text-indent: 30px;">Enclosed are the proposed premium rates, coverage details, benefits, terms and conditions, and other pertinent provisions for your review and evaluation. 
+            We have carefully developed this proposal to offer comprehensive life insurance protection that aligns with your organization's needs and objectives.</p>
+
+            <p style="text-align: justify; text-indent: 30px;">We appreciate the opportunity to present this proposal and trust that it will meet your organization's life insurance requirements. 
+            We look forward to building a long-term, mutually beneficial partnership founded on trust, reliability, and excellent service.</p>
+
+    </div>
+
+<div class="page-break"></div>
+    <div class="main-content">
+    ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+
+    ${
+      page2FooterPhotoUri
+        ? `
+        <div class="page2-footer">
+            <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
+        </div>
+    `
+        : ""
+    }
+
+    <div class="subsequent-header-gradient"></div> <br>
+            <p style="text-align: justify; text-indent: 30px;">
+            Should you require any additional information or wish to discuss any aspect of this proposal, please feel free to contact our Sales Representative ${salesRepName} at ${salesRepNumber} or via email at ${salesRepEmail}.
+            We will be pleased to assist you and discuss the proposal at your convenience.
+            </p>
+
+            <p style="text-align: justify; text-indent: 30px;">
+            Thank you for your time and thoughtful consideration. We look forward to the opportunity to serve your organization and to receiving your favorable response.<br><br>
+            Sincerely yours,
+            </p>
+        <p style="margin-bottom: 0;">
             <strong>${cfeFullName}</strong> <br>
-            ${user.departmentName || "N/A"} <br>
-            <strong>${user.locationName || "N/A"}</strong>
+            ${user.roleName || "Corporate Financial Executive"}${user.position ? ` - ${user.position}` : ""} <br>
+            ${user.departmentName || "N/A"}
         </p>
     </div>
 

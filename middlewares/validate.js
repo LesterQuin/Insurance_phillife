@@ -107,6 +107,10 @@ export const validateRegister = [
     body('phoneNumber')
         .optional()
         .matches(/^(\+63|0)[0-9]{10}$/).withMessage('Phone number must be 10-15 digits'),
+    body('position')
+        .optional()
+        .isLength({ max: 100 }).withMessage('Position must not exceed 100 characters')
+        .trim().escape(),
     body('agent_code')
         .optional()
         .isLength({ max: 50 }).withMessage('Agent code must not exceed 50 characters'),
@@ -394,6 +398,10 @@ export const validateAdminUpdateUser = [
             }
             return true;
         }),
+    body('position')
+        .optional()
+        .isLength({ max: 100 }).withMessage('Position must not exceed 100 characters')
+        .trim().escape(),
     (req, res, next) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
@@ -1481,6 +1489,12 @@ export const validateDraftFinancialApplication = [
         next();
     }
 ];
+
+// Middleware to automatically inject the category into the request body
+export const injectCategory = (category) => (req, res, next) => {
+    req.body.category = category;
+    next();
+};
 
 // -----------------------------
 // System Lookup Validation

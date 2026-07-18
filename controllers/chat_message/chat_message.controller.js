@@ -4,6 +4,8 @@ import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
 import { sanitizeOptions } from '../../middlewares/helper.js';
 import { io } from '../../socket-io/socket_setup.js';
+import fs from 'fs';
+import path from 'path';
 
 export const getComments = async (req, res) => {
     try {
@@ -33,18 +35,50 @@ export const createComment = async (req, res) => {
         let { comment_text } = req.body;
         const userId = req.user.user_id;
 
-        if (!comment_text) return error(res, 'Comment text cannot be empty.', 400);
-
-        // Verify application exists
+        // Verify application exists first to prevent orphan uploads
         const app = await AppModel.getApplicationById(applicationId);
         if (!app) return error(res, 'Application not found.', 404);
 
-        comment_text = sanitizeHtml(comment_text, sanitizeOptions);
+        const hasText = comment_text && comment_text.trim();
+        const hasFile = req.files && req.files.attachment;
+
+        if (!hasText && !hasFile) {
+            return error(res, 'Comment text or file attachment is required.', 400);
+        }
+
+        let attachment_path = null;
+        let attachment_name = null;
+
+        if (hasFile) {
+            const file = req.files.attachment;
+            const groupName = app.group_name || 'unassigned_group';
+            const sanitizedGroup = groupName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const targetDir = path.join(process.cwd(), 'uploads/comments', sanitizedGroup);
+
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
+            }
+
+            attachment_name = file.originalFilename;
+            const fileName = `${Date.now()}_${attachment_name.replace(/\s+/g, '_')}`;
+            const targetPath = path.join(targetDir, fileName);
+
+            fs.renameSync(file.filepath, targetPath);
+            attachment_path = path.join('uploads/comments', sanitizedGroup, fileName).replace(/\\/g, '/');
+        }
+
+        if (hasText) {
+            comment_text = sanitizeHtml(comment_text, sanitizeOptions);
+        } else {
+            comment_text = null;
+        }
 
         const newComment = await Model.createComment({
             application_id: applicationId,
             user_id: userId,
-            comment_text
+            comment_text,
+            attachment_path,
+            attachment_name
         });
 
         // Return the single created item to the requester

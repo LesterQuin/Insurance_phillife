@@ -182,12 +182,14 @@ export const register = async (req, res) => {
             department_id,
             location_id,
             phoneNumber,
-            reporting_to_id
+            reporting_to_id,
+            position
         } = req.body;
 
         // Validation is now handled by middleware
         agent_code = agent_code?.trim() || null;
         phoneNumber = phoneNumber?.trim() || null;
+        position = position?.trim() || null;
         role_id = role_id ? Number(role_id) : 1;
         department_id = department_id ? Number(department_id) : null;
         location_id = location_id ? Number(location_id) : null;
@@ -227,7 +229,8 @@ export const register = async (req, res) => {
             department_id,
             location_id,
             phoneNumber,
-            reporting_to_id
+            reporting_to_id,
+            position
         });
 
         await transporter.sendMail({
@@ -741,7 +744,7 @@ export const updateProfile = async (req, res) => {
 export const adminUpdateUser = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { role_id, department_id, location_id, reporting_to_id } = req.body;
+        const { role_id, department_id, location_id, reporting_to_id, position } = req.body;
 
         // Prevent a super admin from modifying their own role/department/location via this route
         if (Number(req.user.user_id) === Number(userId)) {
@@ -775,7 +778,8 @@ export const adminUpdateUser = async (req, res) => {
             role_id,
             department_id,
             location_id,
-            reporting_to_id
+            reporting_to_id,
+            position
         });
 
         await auditLog(req, {

@@ -167,6 +167,11 @@ export const generateGCLIPDFContent = (application, user, details) => {
 
     const cfeFullName = `${user.firstname} ${user.lastname}`;
 
+    const isDirect = Number(application.channel_type_id) === 55;
+    const salesRepName = isDirect ? cfeFullName : (application.channel_name || "");
+    const salesRepNumber = isDirect ? (user.phoneNumber || application.channel_number || "") : (application.channel_number || "");
+    const salesRepEmail = isDirect ? (user.email || application.channel_email || "helpdesk@phillife.com.ph") : (application.channel_email || "helpdesk@phillife.com.ph");
+
     // Dynamic configuration based on Plan
     const isGCLI = Number(application.plan_id) === 1;
     const standardHeader = isGCLI ? "Term of Loan" : "Rider";
@@ -481,7 +486,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
 
     ${
-      page2FooterPhotoUri
+    page2FooterPhotoUri
         ? `
         <div class="page2-footer">
             <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
@@ -498,29 +503,36 @@ export const generateGCLIPDFContent = (application, user, details) => {
             ${application.group_name} <br>
             ${application.business_address}
         </p>
+
             <p>Dear ${application.contact_person_salutation || ""} ${addresseeLastName},</p>
 
-            <p>
-            We are pleased to present our ${application.basic_plan?.name || "Group Credit Life Insurance Proposal"}, designed to provide 
-            ${application.group_name || ""} and its valued members with comprehensive protection, financial security, and peace of mind.
+            <p style="text-align: justify; text-indent: 30px;">
+            We are pleased to submit our Group Credit Life Insurance Proposal, designed to provide coverage based on the ${application.amount_loans_name || application.amount_loans?.name || ""}
+            for the benefit of the borrowers of ${application.group_name || ""}.
             </p>
 
-            <p>
-            Our program offers competitive premium rates, flexible coverage, and reliable benefits tailored to support your organization’s goals and strengthen the value you deliver to those you serve.
+            <p style="text-align: justify; text-indent: 30px;">
+            This proposal has been carefully prepared to offer financial protection for your borrowers while supporting your organization's commitment to responsible lending and customer security. 
+            Enclosed are the proposed premium rates, coverage details, benefits, terms, and other pertinent provisions for your review and evaluation.
             </p>
 
-            <p>
-            We would be happy to discuss further how this solution can align with your goals. Please contact us at (02) 7798-5433, mobile ${user.phoneNumber || ""} or email us at <a href="mailto:${user.email || "helpdesk@phillife.com.ph"}" class="footer-link">${user.email || "helpdesk@phillife.com.ph"}</a> for any inquiries.
+            <p style="text-align: justify; text-indent: 30px;">We sincerely appreciate the opportunity to present this proposal and hope it meets your organization's credit life insurance requirements. 
+            We look forward to establishing a long-term and mutually beneficial partnership with your esteemed company.
             </p>
 
-            <p>
-            We look forward to partnering with ${application.group_name || ""} to protect what matters most your people, your clients, and your organization’s future.
+            <p style="text-align: justify; text-indent: 30px;">
+            Should you have any questions or require further information or clarification, please do not hesitate to contact our Sales Representative, ${salesRepName} at ${salesRepNumber} or via email at ${salesRepEmail}.
+            We would be pleased to discuss the proposal at your convenience.
+            </p>
+
+            <p style="text-align: justify;">
+            Thank you for your time and consideration. We look forward to your favorable response.<br>
+            Sincerely yours,
             </p>
         <p>
-            Sincerely,<br><br>
 
             <strong>${cfeFullName}</strong> <br>
-            ${user.roleName || "Corporate Financial Executive"} <br>
+            ${user.roleName || "Corporate Financial Executive"}${user.position ? ` - ${user.position}` : ""} <br>
             ${user.departmentName || "N/A"}
         </p>
     </div>

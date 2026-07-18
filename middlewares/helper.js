@@ -692,7 +692,7 @@ export const generateProposalHtml = async (id) => {
         rates71_75: formatDbRatesForTemplate(ratesRows, '71_75', planId, application),
         rates76_80: formatDbRatesForTemplate(ratesRows, '76_80', planId, application),
         logoDataUri: getImageDataUri('img/phillife-logo-hd.png'), 
-        centerPhotoUri: getImageDataUri(planId === 1 ? 'img/GCLI.png' : 'img/cover.png'), 
+        centerPhotoUri: getImageDataUri((planId === 1 || appData.prototype_id === 5 || appData.prototype_id === 6) ? 'img/GCLI.png' : 'img/cover.png'), 
         footerPhotoUri: getImageDataUri('img/footer.png'),
         page2FooterPhotoUri: getImageDataUri('img/page 2 footer.png') 
     };

@@ -2,6 +2,36 @@ import XLSX from 'xlsx';
 import fs from 'fs';
 import * as MainModel from '../models/financial_Insurance_form.model.js';
 
+const validateRateValue = (val, label, rowNum) => {
+    if (val === null || val === undefined || val === '') {
+        throw new Error(`Row ${rowNum}: Missing '${label}' value.`);
+    }
+    const strVal = String(val).trim();
+    
+    // Check if it's a number
+    const parsed = parseFloat(strVal);
+    if (!isNaN(parsed)) {
+        if (parsed < 0) {
+            throw new Error(`Row ${rowNum}: Invalid '${label}' value: "${val}". Negative rates are not allowed.`);
+        }
+        // If it is numeric, ensure it only contains digits and a dot (no special symbols like $, %, etc.)
+        if (!/^\d+(\.\d+)?$/.test(strVal)) {
+            // Check if it is purely alphanumeric (letters, numbers, and spaces)
+            if (!/^[a-zA-Z0-9\s]+$/.test(strVal)) {
+                throw new Error(`Row ${rowNum}: Invalid '${label}' value: "${val}". Only letters, numbers, and spaces are allowed.`);
+            }
+        }
+        return parsed;
+    }
+    
+    // If it's a non-numeric string, it must be alphanumeric only (no special characters)
+    if (!/^[a-zA-Z0-9\s]+$/.test(strVal)) {
+        throw new Error(`Row ${rowNum}: Invalid '${label}' value: "${val}". Only letters, numbers, and spaces are allowed.`);
+    }
+    
+    return strVal;
+};
+
 export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
     const workbook = XLSX.readFile(filePath);
     const sheetName = workbook.SheetNames[0];
@@ -92,10 +122,7 @@ export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
         if (basicRateVal === null || basicRateVal === undefined || basicRateVal === '') {
             throw new Error(`Row ${rowNum}: Missing 'Basic_Rate' or 'Rate' value.`);
         }
-        const basicRate = parseFloat(basicRateVal);
-        if (isNaN(basicRate)) {
-            throw new Error(`Row ${rowNum}: Invalid 'Basic_Rate' value: "${basicRateVal}".`);
-        }
+        const basicRate = validateRateValue(basicRateVal, 'Basic_Rate', rowNum);
 
         // 4. Gather riders from other columns
         const riders = [];
@@ -116,10 +143,7 @@ export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
 
             if (riderMap.has(riderSearchKey)) {
                 const riderId = riderMap.get(riderSearchKey);
-                const rRate = parseFloat(val);
-                if (isNaN(rRate)) {
-                    throw new Error(`Row ${rowNum}: Invalid rate value for rider ${key}: "${val}".`);
-                }
+                const rRate = validateRateValue(val, key, rowNum);
                 riders.push({
                     rider_id: riderId,
                     rider_rate: rRate,
