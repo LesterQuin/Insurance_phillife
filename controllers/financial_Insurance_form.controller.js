@@ -223,13 +223,14 @@ export const updateApplicationStatus = async (req, res) => {
                 return error(res, 'Access Denied: Only the original CFE creator, a Team Leader, or a Super Admin can mark a proposal as Booked.', 403);
             }
 
-            if (!canBypass) {
-                const pendingRequirements = getPendingRequirements(app);
-
-                if (pendingRequirements.length > 0) {
-                    return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
-                }
-            }
+            // Optional for now:
+            // if (!canBypass) {
+            //     const pendingRequirements = getPendingRequirements(app);
+            // 
+            //     if (pendingRequirements.length > 0) {
+            //         return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
+            //     }
+            // }
 
             // Release Check: Customized Proposals must be Released (15) by Actuarial before booking
             const PROTOTYPE_TYPE_ID = 30;
@@ -496,7 +497,14 @@ export const notifyExpiringProposals = async (req, res) => {
             // if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 30); // Production: default to 30 days
             if (!app.expiry_date) expiryDate.setDate(expiryDate.getDate() + 8); // Testing: Valid for 8 days
 
-            const diffDays = Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24));
+            // Normalize dates to midnight to ensure accurate day-to-day comparison
+            const expiryNormalized = new Date(expiryDate);
+            expiryNormalized.setHours(0, 0, 0, 0);
+
+            const nowNormalized = new Date(now);
+            nowNormalized.setHours(0, 0, 0, 0);
+
+            const diffDays = Math.round((expiryNormalized - nowNormalized) / (1000 * 60 * 60 * 24));
 
             // 1. Automatic Closure Logic
             if (diffDays <= 0) {
@@ -562,7 +570,11 @@ export const notifyExpiringProposals = async (req, res) => {
                 }
             }
         }
-        if (res) return success(res, null, 'Expiration checks completed and notifications sent.');
+        if (res) {
+            return success(res, null, 'Expiration checks completed and notifications sent.');
+        } else {
+            console.log('Expiration checks completed and notifications sent automatically via cron.');
+        }
     } catch (err) {
         console.error('Notification Task Error:', err);
         if (res) return error(res, err.message);
@@ -1664,14 +1676,14 @@ export const setStatusBooked = async (req, res) => {
             return error(res, 'Access Denied: Only the original CFE creator, a Team Leader, or a Super Admin can mark a proposal as Booked.', 403);
         }
 
-        // 2. Requirements Validation (CFE Only)
-        if (!canBypass) {
-            const pendingRequirements = getPendingRequirements(app);
-
-            if (pendingRequirements.length > 0) {
-                return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
-            }
-        }
+        // 2. Requirements Validation (CFE Only) - Optional for now
+        // if (!canBypass) {
+        //     const pendingRequirements = getPendingRequirements(app);
+        // 
+        //     if (pendingRequirements.length > 0) {
+        //         return error(res, `Cannot mark as BOOKED. The following requirements are still pending: ${pendingRequirements.join(', ')}`, 400);
+        //     }
+        // }
 
         // Rate Check: Customized Proposals must have actuarial rates defined
         const PROTOTYPE_TYPE_ID = 30;

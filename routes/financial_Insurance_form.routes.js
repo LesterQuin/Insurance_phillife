@@ -32,6 +32,9 @@ router.put('/:id/declined-extension', authenticate, validateRejectExtension, Con
 // get all applications with pending extension request - only for approver team leader and above
 router.get('/extension-requests', authenticate, validateGetExtensionRequests, Controller.getExtensionRequests); // new api
 
+// Trigger expiration notifications manually
+router.post('/notify-expiring', authenticate, Controller.notifyExpiringProposals);
+
 // Routes without validation
 router.get('/list', authenticate, Controller.getAllApplications);
 // get the renewal lookup data for the renewal application form, including the original application details and the available prototype plans for renewal
