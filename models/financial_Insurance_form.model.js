@@ -293,7 +293,7 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
 };
 
 // Get all applications
-export const getAllApplications = async (userId = null) => {
+export const getAllApplications = async (userId = null, excludeDrafts = false) => {
     const pool = await poolPromise;
     const request = pool.request();
 
@@ -307,6 +307,10 @@ export const getAllApplications = async (userId = null) => {
         whereCondition = `fia.user_id IN (${idParams})`;
     } else {
         request.input('user_id', sql.Int, userId);
+    }
+
+    if (excludeDrafts) {
+        whereCondition += ' AND fia.status_id <> 11';
     }
 
     const res = await request

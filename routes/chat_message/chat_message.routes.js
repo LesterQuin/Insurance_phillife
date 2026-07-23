@@ -17,4 +17,8 @@ router.put('/comments/:commentId', authenticate, Controller.updateComment);
 // Delete a comment
 router.delete('/comments/:commentId', authenticate, Controller.deleteComment);
 
+// Download or view a comment attachment
+router.get('/comments/:commentId/attachment', authenticate, Controller.viewAttachment);
+// /api/chat-messages/comments/123/attachment?download=true
+
 export default router;

@@ -146,3 +146,53 @@ export const deleteComment = async (req, res) => {
         return error(res, err.message);
     }
 };
+
+export const viewAttachment = async (req, res) => {
+    try {
+        const commentId = parseInt(req.params.commentId);
+        const userId = req.user.user_id;
+        const userRole = req.user.role;
+
+        const comment = await Model.getCommentById(commentId);
+        if (!comment) {
+            return error(res, 'Comment not found.', 404);
+        }
+
+        if (!comment.attachment_path) {
+            return error(res, 'This comment does not have an attachment.', 404);
+        }
+
+        // Access Control Logic
+        const isAdmin = ['superadmin', 'Super Admin'].includes(userRole) || req.user.role_id === 15;
+        const isAuthorized = isAdmin || await Model.isUserAuthorizedToView(comment.application_id, userId);
+
+        if (!isAuthorized) {
+            return error(res, 'You are not authorized to access this attachment.', 403);
+        }
+
+        const absolutePath = path.resolve(process.cwd(), comment.attachment_path);
+        const uploadsDir = path.resolve(process.cwd(), 'uploads');
+
+        // Security check: Prevent path traversal (must be inside uploads directory)
+        const relative = path.relative(uploadsDir, absolutePath);
+        const isSafe = relative && !relative.startsWith('..') && !path.isAbsolute(relative);
+
+        if (!isSafe) {
+            return error(res, 'Access Denied: Invalid file path.', 403);
+        }
+
+        if (!fs.existsSync(absolutePath) || !fs.statSync(absolutePath).isFile()) {
+            return error(res, 'File not found on server.', 404);
+        }
+
+        // Support forcing download via query param ?download=true
+        if (req.query.download === 'true') {
+            return res.download(absolutePath, comment.attachment_name || path.basename(absolutePath));
+        }
+
+        return res.sendFile(absolutePath);
+    } catch (err) {
+        console.error('View attachment error:', err);
+        return error(res, err.message, 500);
+    }
+};
