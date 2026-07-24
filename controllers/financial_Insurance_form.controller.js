@@ -356,9 +356,9 @@ export const getExtensionRequests = async (req, res) => {
 
         let filterUserIds = null;
         if (!isSuperAdmin) {
-            // Fetch only subordinate IDs so that heads (TLs/Managers) only see requests from their team (e.g., CFEs)
-            filterUserIds = await User.getSubordinateIds(userId);
-            if (filterUserIds.length === 0) return success(res, [], 'No pending extension requests from your subordinates.');
+            // Fetch subordinate IDs and include the logged-in user's own ID
+            const subordinates = await User.getSubordinateIds(userId);
+            filterUserIds = [...subordinates, userId];
         }
 
         const pendingIds = await Model.getExtensionRequests(filterUserIds);
@@ -475,6 +475,88 @@ export const requestExtension = async (req, res) => {
 
         io.emit('requestExtension', response);
 
+        // Send Email Notification to Superior(s)
+        try {
+            const creator = await User.getUserById(updated.user_id);
+            if (creator) {
+                const recipients = new Set();
+                
+                // 1. Direct reporting manager/superior
+                if (creator.reporting_to_id) {
+                    const directSuperior = await User.getUserById(creator.reporting_to_id);
+                    if (directSuperior && directSuperior.email) {
+                        recipients.add(directSuperior.email);
+                    }
+                }
+
+                // 2. Department superiors (Team Leaders, Head, etc.)
+                if (creator.department_id) {
+                    const deptSuperiors = await User.getSuperiorsForDepartment(creator.department_id);
+                    for (const sup of deptSuperiors) {
+                        if (sup.email) {
+                            recipients.add(sup.email);
+                        }
+                    }
+                }
+
+                // Send email to all resolved recipients
+                if (recipients.size > 0) {
+                    const creatorName = [creator.firstname, creator.lastname].filter(Boolean).join(' ');
+                    const emailSubject = `Extension Request Submitted: ${updated.group_name}`;
+                    const appUrl = `${process.env.APP_BASE_URL || 'http://localhost:5000'}/applications/${updated.application_id}`;
+                    
+                    const emailHtml = `
+                        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 5px;">
+                            <h2 style="color: #0d47a1; border-bottom: 2px solid #0d47a1; padding-bottom: 10px; margin-top: 0;">Extension Request Notification</h2>
+                            <p>An extension request has been submitted for an insurance application requiring your review:</p>
+                            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
+                                <tr>
+                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0; width: 180px;">Application ID:</td>
+                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">PRO-${updated.application_id.toString().padStart(6, '0')}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0;">Group Name:</td>
+                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${updated.group_name}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0;">Requested By:</td>
+                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${creatorName} (${creator.email})</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0;">Submission Date:</td>
+                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${new Date().toLocaleDateString()}</td>
+                                </tr>
+                            </table>
+                            <p>Please log in to the PhilLife Insurance System dashboard to review, approve, or decline this request.</p>
+                            <div style="margin-top: 30px; text-align: center;">
+                                <a href="${appUrl}" style="background-color: #0d47a1; color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">View Proposal</a>
+                            </div>
+                            <hr style="border: 0; border-top: 1px solid #e0e0e0; margin-top: 30px; margin-bottom: 20px;" />
+                            <p style="font-size: 9pt; color: #777; text-align: center; margin-bottom: 0;">
+                                This is an automated notification from PhilLife Insurance System. Please do not reply directly to this email.
+                            </p>
+                        </div>
+                    `;
+
+                    for (const email of recipients) {
+                        try {
+                            await transporter.sendMail({
+                                from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                                to: email,
+                                subject: emailSubject,
+                                html: emailHtml
+                            });
+                            console.log(`[requestExtension] Extension email notification successfully sent to: ${email}`);
+                        } catch (err) {
+                            console.error(`[requestExtension] Failed to send email to ${email}:`, err);
+                        }
+                    }
+                }
+            }
+        } catch (mailErr) {
+            console.error('[requestExtension] Email notification lookup/dispatch error:', mailErr);
+        }
+
         return success(res, response, 'Extension request submitted to your Team Leader/Admin.');
     } catch (err) {
         console.error('Request Extension Error:', err);
@@ -505,6 +587,7 @@ export const notifyExpiringProposals = async (req, res) => {
             nowNormalized.setHours(0, 0, 0, 0);
 
             const diffDays = Math.round((expiryNormalized - nowNormalized) / (1000 * 60 * 60 * 24));
+            console.log(`[Scheduler Debug] App ID: ${app.application_id}, Group: ${app.group_name}, status_id: ${currentStatus}, diffDays: ${diffDays}`);
 
             // 1. Automatic Closure Logic
             if (diffDays <= 0) {

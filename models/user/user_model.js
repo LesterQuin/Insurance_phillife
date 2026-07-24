@@ -375,3 +375,18 @@ export const setUserStatus = async (userId, isActive) => {
         await clearTokens(userId);
     }
 };
+
+export const getSuperiorsForDepartment = async (departmentId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('deptId', sql.Int, departmentId)
+        .query(`
+            SELECT u.user_id, u.firstname, u.lastname, u.email
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            WHERE u.department_id = @deptId
+              AND r.name IN ('Group Sales & Marketing Head', 'Team Leader', 'Super Admin', ' Vice President')
+              AND u.is_active = 1
+        `);
+    return result.recordset;
+};
