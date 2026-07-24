@@ -987,6 +987,34 @@ export const generateGYRTPDFContent = (application, user, details) => {
     <p>
         8. The proposal validity is until ${formatDate(expiryDate)}.
     </p>
+
+    ${(() => {
+      let html = "";
+      let num = 9;
+      if (application.notes) {
+        html += `
+        <div style="margin-bottom: 12px; break-inside: avoid;">
+            ${num}. <strong>Remarks</strong>
+            <div style="margin-left: 5mm; margin-top: 1px;">
+                ${application.notes}
+            </div>
+        </div>
+        `;
+        num++;
+      }
+      if (application.actuarial_notes && application.actuarial_notes_show_in_pdf !== false) {
+        html += `
+        <div style="margin-bottom: 12px; break-inside: avoid;">
+            ${num}. <strong>Other Terms</strong>
+            <div style="margin-left: 5mm; margin-top: 1px;">
+                ${application.actuarial_notes}
+            </div>
+        </div>
+        `;
+        num++;
+      }
+      return html;
+    })()}
 </div>
 
 <div class="page-break"></div>

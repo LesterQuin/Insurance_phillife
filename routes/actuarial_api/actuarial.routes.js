@@ -1,6 +1,6 @@
 import express from 'express';
 import * as Controller from '../../controllers/actuarial_api/actuarial.controller.js';
-import { validateRates, validateTotalPremium, validateEvidenceNotes } from '../../middlewares/validate.js';
+import { validateRates, validateTotalPremium, validateEvidenceNotes, validateNotes } from '../../middlewares/validate.js';
 import { authenticate, isActuarial } from '../../middlewares/authenticate.js';
 import parseMultipartForm from '../../middlewares/fileUpload.js';
 import { parseExcelRatesMiddleware } from '../../middlewares/parseExcel.js';
@@ -21,6 +21,10 @@ router.post('/rates/:id/parse-excel', authenticate, isActuarial, parseMultipartF
 // API to input evidence of insurability notes (Section 5)
 router.post('/evidence-notes/:id', authenticate, isActuarial, validateEvidenceNotes, Controller.saveEvidenceNotes);
 router.put('/evidence-notes/:id', authenticate, isActuarial, validateEvidenceNotes, Controller.saveEvidenceNotes);
+
+// API to input general proposal notes
+router.post('/notes/:id', authenticate, isActuarial, validateNotes, Controller.saveNotes);
+router.put('/notes/:id', authenticate, isActuarial, validateNotes, Controller.saveNotes);
 
 // API to input total annual premium
 router.get('/total-premium/queue', authenticate, isActuarial, Controller.getApplicationsPendingTotalPremium);

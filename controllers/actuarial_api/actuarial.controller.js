@@ -189,6 +189,34 @@ export const saveEvidenceNotes = async (req, res) => {
     }
 };
 
+export const saveNotes = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const id = req.params.id;
+        let { actuarial_notes, show_in_pdf } = req.body;
+
+        const existingApplication = await MainModel.getApplicationById(id);
+        if (!existingApplication) return error(res, 'Application not found', 404);
+
+        if (actuarial_notes) {
+            actuarial_notes = sanitizeHtml(actuarial_notes, sanitizeOptions);
+        }
+
+        const showPdf = show_in_pdf !== undefined ? show_in_pdf : true;
+        await ActuarialModel.saveActuarialNotes(id, actuarial_notes, userId, showPdf);
+
+        const updatedApp = await MainModel.getApplicationById(id);
+        const response = await buildApplicationResponse(updatedApp);
+
+        io.emit('saveNotes', response);
+
+        return success(res, response, 'Notes saved successfully.');
+    } catch (err) {
+        console.error('Save Notes Error:', err);
+        return error(res, err.message);
+    }
+};
+
 export const saveTotalAnnualPremium = async (req, res) => {
     try {
         const userId = req.user.user_id;

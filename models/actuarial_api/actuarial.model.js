@@ -303,3 +303,59 @@ export const getRatesHistoryByApplicationId = async (applicationId) => {
         };
     }) ?? [];
 };
+
+// Save or update actuarial notes for an application
+export const saveActuarialNotes = async (applicationId, notes, userId, showInPdf = true) => {
+    const pool = await poolPromise;
+    const showVal = (showInPdf === false || showInPdf === 'false' || showInPdf === 0) ? 0 : 1;
+    
+    // Check if notes already exist for this application and department
+    const checkRes = await pool.request()
+        .input('appId', sql.Int, applicationId)
+        .input('department', sql.NVarChar(100), 'actuarial')
+        .query(`
+            SELECT id FROM DHUB_UAT.sg.financial_insurance_application_notes
+            WHERE application_id = @appId AND department = @department
+        `);
+
+    if (checkRes.recordset && checkRes.recordset.length > 0) {
+        // Update existing row
+        await pool.request()
+            .input('appId', sql.Int, applicationId)
+            .input('department', sql.NVarChar(100), 'actuarial')
+            .input('userId', sql.Int, userId)
+            .input('notes', sql.NVarChar(sql.MAX), notes)
+            .input('show_in_pdf', sql.Bit, showVal)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_application_notes
+                SET notes = @notes, user_id = @userId, show_in_pdf = @show_in_pdf, updated_at = GETDATE()
+                WHERE application_id = @appId AND department = @department
+            `);
+    } else {
+        // Insert new row
+        await pool.request()
+            .input('appId', sql.Int, applicationId)
+            .input('department', sql.NVarChar(100), 'actuarial')
+            .input('userId', sql.Int, userId)
+            .input('notes', sql.NVarChar(sql.MAX), notes)
+            .input('show_in_pdf', sql.Bit, showVal)
+            .query(`
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application_notes (application_id, department, user_id, notes, show_in_pdf)
+                VALUES (@appId, @department, @userId, @notes, @show_in_pdf)
+            `);
+    }
+};
+
+// Retrieve actuarial notes for an application
+export const getActuarialNotes = async (applicationId) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('appId', sql.Int, applicationId)
+        .input('department', sql.NVarChar(100), 'actuarial')
+        .query(`
+            SELECT TOP 1 notes FROM DHUB_UAT.sg.financial_insurance_application_notes
+            WHERE application_id = @appId AND department = @department
+            ORDER BY updated_at DESC
+        `);
+    return res.recordset?.[0]?.notes ?? null;
+};
