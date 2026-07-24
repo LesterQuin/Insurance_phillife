@@ -1,6 +1,6 @@
 import express from 'express';
 import * as Controller from '../../controllers/actuarial_api/actuarial.controller.js';
-import { validateRates, validateTotalPremium, validateEvidenceNotes, validateNotes } from '../../middlewares/validate.js';
+import { validateRates, validateTotalPremium, validateEvidenceNotes, validateNotes, validateFileUpload } from '../../middlewares/validate.js';
 import { authenticate, isActuarial } from '../../middlewares/authenticate.js';
 import parseMultipartForm from '../../middlewares/fileUpload.js';
 import { parseExcelRatesMiddleware } from '../../middlewares/parseExcel.js';
@@ -25,6 +25,10 @@ router.put('/evidence-notes/:id', authenticate, isActuarial, validateEvidenceNot
 // API to input general proposal notes
 router.post('/notes/:id', authenticate, isActuarial, validateNotes, Controller.saveNotes);
 router.put('/notes/:id', authenticate, isActuarial, validateNotes, Controller.saveNotes);
+
+// Actuarial files upload and download
+router.post('/:id/upload-files', authenticate, isActuarial, parseMultipartForm, validateFileUpload, Controller.uploadActuarialFiles);
+router.post('/:id/download-files', authenticate, isActuarial, parseMultipartForm, Controller.downloadActuarialFiles);
 
 // API to input total annual premium
 router.get('/total-premium/queue', authenticate, isActuarial, Controller.getApplicationsPendingTotalPremium);

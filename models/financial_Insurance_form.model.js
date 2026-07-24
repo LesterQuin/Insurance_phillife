@@ -491,9 +491,42 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
             }
             filesMap[f.application_id].push(f.file_path);
         });
+
+        // Bulk load actuarial notes
+        const notesRes = await pool.request().query(`
+            SELECT application_id, notes, show_in_pdf 
+            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
+        `);
+        const notesMap = {};
+        const showMap = {};
+        (notesRes.recordset || []).forEach(n => {
+            notesMap[n.application_id] = n.notes;
+            showMap[n.application_id] = n.show_in_pdf;
+        });
+
+        // Bulk load actuarial files
+        const actFilesRes = await pool.request().query(`
+            SELECT application_id, file_path 
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
+        `);
+        const actFilesMap = {};
+        (actFilesRes.recordset || []).forEach(f => {
+            if (!actFilesMap[f.application_id]) {
+                actFilesMap[f.application_id] = [];
+            }
+            actFilesMap[f.application_id].push(f.file_path);
+        });
+
         apps.forEach(app => {
             const appFiles = filesMap[app.application_id];
             app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
+            app.actuarial_notes = notesMap[app.application_id] ?? null;
+            app.actuarial_notes_show_in_pdf = showMap[app.application_id] !== false;
+            
+            const appActFiles = actFilesMap[app.application_id];
+            app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
         });
     }
     return apps;
@@ -642,9 +675,42 @@ export const getPrototypes = async (userId = null) => {
             }
             filesMap[f.application_id].push(f.file_path);
         });
+
+        // Bulk load actuarial notes
+        const notesRes = await pool.request().query(`
+            SELECT application_id, notes, show_in_pdf 
+            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
+        `);
+        const notesMap = {};
+        const showMap = {};
+        (notesRes.recordset || []).forEach(n => {
+            notesMap[n.application_id] = n.notes;
+            showMap[n.application_id] = n.show_in_pdf;
+        });
+
+        // Bulk load actuarial files
+        const actFilesRes = await pool.request().query(`
+            SELECT application_id, file_path 
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
+        `);
+        const actFilesMap = {};
+        (actFilesRes.recordset || []).forEach(f => {
+            if (!actFilesMap[f.application_id]) {
+                actFilesMap[f.application_id] = [];
+            }
+            actFilesMap[f.application_id].push(f.file_path);
+        });
+
         apps.forEach(app => {
             const appFiles = filesMap[app.application_id];
             app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
+            app.actuarial_notes = notesMap[app.application_id] ?? null;
+            app.actuarial_notes_show_in_pdf = showMap[app.application_id] !== false;
+            
+            const appActFiles = actFilesMap[app.application_id];
+            app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
         });
     }
     return apps;
@@ -744,6 +810,20 @@ export const getApplicationById = async (id) => {
         `);
         const files = filesRes.recordset || [];
         app.excel_file_path = files.length > 0 ? JSON.stringify(files.map(f => f.file_path)) : null;
+
+        // Load actuarial notes
+        const actuarialNotesRes = await pool.request().input('appId', sql.Int, id).query(`
+            SELECT notes, show_in_pdf FROM DHUB_UAT.sg.financial_insurance_application_notes WHERE application_id = @appId AND department = 'actuarial'
+        `);
+        app.actuarial_notes = actuarialNotesRes.recordset?.[0]?.notes ?? null;
+        app.actuarial_notes_show_in_pdf = actuarialNotesRes.recordset?.[0]?.show_in_pdf !== false;
+
+        // Load actuarial files
+        const actuarialFilesRes = await pool.request().input('appId', sql.Int, id).query(`
+            SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_department_files WHERE application_id = @appId AND department = 'actuarial'
+        `);
+        const actFiles = actuarialFilesRes.recordset || [];
+        app.actuarial_files = actFiles.length > 0 ? JSON.stringify(actFiles.map(f => f.file_path)) : null;
     }
     return app;
 };

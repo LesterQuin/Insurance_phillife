@@ -1520,6 +1520,24 @@ export const validateEvidenceNotes = [
 ];
 
 // -----------------------------
+// Notes validation
+// -----------------------------
+export const validateNotes = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('actuarial_notes')
+        .notEmpty().withMessage('Actuarial notes are required')
+        .isString().withMessage('Actuarial notes must be a string'),
+    body('show_in_pdf')
+        .optional()
+        .isBoolean().withMessage('show_in_pdf must be a boolean (true/false)'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ status: false, errors: errors.array() });
+        next();
+    }
+];
+
+// -----------------------------
 // Total Premium validation
 // -----------------------------
 export const validateTotalPremium = [

@@ -1,4 +1,5 @@
 import { poolPromise, sql } from '../../config/db.js';
+import path from 'path';
 
 // Helper to log application actions
 const logApplicationAction = async (transaction, { applicationId, userId, actionType, changes, ipAddress }) => {
@@ -358,4 +359,47 @@ export const getActuarialNotes = async (applicationId) => {
             ORDER BY updated_at DESC
         `);
     return res.recordset?.[0]?.notes ?? null;
+};
+
+// Save actuarial files
+export const saveActuarialFiles = async (applicationId, filePaths, userId) => {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+
+        for (const filePath of filePaths) {
+            if (filePath) {
+                const insertRequest = new sql.Request(transaction);
+                await insertRequest
+                    .input('appId', sql.Int, applicationId)
+                    .input('department', sql.NVarChar(100), 'actuarial')
+                    .input('file_path', sql.NVarChar(500), filePath)
+                    .input('file_name', sql.NVarChar(255), path.basename(filePath))
+                    .query(`
+                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_department_files (application_id, department, file_path, file_name)
+                        VALUES (@appId, @department, @file_path, @file_name)
+                    `);
+            }
+        }
+
+        await transaction.commit();
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+// Retrieve actuarial files
+export const getActuarialFiles = async (applicationId) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('appId', sql.Int, applicationId)
+        .input('department', sql.NVarChar(100), 'actuarial')
+        .query(`
+            SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_department_files
+            WHERE application_id = @appId AND department = @department
+        `);
+    return (res.recordset || []).map(f => f.file_path);
 };

@@ -524,6 +524,7 @@ export const buildApplicationResponse = async (app) => {
         loan_maturity_month_name,
         payment_term_id, sub_payment_term_id,
         excel_file_path,
+        actuarial_files,
         signed_proposal_path, group_app_path, dti_path, sec_reg_path,
         articles_of_inc_path, by_laws_path, business_permit_path,
         masterlist_file_path, authorized_id_path, booking_date,
@@ -553,6 +554,18 @@ export const buildApplicationResponse = async (app) => {
                 // Ignore error, fallback to single path string
             }
             return path.basename(excel_file_path);
+        })(),
+        actuarial_files: (() => {
+            if (!actuarial_files) return null;
+            try {
+                const parsed = JSON.parse(actuarial_files);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(p => path.basename(p));
+                }
+            } catch (e) {
+                // Ignore
+            }
+            return path.basename(actuarial_files);
         })(),
         installation_requirements: {
             signed_proposal: signed_proposal_path ? path.basename(signed_proposal_path) : null,

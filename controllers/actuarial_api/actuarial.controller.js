@@ -3,7 +3,9 @@ import * as ActuarialModel from '../../models/actuarial_api/actuarial.model.js';
 import * as User from '../../models/user/user_model.js';
 import { success, error } from '../../utils/response.js';
 import sanitizeHtml from 'sanitize-html';
-import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus, formatDbRatesForTemplate } from '../../middlewares/helper.js';
+import { buildApplicationResponse, sanitizeOptions, updateActuarialStatus, formatDbRatesForTemplate, ensureCompanyDir, getFileTimestamp } from '../../middlewares/helper.js';
+import fs from 'fs';
+import path from 'path';
 import { io } from '../../socket-io/socket_setup.js';
 import XLSX from 'xlsx-js-style';
 
@@ -668,6 +670,80 @@ export const getRatesHistory = async (req, res) => {
         return success(res, history, 'Rates history fetched successfully.');
     } catch (err) {
         console.error('Get Rates History Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Upload Actuarial Files
+export const uploadActuarialFiles = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const rawFiles = req.files?.file || req.files?.excel_file;
+
+        const app = await MainModel.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found.', 404);
+
+        const targetDir = ensureCompanyDir(app.group_name, 'actuarial_files');
+
+        const filesToProcess = Array.isArray(rawFiles) ? rawFiles : [rawFiles];
+        const newFilePaths = [];
+
+        for (const file of filesToProcess) {
+            const uniqueFilename = `APP-${appId}-ACT-v${getFileTimestamp()}-${file.originalFilename}`;
+            const newFilePath = path.join(targetDir, uniqueFilename).replace(/\\/g, '/');
+
+            await fs.promises.rename(file.filepath, newFilePath);
+            newFilePaths.push(newFilePath);
+        }
+
+        await ActuarialModel.saveActuarialFiles(appId, newFilePaths, userId);
+
+        const updatedApp = await MainModel.getApplicationById(appId);
+        const response = await buildApplicationResponse(updatedApp);
+
+        io.emit('uploadActuarialFiles', response);
+
+        return success(res, response, 'Actuarial files uploaded successfully.');
+    } catch (err) {
+        console.error('Actuarial Upload Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Download Actuarial Files
+export const downloadActuarialFiles = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+
+        const app = await MainModel.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found.', 404);
+
+        const rawFiles = await ActuarialModel.getActuarialFiles(appId);
+        if (!rawFiles || rawFiles.length === 0) {
+            return error(res, 'No actuarial files found for this application.', 404);
+        }
+
+        let targetFilePath = rawFiles[0];
+        const indexParam = req.query.index || req.body.index;
+        if (indexParam !== undefined) {
+            const index = parseInt(indexParam, 10);
+            if (isNaN(index) || index < 0 || index >= rawFiles.length) {
+                return error(res, `Invalid file index. This application has ${rawFiles.length} uploaded actuarial files (valid index range: 0 to ${rawFiles.length - 1}).`, 400);
+            }
+            targetFilePath = rawFiles[index];
+        }
+
+        if (!fs.existsSync(targetFilePath)) {
+            console.error(`[downloadActuarialFiles] File not found at: ${targetFilePath}`);
+            return error(res, 'File not found on server.', 404);
+        }
+
+        const originalName = path.basename(targetFilePath).replace(/^APP-\d+-ACT-v?\d{8}-\d{6}-/, '');
+        return res.download(targetFilePath, originalName);
+    } catch (err) {
+        console.error('Actuarial File Download Error:', err);
         return error(res, err.message);
     }
 };
