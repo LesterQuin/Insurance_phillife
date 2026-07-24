@@ -1,6 +1,6 @@
 import express from 'express';
 import * as Controller from '../controllers/financial_Insurance_form.controller.js';
-import { validateFinancialApplication, validateUpdateFinancialApplication, validateDraftFinancialApplication, validateRates, validateGetHistory, validateTotalPremium, validateMaxAmounts, validateEvidenceNotes, validateExcelUpload, validateGetExtensionRequests, validateRequestExtension, validateApproveExtension, validateRejectExtension } from '../middlewares/validate.js';
+import { validateFinancialApplication, validateUpdateFinancialApplication, validateDraftFinancialApplication, validateRates, validateGetHistory, validateTotalPremium, validateMaxAmounts, validateEvidenceNotes, validateFileUpload, validateGetExtensionRequests, validateRequestExtension, validateApproveExtension, validateRejectExtension } from '../middlewares/validate.js';
 import { authenticate } from '../middlewares/authenticate.js';
 import parseMultipartForm from '../middlewares/fileUpload.js';
 
@@ -11,8 +11,8 @@ router.post('/create', authenticate, parseMultipartForm, validateFinancialApplic
 router.post('/draft', authenticate, parseMultipartForm, validateDraftFinancialApplication, Controller.saveDraft);
 router.put('/:id', authenticate, parseMultipartForm, validateUpdateFinancialApplication, Controller.updateApplication);
 
-router.post('/:id/upload-excel', authenticate, parseMultipartForm, validateExcelUpload, Controller.uploadExcelFile);
-router.post('/:id/download-excel', authenticate, parseMultipartForm, Controller.downloadExcelFile);
+router.post('/:id/upload-files', authenticate, parseMultipartForm, validateFileUpload, Controller.uploadFiles);
+router.post('/:id/download-files', authenticate, parseMultipartForm, Controller.downloadFiles);
 
 //router.put('/:id/prototype-status', authenticate, parseMultipartForm, Controller.updatePrototypeStatus);
 router.put('/:id/status/checking', authenticate, Controller.setStatusChecking); // addtional with controller not tested

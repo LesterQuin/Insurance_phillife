@@ -53,7 +53,7 @@ export const createComment = async (req, res) => {
             const file = req.files.attachment;
             const groupName = app.group_name || 'unassigned_group';
             const sanitizedGroup = groupName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-            const targetDir = path.join(process.cwd(), 'uploads/comments', sanitizedGroup);
+            const targetDir = path.join(process.cwd(), 'uploads', sanitizedGroup, 'comments');
 
             if (!fs.existsSync(targetDir)) {
                 fs.mkdirSync(targetDir, { recursive: true });
@@ -64,7 +64,7 @@ export const createComment = async (req, res) => {
             const targetPath = path.join(targetDir, fileName);
 
             fs.renameSync(file.filepath, targetPath);
-            attachment_path = path.join('uploads/comments', sanitizedGroup, fileName).replace(/\\/g, '/');
+            attachment_path = path.join('uploads', sanitizedGroup, 'comments', fileName).replace(/\\/g, '/');
         }
 
         if (hasText) {

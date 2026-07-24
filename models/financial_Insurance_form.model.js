@@ -1,4 +1,5 @@
 import { poolPromise, sql } from '../config/db.js';
+import path from 'path';
 
 const valueOrNull = (val) => (val !== undefined && val !== null && val !== '') ? val : null;
 
@@ -236,6 +237,27 @@ export const createApplication = async (data, userId) => {
             }
         }
 
+        // Insert files if applicable
+        if (data.excel_file_path) {
+            let paths = [];
+            try {
+                paths = JSON.parse(data.excel_file_path);
+                if (!Array.isArray(paths)) paths = [data.excel_file_path];
+            } catch (e) {
+                paths = data.excel_file_path.split(',').map(p => p.trim());
+            }
+
+            for (const p of paths) {
+                if (p) {
+                    await new sql.Request(transaction)
+                        .input('application_id', sql.Int, applicationId)
+                        .input('file_path', sql.NVarChar(500), p)
+                        .input('file_name', sql.NVarChar(255), path.basename(p))
+                        .query('INSERT INTO DHUB_UAT.sg.financial_insurance_application_files (application_id, file_path, file_name) VALUES (@application_id, @file_path, @file_name)');
+                }
+            }
+        }
+
         await transaction.commit();
         return { application_id: applicationId };
     } catch (err) {
@@ -454,7 +476,27 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
             ORDER BY fia.created_at DESC;
         `);
 
-    return res.recordset ?? [];
+    const apps = res.recordset ?? [];
+    if (apps.length > 0) {
+        const appIds = apps.map(a => a.application_id);
+        const filesRes = await pool.request().query(`
+            SELECT application_id, file_path 
+            FROM DHUB_UAT.sg.financial_insurance_application_files 
+            WHERE application_id IN (${appIds.join(',')})
+        `);
+        const filesMap = {};
+        (filesRes.recordset || []).forEach(f => {
+            if (!filesMap[f.application_id]) {
+                filesMap[f.application_id] = [];
+            }
+            filesMap[f.application_id].push(f.file_path);
+        });
+        apps.forEach(app => {
+            const appFiles = filesMap[app.application_id];
+            app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
+        });
+    }
+    return apps;
 };
 
 export const getExtensionRequests = async (userIds = null) => {
@@ -585,7 +627,27 @@ export const getPrototypes = async (userId = null) => {
             ORDER BY fia.created_at DESC
         `);
 
-    return res.recordset ?? [];
+    const apps = res.recordset ?? [];
+    if (apps.length > 0) {
+        const appIds = apps.map(a => a.application_id);
+        const filesRes = await pool.request().query(`
+            SELECT application_id, file_path 
+            FROM DHUB_UAT.sg.financial_insurance_application_files 
+            WHERE application_id IN (${appIds.join(',')})
+        `);
+        const filesMap = {};
+        (filesRes.recordset || []).forEach(f => {
+            if (!filesMap[f.application_id]) {
+                filesMap[f.application_id] = [];
+            }
+            filesMap[f.application_id].push(f.file_path);
+        });
+        apps.forEach(app => {
+            const appFiles = filesMap[app.application_id];
+            app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
+        });
+    }
+    return apps;
 };
 
 // Get application by ID
@@ -675,7 +737,15 @@ export const getApplicationById = async (id) => {
             WHERE fia.application_id = @id
         `);
 
-    return res.recordset?.[0] ?? null;
+    const app = res.recordset?.[0] ?? null;
+    if (app) {
+        const filesRes = await pool.request().input('appId', sql.Int, id).query(`
+            SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_files WHERE application_id = @appId
+        `);
+        const files = filesRes.recordset || [];
+        app.excel_file_path = files.length > 0 ? JSON.stringify(files.map(f => f.file_path)) : null;
+    }
+    return app;
 };
 
 // Check if group name exists
@@ -975,6 +1045,36 @@ export const updateApplication = async (id, data, userId) => {
 
         // Add excel_file_path to update clause
         addClause('excel_file_path', data.excel_file_path, sql.NVarChar(sql.MAX));
+
+        if (data.excel_file_path !== undefined) {
+            // Delete existing files in files table first
+            const deleteFilesRequest = new sql.Request(transaction);
+            await deleteFilesRequest
+                .input('application_id', sql.Int, id)
+                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_files WHERE application_id = @application_id');
+
+            if (data.excel_file_path) {
+                let paths = [];
+                try {
+                    paths = JSON.parse(data.excel_file_path);
+                    if (!Array.isArray(paths)) paths = [data.excel_file_path];
+                } catch (e) {
+                    paths = data.excel_file_path.split(',').map(p => p.trim());
+                }
+
+                for (const p of paths) {
+                    if (p) {
+                        const insertFileRequest = new sql.Request(transaction);
+                        await insertFileRequest
+                            .input('application_id', sql.Int, id)
+                            .input('file_path', sql.NVarChar(500), p)
+                            .input('file_name', sql.NVarChar(255), path.basename(p))
+                            .query('INSERT INTO DHUB_UAT.sg.financial_insurance_application_files (application_id, file_path, file_name) VALUES (@application_id, @file_path, @file_name)');
+                    }
+                }
+            }
+        }
+
         if (data.payment !== undefined) {
             const paymentTerm = (Array.isArray(data.payment) && data.payment.length > 0) ? data.payment[0] : null;
             addClause('payment_term_id', paymentTerm ? paymentTerm.payment_term_id : null, sql.Int);

@@ -1220,24 +1220,17 @@ body('basic_plan_id')
                 throw new Error(`Invalid coverage_type_id (${value}). Valid options: ${validOptions}`);
             }
 
-            const excelFile = req.files?.excel_file;
+            const excelFile = req.files?.file || req.files?.excel_file;
 
-            // 1. Mandatory check removed here to allow separate upload via the /:id/upload-excel API.
+            // 1. Mandatory check removed here to allow separate upload via the /:id/upload-files API.
             // The file is now optional during the initial 'create' or 'draft' phase.
 
-            // 2. Validate file type if any file is uploaded
+            // 2. Validate file count if files are uploaded
             if (excelFile) {
-                const fileName = excelFile.originalFilename?.toLowerCase() || '';
-                const mimeType = excelFile.mimetype || '';
-                const isExcel = fileName.endsWith('.xlsx') || 
-                                fileName.endsWith('.xls') || 
-                                fileName.endsWith('.csv') || 
-                                mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                                mimeType === 'application/vnd.ms-excel' ||
-                                mimeType === 'text/csv';
-
-                if (!isExcel) {
-                    throw new Error('Invalid file type. Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.');
+                const fileList = Array.isArray(excelFile) ? excelFile : [excelFile];
+                const maxFiles = 10;
+                if (fileList.length > maxFiles) {
+                    throw new Error(`Maximum of ${maxFiles} files can be uploaded.`);
                 }
             }
 
@@ -2614,27 +2607,20 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 ];
 
 // -----------------------------
-// Excel Upload validation
+// Generic File Upload validation
 // -----------------------------
-export const validateExcelUpload = [
+export const validateFileUpload = [
     param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
     (req, res, next) => {
-        const excelFile = req.files?.excel_file;
-        if (!excelFile) {
-            return res.status(400).json({ status: false, errors: [{ msg: 'excel_file is required.' }] });
+        const files = req.files?.file || req.files?.excel_file;
+        if (!files || (Array.isArray(files) && files.length === 0)) {
+            return res.status(400).json({ status: false, errors: [{ msg: 'file is required.' }] });
         }
 
-        const fileName = excelFile.originalFilename?.toLowerCase() || '';
-        const mimeType = excelFile.mimetype || '';
-        const isExcel = fileName.endsWith('.xlsx') || 
-                        fileName.endsWith('.xls') || 
-                        fileName.endsWith('.csv') || 
-                        mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || 
-                        mimeType === 'application/vnd.ms-excel' ||
-                        mimeType === 'text/csv';
-
-        if (!isExcel) {
-            return res.status(400).json({ status: false, errors: [{ msg: 'Invalid file type. Only Excel files (.xlsx, .xls) or CSV files (.csv) are allowed.' }] });
+        const fileList = Array.isArray(files) ? files : [files];
+        const maxFiles = 10;
+        if (fileList.length > maxFiles) {
+            return res.status(400).json({ status: false, errors: [{ msg: `Maximum of ${maxFiles} files can be uploaded.` }] });
         }
         next();
     }

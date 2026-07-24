@@ -36,7 +36,11 @@ const parseMultipartForm = (req, res, next) => {
 
     const processedFiles = {};
     for (const key in files) {
-      processedFiles[key] = Array.isArray(files[key]) ? files[key][0] : files[key];
+      if (key === 'excel_file' || key === 'file') {
+        processedFiles[key] = Array.isArray(files[key]) ? files[key] : [files[key]];
+      } else {
+        processedFiles[key] = Array.isArray(files[key]) ? files[key][0] : files[key];
+      }
     }
 
     req.body = { ...req.body, ...processedFields };

@@ -45,15 +45,27 @@ export const getImageDataUri = (imagePath) => {
 
 // Helper to ensure group-specific and requirement-specific directory exists
 export const ensureRequirementsDir = (groupName, requirementType = '') => {
-    const rootDir = path.resolve('uploads/requirements');
+    const rootDir = path.resolve('uploads');
     // Sanitize group name for folder path (remove special chars, replace spaces with underscores)
     const sanitizedGroup = groupName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const appDir = path.join(rootDir, sanitizedGroup, requirementType);
+    const appDir = path.join(rootDir, sanitizedGroup, 'requirements', requirementType);
     
     if (!fs.existsSync(appDir)) {
         fs.mkdirSync(appDir, { recursive: true });
     }
     return appDir;
+};
+
+// Helper to ensure group-specific and custom folder directory exists (e.g. uploaded_files, comments)
+export const ensureCompanyDir = (groupName, folderType = '') => {
+    const rootDir = path.resolve('uploads');
+    const sanitizedGroup = groupName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const targetDir = path.join(rootDir, sanitizedGroup, folderType);
+    
+    if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+    }
+    return targetDir;
 };
 
 // Configuration for rich-text sanitization
@@ -465,9 +477,13 @@ export const buildApplicationResponse = async (app) => {
     const isExpiredByTime = effectiveNow > expiryDate;
     const isFinalized = currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED || isExpiredByTime;
     
-    const daysRemaining = (currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED) 
+    const proposalDaysRemaining = (currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED) 
         ? 0 
         : Math.max(0, Math.ceil((expiryDate.getTime() - effectiveNow.getTime()) / (1000 * 60 * 60 * 24)));
+
+    const policyDaysBeforeRenew = (currentStatus === STATUS_BOOKED)
+        ? Math.max(0, Math.ceil((expiryDate.getTime() - effectiveNow.getTime()) / (1000 * 60 * 60 * 24)))
+        : 0;
 
     if ((app.coverage_type_id === 32 || app.coverage_type_id === 34) && rankingRiders.length > 0) {
         riders.forEach(mainRider => {
@@ -526,7 +542,18 @@ export const buildApplicationResponse = async (app) => {
             mi: contact_person_mi,
             lastname: contact_person_lastname
         },
-        excel_file_path: excel_file_path ? path.basename(excel_file_path) : null,
+        excel_file_path: (() => {
+            if (!excel_file_path) return null;
+            try {
+                const parsed = JSON.parse(excel_file_path);
+                if (Array.isArray(parsed)) {
+                    return parsed.map(p => path.basename(p));
+                }
+            } catch (e) {
+                // Ignore error, fallback to single path string
+            }
+            return path.basename(excel_file_path);
+        })(),
         installation_requirements: {
             signed_proposal: signed_proposal_path ? path.basename(signed_proposal_path) : null,
             group_app: group_app_path ? path.basename(group_app_path) : null,
@@ -619,7 +646,8 @@ export const buildApplicationResponse = async (app) => {
         },
         validity: {
             expiry_date: expiryDate,
-            days_remaining: daysRemaining,
+            proposal_days_remaining: proposalDaysRemaining,
+            policy_days_before_renew_remaining: policyDaysBeforeRenew,
             is_expired: (currentStatus === STATUS_CLOSED || isExpiredByTime) && currentStatus !== STATUS_BOOKED,
             countdown_active: !isFinalized && currentStatus !== STATUS_BOOKED && currentStatus !== STATUS_CLOSED,
             extension_requested: !!app.extension_requested,
@@ -827,4 +855,102 @@ export const generateCOCHtml = async (id) => {
 
     const { generateCOCTemplate } = await import('../templates/coc/cocTemplate.js');
     return generateCOCTemplate(application, user, details);
+};
+
+/**
+ * Helper to fetch internal email recipients and generate a dynamic salutation for proposal notifications.
+ * Dynamically retrieves:
+ * 1. Configured static users (e.g. User ID 17 - Marvin Mayo Catapang)
+ * 2. Head / Team Lead of the CFE Creator (via creator.reporting_to_id)
+ * (Note: CFE Creator email and salutation are excluded from internal email recipients as CFE details are listed in the email body)
+ */
+export const getProposalNotificationRecipients = async (creatorUserId) => {
+    const emailSet = new Set();
+    const salutationParts = [];
+    let creator = null;
+    let head = null;
+
+    // List of static internal recipients (Add any user IDs, fallback emails, or custom salutation titles here)
+    const staticUsers = [
+        { id: 17, fallbackEmail: 'marvinc@phillife.com.ph', fallbackLastName: 'Catapang', salutationName: 'Sir Marvin' },
+        // To add another user by ID or email, simply add objects here:
+        // { id: 25, fallbackEmail: 'john.doe@phillife.com.ph', fallbackLastName: 'Kwong' },
+        // { email: 'customteam@phillife.com.ph', salutationName: 'EBAM Team' }
+    ];
+
+    // 1. Fetch static internal recipients
+    for (const target of staticUsers) {
+        let u = null;
+        if (target.id) {
+            try {
+                u = await User.getUserById(target.id);
+                if (u && u.email) {
+                    emailSet.add(u.email.trim());
+                }
+            } catch (e) {}
+        }
+
+        if (!u && (target.fallbackEmail || target.email)) {
+            emailSet.add((target.fallbackEmail || target.email).trim());
+        }
+
+        // Determine salutation name for static user (using salutationName or fetched last name)
+        const nameToUse = target.salutationName 
+            ? target.salutationName 
+            : (u && u.lastname ? `Sir/Ms. ${u.lastname}` : (target.fallbackLastName ? `Sir/Ms. ${target.fallbackLastName}` : null));
+            
+        if (nameToUse && !salutationParts.includes(nameToUse)) {
+            salutationParts.push(nameToUse);
+        }
+    }
+
+    // 2. Fetch CFE Creator & Head (Head gets the email, Creator is only fetched for head lookup & template info)
+    if (creatorUserId) {
+        try {
+            creator = await User.getUserById(creatorUserId);
+
+            // Fetch CFE Creator's Head (via reporting_to_id)
+            if (creator && creator.reporting_to_id) {
+                head = await User.getUserById(creator.reporting_to_id);
+                if (head && head.email) {
+                    emailSet.add(head.email.trim());
+                }
+            }
+        } catch (e) {
+            console.error('Error fetching creator or head for notification:', e);
+        }
+    }
+
+    // Include Head's Last Name in salutation if available
+    if (head && head.lastname) {
+        const headSalutation = `Sir/Ms. ${head.lastname} (Team Lead)`;
+        if (!salutationParts.includes(headSalutation)) {
+            salutationParts.push(headSalutation);
+        }
+    } else if (!salutationParts.includes('Team Lead')) {
+        salutationParts.push('Team Lead');
+    }
+
+    // Add "EBAM Team" at the end if not already included
+    if (!salutationParts.includes('EBAM Team')) {
+        salutationParts.push('EBAM Team');
+    }
+
+    // Construct internalSalutation string dynamically
+    let internalSalutation = "";
+    if (salutationParts.length === 1) {
+        internalSalutation = salutationParts[0];
+    } else if (salutationParts.length === 2) {
+        internalSalutation = `${salutationParts[0]} and ${salutationParts[1]}`;
+    } else {
+        const lastPart = salutationParts.pop();
+        internalSalutation = `${salutationParts.join(', ')}, and ${lastPart}`;
+    }
+
+    return {
+        creator,
+        head,
+        recipientEmails: Array.from(emailSet),
+        internalSalutation
+    };
 };

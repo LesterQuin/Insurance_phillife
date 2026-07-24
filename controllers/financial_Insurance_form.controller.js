@@ -79,24 +79,25 @@ export const createApplication = async (req, res) => {
 
         const appId = newRecord.application_id;
 
-        // Handle Excel file after ID is generated to include it in the filename
-        const excelFile = req.files?.excel_file; 
+        // Handle files after ID is generated to include it in the filename
+        const excelFile = req.files?.file || req.files?.excel_file; 
         if (excelFile) {
-            const tempFilePath = excelFile.filepath;
-            const originalFilename = excelFile.originalFilename;
-            
-            if (!fs.existsSync(UPLOAD_DIR)) {
-                fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+            const filesToProcess = Array.isArray(excelFile) ? excelFile : [excelFile];
+            const newFilePaths = [];
+
+            const targetDir = Helper.ensureCompanyDir(processedData.group_name, 'uploaded_files');
+
+            for (const file of filesToProcess) {
+                // Add application_id to the filename
+                const uniqueFilename = `APP-${appId}-v${Helper.getFileTimestamp()}-${file.originalFilename}`;
+                const newFilePath = path.join(targetDir, uniqueFilename).replace(/\\/g, '/');
+
+                await fs.promises.rename(file.filepath, newFilePath);
+                newFilePaths.push(newFilePath);
             }
-
-            // Add application_id to the filename
-            const uniqueFilename = `APP-${appId}-v${Helper.getFileTimestamp()}-${originalFilename}`;
-            const newFilePath = path.join(UPLOAD_DIR, uniqueFilename);
-
-            await fs.promises.rename(tempFilePath, newFilePath);
             
-            // Update the record with the file path
-            await Model.updateApplication(appId, { excel_file_path: newFilePath }, userId);
+            // Store as a JSON array string in the database
+            await Model.updateApplication(appId, { excel_file_path: JSON.stringify(newFilePaths) }, userId);
         }
 
         // Fetch the raw application data
@@ -254,18 +255,17 @@ export const updateApplicationStatus = async (req, res) => {
         // Notify via email if status is manually set to Booked (7)
         if (Number(status_id) === 7) {
             try {
-                const creator = await User.getUserById(app.user_id);
+                const { creator, head, recipientEmails, internalSalutation } = await Helper.getProposalNotificationRecipients(app.user_id);
                 const bookedDate = new Date().toLocaleDateString();
                 const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
                 const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
-                const internalSalutation = "Sir MMC, John Kwong, Team Lead, and EBAM Team";
                 const clientSalutation = `Mr./Ms. ${app.contact_person_lastname}`;
 
-                // Notify CFE (Creator)
-                if (creator && creator.email) {
+                // Notify Internal Team (User 17, CFE Creator, CFE Head)
+                if (recipientEmails.length > 0) {
                     await transporter.sendMail({
                         from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: creator.email,
+                        to: recipientEmails.join(', '),
                         subject: `Account BOOKED: ${app.group_name}`,
                         html: bookedNotificationTemplate(
                             internalSalutation,
@@ -273,7 +273,7 @@ export const updateApplicationStatus = async (req, res) => {
                             clientName,
                             proposalNumber,
                             bookedDate,
-                            `${creator.firstname} ${creator.lastname}`
+                            creator ? `${creator.firstname} ${creator.lastname}` : 'System'
                         )
                     });
                 }
@@ -750,8 +750,8 @@ export const checkGroupName = async (req, res) => {
     }
 };
 
-// Download Excel File
-export const downloadExcelFile = async (req, res) => {
+// Download Application Files
+export const downloadFiles = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
@@ -761,7 +761,7 @@ export const downloadExcelFile = async (req, res) => {
         if (!app) return error(res, 'Application not found', 404);
 
         if (!app.excel_file_path) {
-            return error(res, 'No Excel file associated with this application.', 404);
+            return error(res, 'No files associated with this application.', 404);
         }
 
         const loggedInId = Number(userId);
@@ -791,14 +791,36 @@ export const downloadExcelFile = async (req, res) => {
             return error(res, 'You are not authorized to download files for this application.', 403);
         }
 
-        if (!fs.existsSync(app.excel_file_path)) {
-            console.error(`[downloadExcelFile] File not found at: ${app.excel_file_path}`);
-            return error(res, 'Excel file not found on server.', 404);
+        let targetFilePath = app.excel_file_path;
+        if (targetFilePath.startsWith('[') && targetFilePath.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(targetFilePath);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const indexParam = req.query.index || req.body.index;
+                    if (indexParam !== undefined) {
+                        const index = parseInt(indexParam, 10);
+                        if (isNaN(index) || index < 0 || index >= parsed.length) {
+                            return error(res, `Invalid file index. This application has ${parsed.length} uploaded files (valid index range: 0 to ${parsed.length - 1}).`, 400);
+                        }
+                        targetFilePath = parsed[index];
+                    } else {
+                        targetFilePath = parsed[0];
+                    }
+                }
+            } catch (e) {
+                // Ignore parse errors, treat as single path string
+            }
         }
 
-        return res.download(app.excel_file_path, path.basename(app.excel_file_path));
+        if (!fs.existsSync(targetFilePath)) {
+            console.error(`[downloadExcelFile] File not found at: ${targetFilePath}`);
+            return error(res, 'File not found on server.', 404);
+        }
+
+        const originalName = path.basename(targetFilePath).replace(/^APP-\d+-v?\d{8}-\d{6}-/, '');
+        return res.download(targetFilePath, originalName);
     } catch (err) {
-        console.error('Excel Download Error:', err);
+        console.error('File Download Error:', err);
         return error(res, err.message);
     }
 };
@@ -1074,7 +1096,7 @@ export const getAllApplications = async (req, res) => {
             filterUserId = [userId, ...subordinates];
         }
 
-        const rawApplications = await Model.getAllApplications(filterUserId); // Fetch raw data
+        const rawApplications = await Model.getAllApplications(filterUserId, isActuarial); // Fetch raw data
         if (rawApplications.length === 0) { // Check if any applications were found
             return success(res, [], 'Applications fetched successfully.');
         }
@@ -1477,12 +1499,12 @@ export const updateApplication = async (req, res) => {
     }
 };
 
-// Upload Excel File separately
-export const uploadExcelFile = async (req, res) => {
+// Upload Files separately
+export const uploadFiles = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
-        const excelFile = req.files?.excel_file;
+        const rawFiles = req.files?.file || req.files?.excel_file;
 
         // Fetch application to get group_name for folder structure
         const app = await Model.getApplicationById(appId);
@@ -1508,20 +1530,40 @@ export const uploadExcelFile = async (req, res) => {
 
         const oldFilePath = app.excel_file_path;
 
-        // Create the new structured directory: uploads/requirements/{group_name}/excel_files/
-        const targetDir = Helper.ensureRequirementsDir(app.group_name, 'excel_files');
+        // Create the new structured directory: uploads/{group_name}/uploaded_files/
+        const targetDir = Helper.ensureCompanyDir(app.group_name, 'uploaded_files');
 
-        const uniqueFilename = `APP-${appId}-v${Helper.getFileTimestamp()}-${excelFile.originalFilename}`;
-        const newFilePath = path.join(targetDir, uniqueFilename);
+        const filesToProcess = Array.isArray(rawFiles) ? rawFiles : [rawFiles];
+        const newFilePaths = [];
 
-        // Move the uploaded temporary file to its permanent structured location
-        await fs.promises.rename(excelFile.filepath, newFilePath);
+        for (const file of filesToProcess) {
+            const uniqueFilename = `APP-${appId}-v${Helper.getFileTimestamp()}-${file.originalFilename}`;
+            const newFilePath = path.join(targetDir, uniqueFilename).replace(/\\/g, '/');
 
-        await Model.updateApplication(appId, { excel_file_path: newFilePath }, userId);
+            // Move the uploaded temporary file to its permanent structured location
+            await fs.promises.rename(file.filepath, newFilePath);
+            newFilePaths.push(newFilePath);
+        }
 
-        // Cleanup old file
-        if (oldFilePath && fs.existsSync(oldFilePath)) {
-            fs.promises.unlink(oldFilePath).catch(e => console.error("Old file cleanup failed:", e));
+        // Update the application record with JSON string of file paths
+        const dbValue = JSON.stringify(newFilePaths);
+        await Model.updateApplication(appId, { excel_file_path: dbValue }, userId);
+
+        // Cleanup old files
+        if (oldFilePath) {
+            let oldPaths = [];
+            try {
+                oldPaths = JSON.parse(oldFilePath);
+                if (!Array.isArray(oldPaths)) oldPaths = [oldFilePath];
+            } catch (e) {
+                oldPaths = oldFilePath.split(',').map(p => p.trim());
+            }
+
+            for (const oldPath of oldPaths) {
+                if (oldPath && fs.existsSync(oldPath)) {
+                    fs.promises.unlink(oldPath).catch(e => console.error("Old file cleanup failed:", e));
+                }
+            }
         }
 
         const updated = await Model.getApplicationById(appId);
@@ -1535,10 +1577,10 @@ export const uploadExcelFile = async (req, res) => {
             entity: 'FinancialApplication',
             entityId: appId,
             status: AuditStatus.INFO,
-            metadata: { info: 'Excel file uploaded separately' }
+            metadata: { info: 'Files uploaded separately', files: newFilePaths }
         });
 
-        return success(res, response, 'Excel file uploaded successfully.');
+        return success(res, response, 'Files uploaded successfully.');
     } catch (err) {
         console.error('File Upload Error:', err);
         return error(res, err.message);
@@ -1713,18 +1755,17 @@ export const setStatusBooked = async (req, res) => {
 
         // 5. Send Notification Email
         try {
-            const creator = await User.getUserById(app.user_id);
+            const { creator, head, recipientEmails, internalSalutation } = await Helper.getProposalNotificationRecipients(app.user_id);
             const bookedDate = new Date().toLocaleDateString();
             const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
             const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
-            const internalSalutation = "Sir MMC, John Kwong, Team Lead, and EBAM Team";
             const clientSalutation = `Mr./Ms. ${app.contact_person_lastname}`;
 
-            // Notify CFE (Creator)
-            if (creator && creator.email) {
+            // Notify Internal Team (User 17, CFE Creator, CFE Head)
+            if (recipientEmails.length > 0) {
                 await transporter.sendMail({
                     from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                    to: creator.email,
+                    to: recipientEmails.join(', '),
                     subject: `Account Successfully BOOKED: ${app.group_name}`,
                     html: bookedNotificationTemplate(
                         internalSalutation,
@@ -1732,7 +1773,7 @@ export const setStatusBooked = async (req, res) => {
                         clientName,
                         proposalNumber,
                         bookedDate,
-                        `${creator.firstname} ${creator.lastname}`
+                        creator ? `${creator.firstname} ${creator.lastname}` : 'System'
                     )
                 });
             }
