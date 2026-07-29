@@ -754,13 +754,25 @@ export const downloadActuarialFiles = async (req, res) => {
         }
 
         let targetFilePath = rawFiles[0];
-        const indexParam = req.query.index || req.body.index;
+        const indexParam = req.query.index || req.body?.index;
         if (indexParam !== undefined) {
             const index = parseInt(indexParam, 10);
             if (isNaN(index) || index < 0 || index >= rawFiles.length) {
                 return error(res, `Invalid file index. This application has ${rawFiles.length} uploaded actuarial files (valid index range: 0 to ${rawFiles.length - 1}).`, 400);
             }
             targetFilePath = rawFiles[index];
+        }
+
+        if (!fs.existsSync(targetFilePath)) {
+            // Fallback: resolve path under the current project's uploads folder
+            const uploadsIdx = targetFilePath.replace(/\\/g, '/').indexOf('/uploads/');
+            if (uploadsIdx !== -1) {
+                const relativePart = targetFilePath.substring(uploadsIdx + 1);
+                const fallbackPath = path.join(process.cwd(), relativePart);
+                if (fs.existsSync(fallbackPath)) {
+                    targetFilePath = fallbackPath;
+                }
+            }
         }
 
         if (!fs.existsSync(targetFilePath)) {

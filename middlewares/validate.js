@@ -860,6 +860,20 @@ export const validateFinancialApplication = [
 
     body('total_annual_premium').optional().isFloat({ min: 0 }).withMessage('Total Annual Premium must be 0 or a positive number'),
 
+    body('company_tin')
+        .optional({ nullable: true })
+        .custom((value) => {
+            if (value !== undefined && value !== null && value !== '') {
+                if (typeof value !== 'string' && typeof value !== 'number') {
+                    throw new Error('TIN must be a string or number');
+                }
+                if (value.toString().length > 50) {
+                    throw new Error('TIN must not exceed 50 characters');
+                }
+            }
+            return true;
+        }),
+
     // ------------------------------------------
     // Prototype / Product Plan (Conditional)
     // ------------------------------------------
@@ -1403,6 +1417,19 @@ export const validateDraftFinancialApplication = [
     body('contact_number').optional({ nullable: true, checkFalsy: true }).isLength({ max: 20 }).withMessage('Contact Number must not exceed 20 characters'),
     body('fax_number').optional({ nullable: true, checkFalsy: true }).isLength({ max: 20 }).withMessage('Fax Number must not exceed 20 characters'),
     body('email').optional().isEmail().withMessage('Valid Email is required'),
+    body('company_tin')
+        .optional({ nullable: true })
+        .custom((value) => {
+            if (value !== undefined && value !== null && value !== '') {
+                if (typeof value !== 'string' && typeof value !== 'number') {
+                    throw new Error('TIN must be a string or number');
+                }
+                if (value.toString().length > 50) {
+                    throw new Error('TIN must not exceed 50 characters');
+                }
+            }
+            return true;
+        }),
     body('contact_person_salutation').optional().isLength({ max: 20 }).withMessage('Salutation must not exceed 20 characters'),
     body('contact_person_firstname').optional().isLength({ max: 100 }).withMessage('First Name must not exceed 100 characters'),
     body('contact_person_mi').optional({ nullable: true, checkFalsy: true }).isLength({ max: 5 }).withMessage('Middle Initial must not exceed 5 characters'),
@@ -2054,6 +2081,19 @@ export const validateUpdateFinancialApplication = [
     body('contact_number').optional().isLength({ max: 20 }).withMessage('Contact Number must not exceed 20 characters'),
     body('fax_number').optional({ nullable: true }).isLength({ max: 20 }).withMessage('Fax Number must not exceed 20 characters'),
     body('email').optional().isEmail().withMessage('Valid Email is required'),
+    body('company_tin')
+        .optional({ nullable: true })
+        .custom((value) => {
+            if (value !== undefined && value !== null && value !== '') {
+                if (typeof value !== 'string' && typeof value !== 'number') {
+                    throw new Error('TIN must be a string or number');
+                }
+                if (value.toString().length > 50) {
+                    throw new Error('TIN must not exceed 50 characters');
+                }
+            }
+            return true;
+        }),
     body('contact_person_salutation').optional().isLength({ max: 20 }).withMessage('Salutation must not exceed 20 characters'),
     body('contact_person_firstname').optional().isLength({ max: 100 }).withMessage('First Name must not exceed 100 characters'),
     body('contact_person_mi').optional({ nullable: true, checkFalsy: true }).isLength({ max: 5 }).withMessage('Middle Initial must not exceed 5 characters'),

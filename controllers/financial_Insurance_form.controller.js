@@ -121,26 +121,6 @@ export const createApplication = async (req, res) => {
     }
 };
 
-// Fetch statuses allowed for the user's department
-// export const getAvailableStatuses = async (req, res) => {
-//     try {
-//         const allStatuses = await Model.getStatusLookups();
-//         const userDeptId = Number(req.user.department_id);
-//         const isSuperAdmin = req.user.roleName === 'Super Admin' || Number(req.user.role_id) === 15;
-
-//         // Mapping: User Dept ID -> Status Parent ID
-//         const deptMapping = { 12: 4, 18: 2 }; // 12=GMS(Parent 4), 18=Actuarial(Parent 2)
-//         const allowedParentId = deptMapping[userDeptId];
-
-//         const filtered = isSuperAdmin 
-//             ? allStatuses 
-//             : allStatuses.filter(s => Number(s.parent_id) === allowedParentId);
-
-//         return success(res, filtered, 'Available statuses fetched successfully.');
-//     } catch (err) {
-//         return error(res, err.message);
-//     }
-// };
 export const getAvailableStatuses = async (req, res) => {
     try {
         const allStatuses = await Model.getStatusLookups();
@@ -879,9 +859,9 @@ export const downloadMasterFile = async (req, res) => {
             try {
                 const parsed = JSON.parse(targetFilePath);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    const indexParam = req.query.index || req.body.index;
-                    const filePathParam = req.query.file_path || req.body.file_path;
-                    const fileNameParam = req.query.file_name || req.body.file_name;
+                    const indexParam = req.query.index || req.body?.index;
+                    const filePathParam = req.query.file_path || req.body?.file_path;
+                    const fileNameParam = req.query.file_name || req.body?.file_name;
 
                     if (filePathParam) {
                         const matchedPath = parsed.find(p => path.basename(p) === filePathParam || p === filePathParam);
@@ -906,7 +886,41 @@ export const downloadMasterFile = async (req, res) => {
                     }
                 }
             } catch (e) {
-                // Ignore parse errors, treat as single path string
+                // JSON parse failed (likely due to unescaped Windows backslashes)
+                // Fallback: extract paths using regex matching characters inside double quotes
+                const matches = [...targetFilePath.matchAll(/"([^"]+)"/g)].map(m => m[1]);
+                if (matches.length > 0) {
+                    const indexParam = req.query.index || req.body?.index;
+                    const filePathParam = req.query.file_path || req.body?.file_path;
+                    const fileNameParam = req.query.file_name || req.body?.file_name;
+
+                    if (filePathParam) {
+                        const matchedPath = matches.find(p => path.basename(p) === filePathParam || p === filePathParam);
+                        if (matchedPath) targetFilePath = matchedPath;
+                    } else if (fileNameParam) {
+                        const matchedPath = matches.find(p => p.toLowerCase().endsWith(fileNameParam.toLowerCase()) || path.basename(p).toLowerCase().includes(fileNameParam.toLowerCase()));
+                        if (matchedPath) targetFilePath = matchedPath;
+                    } else if (indexParam !== undefined) {
+                        const index = parseInt(indexParam, 10);
+                        if (!isNaN(index) && index >= 0 && index < matches.length) {
+                            targetFilePath = matches[index];
+                        }
+                    } else {
+                        targetFilePath = matches[0];
+                    }
+                }
+            }
+        }
+
+        if (!fs.existsSync(targetFilePath)) {
+            // Fallback: resolve path under the current project's uploads folder
+            const uploadsIdx = targetFilePath.replace(/\\/g, '/').indexOf('/uploads/');
+            if (uploadsIdx !== -1) {
+                const relativePart = targetFilePath.substring(uploadsIdx + 1);
+                const fallbackPath = path.join(process.cwd(), relativePart);
+                if (fs.existsSync(fallbackPath)) {
+                    targetFilePath = fallbackPath;
+                }
             }
         }
 
@@ -928,9 +942,9 @@ export const downloadSupportingDetails = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
-        const indexParam = req.query.index || req.body.index;
-        const filePathParam = req.query.file_path || req.body.file_path;
-        const fileNameParam = req.query.file_name || req.body.file_name;
+        const indexParam = req.query.index || req.body?.index;
+        const filePathParam = req.query.file_path || req.body?.file_path;
+        const fileNameParam = req.query.file_name || req.body?.file_name;
 
         const app = await Model.getApplicationById(appId);
         if (!app) return error(res, 'Application not found', 404);
@@ -988,7 +1002,19 @@ export const downloadSupportingDetails = async (req, res) => {
             targetFile = files[0];
         }
 
-        const targetFilePath = targetFile.file_path;
+        let targetFilePath = targetFile.file_path;
+        if (!fs.existsSync(targetFilePath)) {
+            // Fallback: resolve path under the current project's uploads folder
+            const uploadsIdx = targetFilePath.replace(/\\/g, '/').indexOf('/uploads/');
+            if (uploadsIdx !== -1) {
+                const relativePart = targetFilePath.substring(uploadsIdx + 1);
+                const fallbackPath = path.join(process.cwd(), relativePart);
+                if (fs.existsSync(fallbackPath)) {
+                    targetFilePath = fallbackPath;
+                }
+            }
+        }
+
         if (!fs.existsSync(targetFilePath)) {
             console.error(`[downloadSupportingDetails] File not found at: ${targetFilePath}`);
             return error(res, 'File not found on server.', 404);

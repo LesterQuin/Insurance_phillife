@@ -89,6 +89,7 @@ export const createApplication = async (data, userId) => {
             .input('evidence_notes', sql.NVarChar(sql.MAX), valueOrNull(data.evidence_notes))
             .input('expiry_date', sql.DateTime, valueOrNull(data.expiry_date))
             .input('excel_file_path', sql.NVarChar(sql.MAX), valueOrNull(data.excel_file_path))
+            .input('company_tin', sql.NVarChar(50), valueOrNull(data.company_tin))
             .query(`
                 INSERT INTO DHUB_UAT.sg.financial_insurance_application (
                     user_id, group_name, business_nature, business_nature_id, sub_business_nature_id, number_of_lives, business_address, contact_number, fax_number, email,
@@ -96,14 +97,14 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, max_loan_amount, min_loan_amount, loan_portfolio_amount, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id, excel_file_path,
-                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, borrower_amount_under_min, borrower_amount_over_max, channel_type_id, channel_name, channel_number, channel_email, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date
+                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, borrower_amount_under_min, borrower_amount_over_max, channel_type_id, channel_name, channel_number, channel_email, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date, company_tin
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @business_nature_id, @sub_business_nature_id, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type,
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @max_loan_amount, @min_loan_amount, @loan_portfolio_amount, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id, @excel_file_path,
-                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @borrower_amount_under_min, @borrower_amount_over_max, @channel_type_id, @channel_name, @channel_number, @channel_email, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date
+                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @borrower_amount_under_min, @borrower_amount_over_max, @channel_type_id, @channel_name, @channel_number, @channel_email, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date, @company_tin
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -536,9 +537,10 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
 
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
-            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname, dept.name AS uploader_department
             FROM DHUB_UAT.sg.financial_insurance_application_department_files f
             LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id IN (${appIds.join(',')})
         `);
         const deptFilesMap = {};
@@ -552,7 +554,8 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
                 department: f.department,
                 created_at: f.created_at,
                 firstname: f.firstname,
-                lastname: f.lastname
+                lastname: f.lastname,
+                uploader_department: f.uploader_department
             });
         });
 
@@ -747,9 +750,10 @@ export const getPrototypes = async (userId = null) => {
 
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
-            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname, dept.name AS uploader_department
             FROM DHUB_UAT.sg.financial_insurance_application_department_files f
             LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id IN (${appIds.join(',')})
         `);
         const deptFilesMap = {};
@@ -763,7 +767,8 @@ export const getPrototypes = async (userId = null) => {
                 department: f.department,
                 created_at: f.created_at,
                 firstname: f.firstname,
-                lastname: f.lastname
+                lastname: f.lastname,
+                uploader_department: f.uploader_department
             });
         });
 
@@ -899,9 +904,10 @@ export const getApplicationById = async (id) => {
 
         // Load all department files (supporting details)
         const departmentFilesRes = await pool.request().input('appId', sql.Int, id).query(`
-            SELECT f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+            SELECT f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname, dept.name AS uploader_department
             FROM DHUB_UAT.sg.financial_insurance_application_department_files f
             LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id = @appId
         `);
         app.department_files = departmentFilesRes.recordset || [];
@@ -1255,6 +1261,7 @@ export const updateApplication = async (id, data, userId) => {
 
         // Add excel_file_path to update clause
         addClause('excel_file_path', data.excel_file_path, sql.NVarChar(sql.MAX));
+        addClause('company_tin', data.company_tin);
 
         if (data.excel_file_path !== undefined) {
             // Delete existing files in files table first

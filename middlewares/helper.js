@@ -556,18 +556,15 @@ export const buildApplicationResponse = async (app) => {
             }
             return path.basename(excel_file_path);
         })(),
-        actuarial_files: (() => {
-            if (!actuarial_files) return null;
-            try {
-                const parsed = JSON.parse(actuarial_files);
-                if (Array.isArray(parsed)) {
-                    return parsed.map(p => path.basename(p));
-                }
-            } catch (e) {
-                // Ignore
-            }
-            return path.basename(actuarial_files);
-        })(),
+        actuarial_files: (department_files || [])
+            .filter(f => f.department === 'actuarial')
+            .map(f => ({
+                file_name: f.file_name,
+                file_path: path.basename(f.file_path),
+                department: f.uploader_department || f.department,
+                uploaded_at: f.created_at,
+                uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : 'Unknown'
+            })),
         installation_requirements: {
             signed_proposal: signed_proposal_path ? path.basename(signed_proposal_path) : null,
             group_app: group_app_path ? path.basename(group_app_path) : null,
@@ -583,7 +580,7 @@ export const buildApplicationResponse = async (app) => {
         supporting_details: (department_files || []).map(f => ({
             file_name: f.file_name,
             file_path: path.basename(f.file_path),
-            department: f.department,
+            department: f.uploader_department || f.department,
             uploaded_at: f.created_at,
             uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : 'Unknown'
         })),

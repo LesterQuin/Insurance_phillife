@@ -12,10 +12,10 @@ router.post('/draft', authenticate, parseMultipartForm, validateDraftFinancialAp
 router.put('/:id', authenticate, parseMultipartForm, validateUpdateFinancialApplication, Controller.updateApplication);
 
 router.post('/:id/upload-masterfile', authenticate, parseMultipartForm, validateMasterFileUpload, Controller.uploadMasterFile); // any file
-router.post('/:id/download-masterfile', authenticate, parseMultipartForm, Controller.downloadMasterFile); // any file
+router.get('/:id/download-masterfile', authenticate, Controller.downloadMasterFile); // any file
 
 router.post('/:id/upload-supporting-details', authenticate, parseMultipartForm, validateSupportingDetailsUpload, Controller.uploadSupportingDetails); // for all department use flex
-router.post('/:id/download-supporting-details', authenticate, parseMultipartForm, Controller.downloadSupportingDetails); // for all department use flex
+router.get('/:id/download-supporting-details', authenticate, Controller.downloadSupportingDetails); // for all department use flex
 
 //router.put('/:id/prototype-status', authenticate, parseMultipartForm, Controller.updatePrototypeStatus);
 router.put('/:id/status/checking', authenticate, Controller.setStatusChecking); // addtional with controller not tested

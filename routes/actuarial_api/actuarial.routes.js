@@ -37,7 +37,7 @@ router.put('/notes-to-cfe/:id', authenticate, isActuarial, validateActuarialToCf
 
 // Actuarial files upload and download
 router.post('/:id/upload-files', authenticate, isActuarial, parseMultipartForm, validateMasterFileUpload, Controller.uploadActuarialFiles);
-router.post('/:id/download-files', authenticate, isActuarial, parseMultipartForm, Controller.downloadActuarialFiles);
+router.get('/:id/download-files', authenticate, isActuarial, Controller.downloadActuarialFiles);
 
 // API to input total annual premium
 router.get('/total-premium/queue', authenticate, isActuarial, Controller.getApplicationsPendingTotalPremium);
