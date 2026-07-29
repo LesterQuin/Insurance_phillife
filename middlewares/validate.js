@@ -750,6 +750,14 @@ export const validateFinancialApplication = [
             }
             return true;
         }),
+    body('borrower_amount_under_min')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('borrower_amount_under_min must be a non-negative number'),
+    body('borrower_amount_over_max')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('borrower_amount_over_max must be a non-negative number'),
 
     // -----------------------------
     // Mode of Payment
@@ -1097,7 +1105,8 @@ body('basic_plan_id')
 
     // GCLI Age Bracket Amount Validations
     body('borrower_amount_18_65') // Base age range amount (e.g., 18-65)
-        .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
+        .if(body('plan_id').equals('1')) // Apply only for GCLI (plan_id: 1)
+        // .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
         .notEmpty().withMessage((value, { req }) => {
             const min = req.body.minimum_age || 18;
             const max = req.body.maximum_age || 65;
@@ -1106,7 +1115,15 @@ body('basic_plan_id')
         .isFloat({ min: 0 }).withMessage((value, { req }) => {
             const min = req.body.minimum_age || 18;
             const max = req.body.maximum_age || 65;
-            return `Borrower Amount for age ${min}-${max} must be a non-negative number`; // Message is fine
+            return `Borrower Amount for age ${min}-${max} must be a non-negative number`;
+        }),
+    body('borrower_amount_18_65')
+        .if(body('plan_id').isIn(['2', '3'])) // Optional/nullable for GPA, GYRT
+        .optional({ nullable: true })
+        .isFloat({ min: 0 }).withMessage((value, { req }) => {
+            const min = req.body.minimum_age || 18;
+            const max = req.body.maximum_age || 65;
+            return `Borrower Amount for age ${min}-${max} must be a non-negative number`;
         }),
     body('borrower_amount_66_70') // Conditional age bracket amount
         .if(body('plan_id').isIn(['1', '2', '3'])) // Apply for GCLI, GPA, GYRT
@@ -1222,7 +1239,7 @@ body('basic_plan_id')
 
             const excelFile = req.files?.file || req.files?.excel_file;
 
-            // 1. Mandatory check removed here to allow separate upload via the /:id/upload-files API.
+            // 1. Mandatory check removed here to allow separate upload via the /:id/upload-masterfile API.
             // The file is now optional during the initial 'create' or 'draft' phase.
 
             // 2. Validate file count if files are uploaded
@@ -1394,7 +1411,6 @@ export const validateDraftFinancialApplication = [
     body('proposal_addressee').optional().isLength({ max: 255 }).withMessage('Proposal Addressee must not exceed 255 characters'),
     body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
 
-    // Age Profile
     body('minimum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Minimum Age must be between 18 and 65'),
     body('maximum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Maximum Age must be between 18 and 65')
         .custom((value, { req }) => {
@@ -1404,6 +1420,14 @@ export const validateDraftFinancialApplication = [
             }
             return true;
         }),
+    body('borrower_amount_under_min')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('borrower_amount_under_min must be a non-negative number'),
+    body('borrower_amount_over_max')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('borrower_amount_over_max must be a non-negative number'),
 
     // Lookup ID validations (Optional but must be valid if provided)
     body('group_classification_id').optional().isInt({ min: 0 }).custom(async (value) => {
@@ -1606,9 +1630,9 @@ export const validateRates = [
             const app = await Financial.getApplicationById(applicationId);
             if (!app) throw new Error(`Application with ID ${applicationId} not found.`);
 
-            // Allow rate input for Checking (5), Pending (8), Rating (13), and Approved (14)
-            if (![5, 8, 13, 14].includes(Number(app.status_id))) {
-                throw new Error('Only proposals with a status of Pending or Rating can be computed.');
+            // Allow rate input for Checking (5), Pending (8), Amend GMS (10), Rating (13), Approved (14), and Amend Actuarial (16)
+            if (![5, 8, 10, 13, 14, 16].includes(Number(app.status_id))) {
+                throw new Error('Only proposals with a status of Pending, Rating, or Amend can be computed.');
             }
 
             const planId = Number(app.plan_id);
@@ -2038,7 +2062,6 @@ export const validateUpdateFinancialApplication = [
     body('proposal_addressee').optional().isLength({ max: 255 }).withMessage('Proposal Addressee must not exceed 255 characters'),
     body('addressee_designation').optional().isLength({ max: 255 }).withMessage('Addressee Designation must not exceed 255 characters'),
 
-    // Age validation for update - Minimum 18, Maximum 64
     body('minimum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Minimum Age must be between 18 and 65'),
     body('maximum_age').optional().isInt({ min: 18, max: 65 }).withMessage('Maximum Age must be between 18 and 65')
         .custom(async (value, { req }) => {
@@ -2049,6 +2072,14 @@ export const validateUpdateFinancialApplication = [
             }
             return true;
         }),
+    body('borrower_amount_under_min')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('borrower_amount_under_min must be a non-negative number'),
+    body('borrower_amount_over_max')
+        .optional({ nullable: true, checkFalsy: true })
+        .isFloat({ min: 0 })
+        .withMessage('borrower_amount_over_max must be a non-negative number'),
 
     // Lookup ID validations (optional, but validated if present)
     body('group_classification_id').optional().isInt({ min: 0 }).withMessage('group_classification_id must be a non-negative integer').custom(async (value) => {
@@ -2625,9 +2656,9 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
 ];
 
 // -----------------------------
-// Generic File Upload validation
+// Generic Masterfile Upload validation
 // -----------------------------
-export const validateFileUpload = [
+export const validateMasterFileUpload = [
     param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
     (req, res, next) => {
         const files = req.files?.file || req.files?.excel_file;
@@ -2638,6 +2669,34 @@ export const validateFileUpload = [
         const fileList = Array.isArray(files) ? files : [files];
         const maxFiles = 10;
         if (fileList.length > maxFiles) {
+            return res.status(400).json({ status: false, errors: [{ msg: `Maximum of ${maxFiles} files can be uploaded.` }] });
+        }
+        next();
+    }
+];
+
+// -----------------------------
+// Supporting Details Upload validation
+// -----------------------------
+export const validateSupportingDetailsUpload = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    (req, res, next) => {
+        if (!req.files || Object.keys(req.files).length === 0) {
+            return res.status(400).json({ status: false, errors: [{ msg: 'At least one file is required.' }] });
+        }
+        
+        let totalFiles = 0;
+        for (const key of Object.keys(req.files)) {
+            const item = req.files[key];
+            if (Array.isArray(item)) {
+                totalFiles += item.length;
+            } else if (item) {
+                totalFiles += 1;
+            }
+        }
+        
+        const maxFiles = 10;
+        if (totalFiles > maxFiles) {
             return res.status(400).json({ status: false, errors: [{ msg: `Maximum of ${maxFiles} files can be uploaded.` }] });
         }
         next();
@@ -2807,6 +2866,168 @@ export const validateRejectExtension = [
         if (!isAuthorized) {
             return res.status(403).json({ status: false, message: 'Access Denied: You do not have the capacity to decline extension requests. This action is reserved for Team Leaders and Super Admins.' });
         }
+        next();
+    }
+];
+
+// =============================================
+// Amendment System Validation Middlewares
+// =============================================
+
+// Validate Request Amendment
+export const validateRequestAmendment = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('request_notes').optional({ nullable: true }).isString().withMessage('request_notes must be a string'),
+    async (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ success: false, message: errors.array()[0].msg });
+
+        try {
+            const appId = Number(req.params.id);
+            const app = await Financial.getApplicationById(appId);
+            if (!app) return res.status(404).json({ success: false, message: 'Application not found' });
+
+            const STATUS_RELEASED = 15;
+            if (Number(app.status_id) !== STATUS_RELEASED) {
+                return res.status(400).json({ success: false, message: 'Amendments can only be requested for applications with "Released" status.' });
+            }
+
+            const currentUser = req.user || {};
+            const currentUserId = Number(currentUser.user_id || currentUser.userId || currentUser.id || 0);
+            const appUserId = Number(app.user_id || app.userId || 0);
+
+            const isOwner = (currentUserId > 0 && currentUserId === appUserId);
+            const userRoleName = (currentUser.roleName || currentUser.role_name || '').toString().trim();
+            const userRoleId = Number(currentUser.role_id || currentUser.roleId || 0);
+
+            const isSuperAdmin = userRoleName === 'Super Admin' || userRoleId === 15 || userRoleId === 1;
+            const isTeamLeader = userRoleName === 'Team Leader' || userRoleId === 2;
+
+            const canRequest = isOwner || isSuperAdmin || isTeamLeader;
+
+            if (!canRequest) {
+                return res.status(403).json({ success: false, message: 'Access Denied: You can only request an amendment for applications that you created (unless you are a Team Leader or Super Admin).' });
+            }
+
+            // Check if there is already an active PENDING amendment request
+            const latestAmendment = await Financial.getLatestAmendmentRequestByAppId(appId);
+            if (latestAmendment && latestAmendment.status === 'PENDING') {
+                return res.status(400).json({ success: false, message: 'An amendment request is already pending Actuarial review for this application.' });
+            }
+
+            req.targetApp = app;
+            next();
+        } catch (error) {
+            console.error('validateRequestAmendment error:', error);
+            return res.status(500).json({ success: false, message: `Internal server error during amendment request validation: ${error.message}` });
+        }
+    }
+];
+
+// Validate Get Amendment Requests Queue (Actuarial / Super Admin)
+export const validateGetAmendmentRequests = [
+    (req, res, next) => {
+        const loggedInUser = req.user;
+        const DEPT_ACTUARIAL_ID = 18;
+        const ROLE_SA_ID = 15;
+
+        const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+        const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+
+        if (!isActuarial && !isSuperAdmin) {
+            return res.status(403).json({ success: false, message: 'Access Denied: Only users from Actuarial department or Super Admins can view pending amendment requests.' });
+        }
+        next();
+    }
+];
+
+// Validate Approve Amendment (Actuarial / Leadership)
+export const validateApproveAmendment = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('response_notes').optional({ nullable: true }).isString().withMessage('response_notes must be a string'),
+    async (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ success: false, message: errors.array()[0].msg });
+
+        try {
+            const loggedInUser = req.user;
+            const DEPT_ACTUARIAL_ID = 18;
+            const ROLE_SA_ID = 15;
+            const ROLE_TL_ID = 2;
+
+            const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+            const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+            const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+
+            if (!isActuarial && !isSuperAdmin && !isTeamLeader) {
+                return res.status(403).json({ success: false, message: 'Access Denied: Only Actuarial department users, Team Leaders, or Super Admins can approve amendment requests.' });
+            }
+
+            const appId = Number(req.params.id);
+            const app = await Financial.getApplicationById(appId);
+            if (!app) return res.status(404).json({ success: false, message: 'Application not found' });
+
+            const latestAmendment = await Financial.getLatestAmendmentRequestByAppId(appId);
+            if (!latestAmendment || latestAmendment.status !== 'PENDING') {
+                return res.status(400).json({ success: false, message: 'No pending amendment request found for this application.' });
+            }
+
+            req.targetApp = app;
+            next();
+        } catch (error) {
+            console.error('validateApproveAmendment error:', error);
+            return res.status(500).json({ success: false, message: 'Internal server error during approve amendment validation' });
+        }
+    }
+];
+
+// Validate Decline Amendment (Actuarial / Leadership)
+export const validateDeclineAmendment = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('response_notes').optional({ nullable: true }).isString().withMessage('response_notes must be a string'),
+    async (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ success: false, message: errors.array()[0].msg });
+
+        try {
+            const loggedInUser = req.user;
+            const DEPT_ACTUARIAL_ID = 18;
+            const ROLE_SA_ID = 15;
+            const ROLE_TL_ID = 2;
+
+            const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+            const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+            const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+
+            if (!isActuarial && !isSuperAdmin && !isTeamLeader) {
+                return res.status(403).json({ success: false, message: 'Access Denied: Only Actuarial department users, Team Leaders, or Super Admins can decline amendment requests.' });
+            }
+
+            const appId = Number(req.params.id);
+            const app = await Financial.getApplicationById(appId);
+            if (!app) return res.status(404).json({ success: false, message: 'Application not found' });
+
+            const latestAmendment = await Financial.getLatestAmendmentRequestByAppId(appId);
+            if (!latestAmendment || latestAmendment.status !== 'PENDING') {
+                return res.status(400).json({ success: false, message: 'No pending amendment request found for this application.' });
+            }
+
+            req.targetApp = app;
+            next();
+        } catch (error) {
+            console.error('validateDeclineAmendment error:', error);
+            return res.status(500).json({ success: false, message: 'Internal server error during decline amendment validation' });
+        }
+    }
+];
+
+// Validate Actuarial to CFE Notes
+export const validateActuarialToCfeNotes = [
+    param('id').isInt({ min: 1 }).withMessage('Valid Application ID is required'),
+    body('notes').notEmpty().withMessage('Notes are required').isString().withMessage('Notes must be a string'),
+    (req, res, next) => {
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) return res.status(400).json({ success: false, message: errors.array()[0].msg });
         next();
     }
 ];

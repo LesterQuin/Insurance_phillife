@@ -525,6 +525,7 @@ export const buildApplicationResponse = async (app) => {
         payment_term_id, sub_payment_term_id,
         excel_file_path,
         actuarial_files,
+        department_files,
         signed_proposal_path, group_app_path, dti_path, sec_reg_path,
         articles_of_inc_path, by_laws_path, business_permit_path,
         masterlist_file_path, authorized_id_path, booking_date,
@@ -579,6 +580,13 @@ export const buildApplicationResponse = async (app) => {
             auth_id: authorized_id_path ? path.basename(authorized_id_path) : null,
             booking_date: booking_date || null
         },
+        supporting_details: (department_files || []).map(f => ({
+            file_name: f.file_name,
+            file_path: path.basename(f.file_path),
+            department: f.department,
+            uploaded_at: f.created_at,
+            uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : 'Unknown'
+        })),
         business_nature_id: app.business_nature_id,
         sub_business_nature_id: app.sub_business_nature_id,
         status: { id: status_id, name: status_name },
@@ -674,7 +682,24 @@ export const buildApplicationResponse = async (app) => {
         coverage_totals,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
-        uniform_coverage_amount: coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null
+        uniform_coverage_amount: coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
+        amendment_request: await (async () => {
+            const latest = await Model.getLatestAmendmentRequestByAppId(app.application_id);
+            if (!latest) return null;
+            return {
+                id: latest.id,
+                status: latest.status,
+                request_notes: latest.request_notes,
+                response_notes: latest.response_notes,
+                requested_by: latest.requested_by,
+                requested_by_name: latest.requested_by_name,
+                request_dept_name: latest.request_dept_name,
+                responded_by: latest.responded_by,
+                responded_by_name: latest.responded_by_name,
+                requested_at: latest.requested_at,
+                responded_at: latest.responded_at
+            };
+        })()
     };
 };
 
