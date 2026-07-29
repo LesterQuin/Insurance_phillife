@@ -219,6 +219,34 @@ export const saveNotes = async (req, res) => {
     }
 };
 
+// Save notes to CFE
+export const saveActuarialToCfeNotes = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const id = req.params.id;
+        let { notes } = req.body;
+
+        const existingApplication = await MainModel.getApplicationById(id);
+        if (!existingApplication) return error(res, 'Application not found', 404);
+
+        if (notes) {
+            notes = sanitizeHtml(notes, sanitizeOptions);
+        }
+
+        await ActuarialModel.saveActuarialToCfeNotes(id, notes, userId);
+
+        const updatedApp = await MainModel.getApplicationById(id);
+        const response = await buildApplicationResponse(updatedApp);
+
+        io.emit('saveActuarialToCfeNotes', response);
+
+        return success(res, response, 'Notes to CFE saved successfully.');
+    } catch (err) {
+        console.error('Save Notes to CFE Error:', err);
+        return error(res, err.message);
+    }
+};
+
 export const saveTotalAnnualPremium = async (req, res) => {
     try {
         const userId = req.user.user_id;
@@ -744,6 +772,69 @@ export const downloadActuarialFiles = async (req, res) => {
         return res.download(targetFilePath, originalName);
     } catch (err) {
         console.error('Actuarial File Download Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Get Pending Amendment Requests Queue for Actuarial
+export const getApplicationsPendingAmendments = async (req, res) => {
+    try {
+        const list = await MainModel.getPendingAmendmentRequests(18); // 18 = Actuarial Dept
+        return success(res, list, 'Pending amendment requests fetched successfully.');
+    } catch (err) {
+        console.error('Actuarial Amendment Queue Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Approve Amendment Request (Actuarial)
+export const approveAmendment = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const applicationId = Number(req.params.id);
+        const { response_notes } = req.body || {};
+        const ipAddress = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+
+        await MainModel.approveAmendment({
+            applicationId,
+            responseNotes: response_notes || null,
+            ipAddress
+        }, userId);
+
+        const updatedApp = await MainModel.getApplicationById(applicationId);
+        const response = await buildApplicationResponse(updatedApp);
+
+        io.emit('approveAmendment', response);
+
+        return success(res, response, 'Amendment request approved. Application is now open for Actuarial rate/file updates.');
+    } catch (err) {
+        console.error('Actuarial Approve Amendment Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Decline Amendment Request (Actuarial)
+export const declineAmendment = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const applicationId = Number(req.params.id);
+        const { response_notes } = req.body || {};
+        const ipAddress = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+
+        await MainModel.declineAmendment({
+            applicationId,
+            responseNotes: response_notes || null,
+            ipAddress
+        }, userId);
+
+        const updatedApp = await MainModel.getApplicationById(applicationId);
+        const response = await buildApplicationResponse(updatedApp);
+
+        io.emit('declineAmendment', response);
+
+        return success(res, response, 'Amendment request declined. Application status restored to Released.');
+    } catch (err) {
+        console.error('Actuarial Decline Amendment Error:', err);
         return error(res, err.message);
     }
 };

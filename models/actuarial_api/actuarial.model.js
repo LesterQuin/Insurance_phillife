@@ -403,3 +403,57 @@ export const getActuarialFiles = async (applicationId) => {
         `);
     return (res.recordset || []).map(f => f.file_path);
 };
+
+// Save or update actuarial to cfe notes for an application
+export const saveActuarialToCfeNotes = async (applicationId, notes, userId) => {
+    const pool = await poolPromise;
+    const department = 'actuarial_to_cfe';
+    
+    // Check if notes already exist for this application and department
+    const checkRes = await pool.request()
+        .input('appId', sql.Int, applicationId)
+        .input('department', sql.NVarChar(100), department)
+        .query(`
+            SELECT id FROM DHUB_UAT.sg.financial_insurance_application_notes
+            WHERE application_id = @appId AND department = @department
+        `);
+
+    if (checkRes.recordset && checkRes.recordset.length > 0) {
+        // Update existing row
+        await pool.request()
+            .input('appId', sql.Int, applicationId)
+            .input('department', sql.NVarChar(100), department)
+            .input('userId', sql.Int, userId)
+            .input('notes', sql.NVarChar(sql.MAX), notes)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_application_notes
+                SET notes = @notes, user_id = @userId, show_in_pdf = 0, updated_at = GETDATE()
+                WHERE application_id = @appId AND department = @department
+            `);
+    } else {
+        // Insert new row
+        await pool.request()
+            .input('appId', sql.Int, applicationId)
+            .input('department', sql.NVarChar(100), department)
+            .input('userId', sql.Int, userId)
+            .input('notes', sql.NVarChar(sql.MAX), notes)
+            .query(`
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application_notes (application_id, department, user_id, notes, show_in_pdf)
+                VALUES (@appId, @department, @userId, @notes, 0)
+            `);
+    }
+};
+
+// Retrieve actuarial to cfe notes for an application
+export const getActuarialToCfeNotes = async (applicationId) => {
+    const pool = await poolPromise;
+    const res = await pool.request()
+        .input('appId', sql.Int, applicationId)
+        .input('department', sql.NVarChar(100), 'actuarial_to_cfe')
+        .query(`
+            SELECT TOP 1 notes FROM DHUB_UAT.sg.financial_insurance_application_notes
+            WHERE application_id = @appId AND department = @department
+            ORDER BY updated_at DESC
+        `);
+    return res.recordset?.[0]?.notes ?? null;
+};

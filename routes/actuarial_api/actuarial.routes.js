@@ -1,6 +1,6 @@
 import express from 'express';
 import * as Controller from '../../controllers/actuarial_api/actuarial.controller.js';
-import { validateRates, validateTotalPremium, validateEvidenceNotes, validateNotes, validateFileUpload } from '../../middlewares/validate.js';
+import { validateRates, validateTotalPremium, validateEvidenceNotes, validateNotes, validateMasterFileUpload, validateApproveAmendment, validateDeclineAmendment, validateActuarialToCfeNotes } from '../../middlewares/validate.js';
 import { authenticate, isActuarial } from '../../middlewares/authenticate.js';
 import parseMultipartForm from '../../middlewares/fileUpload.js';
 import { parseExcelRatesMiddleware } from '../../middlewares/parseExcel.js';
@@ -11,6 +11,11 @@ const router = express.Router();
 router.get('/rates/queue', authenticate, isActuarial, Controller.getApplicationsPendingRates);
 router.post('/rates/:id', authenticate, isActuarial, validateRates, Controller.saveRates);
 router.put('/rates/:id', authenticate, isActuarial, validateRates, Controller.saveRates);
+
+// Amendment Review & Queue APIs (Actuarial)
+router.get('/amendment/queue', authenticate, isActuarial, Controller.getApplicationsPendingAmendments); // new API
+router.put('/amendment/:id/approve', authenticate, isActuarial, validateApproveAmendment, Controller.approveAmendment); // new API
+router.put('/amendment/:id/decline', authenticate, isActuarial, validateDeclineAmendment, Controller.declineAmendment); // new API
 
 // Excel template download & upload for actuarial rates
 router.get('/rates/:id/download-template', authenticate, isActuarial, Controller.downloadRatesTemplate); // new API
@@ -26,8 +31,12 @@ router.put('/evidence-notes/:id', authenticate, isActuarial, validateEvidenceNot
 router.post('/notes/:id', authenticate, isActuarial, validateNotes, Controller.saveNotes);
 router.put('/notes/:id', authenticate, isActuarial, validateNotes, Controller.saveNotes);
 
+// API to input notes intended only for CFE (not shown in PDF)
+router.post('/notes-to-cfe/:id', authenticate, isActuarial, validateActuarialToCfeNotes, Controller.saveActuarialToCfeNotes);
+router.put('/notes-to-cfe/:id', authenticate, isActuarial, validateActuarialToCfeNotes, Controller.saveActuarialToCfeNotes);
+
 // Actuarial files upload and download
-router.post('/:id/upload-files', authenticate, isActuarial, parseMultipartForm, validateFileUpload, Controller.uploadActuarialFiles);
+router.post('/:id/upload-files', authenticate, isActuarial, parseMultipartForm, validateMasterFileUpload, Controller.uploadActuarialFiles);
 router.post('/:id/download-files', authenticate, isActuarial, parseMultipartForm, Controller.downloadActuarialFiles);
 
 // API to input total annual premium
