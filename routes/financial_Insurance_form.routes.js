@@ -1,6 +1,6 @@
 import express from 'express';
 import * as Controller from '../controllers/financial_Insurance_form.controller.js';
-import { validateFinancialApplication, validateUpdateFinancialApplication, validateDraftFinancialApplication, validateRates, validateGetHistory, validateTotalPremium, validateMaxAmounts, validateEvidenceNotes, validateFileUpload, validateGetExtensionRequests, validateRequestExtension, validateApproveExtension, validateRejectExtension } from '../middlewares/validate.js';
+import { validateFinancialApplication, validateUpdateFinancialApplication, validateDraftFinancialApplication, validateRates, validateGetHistory, validateTotalPremium, validateMaxAmounts, validateEvidenceNotes, validateMasterFileUpload, validateSupportingDetailsUpload, validateGetExtensionRequests, validateRequestExtension, validateApproveExtension, validateRejectExtension, validateRequestAmendment, validateGetAmendmentRequests, validateApproveAmendment, validateDeclineAmendment } from '../middlewares/validate.js';
 import { authenticate } from '../middlewares/authenticate.js';
 import parseMultipartForm from '../middlewares/fileUpload.js';
 
@@ -11,8 +11,11 @@ router.post('/create', authenticate, parseMultipartForm, validateFinancialApplic
 router.post('/draft', authenticate, parseMultipartForm, validateDraftFinancialApplication, Controller.saveDraft);
 router.put('/:id', authenticate, parseMultipartForm, validateUpdateFinancialApplication, Controller.updateApplication);
 
-router.post('/:id/upload-files', authenticate, parseMultipartForm, validateFileUpload, Controller.uploadFiles);
-router.post('/:id/download-files', authenticate, parseMultipartForm, Controller.downloadFiles);
+router.post('/:id/upload-masterfile', authenticate, parseMultipartForm, validateMasterFileUpload, Controller.uploadMasterFile); // any file
+router.post('/:id/download-masterfile', authenticate, parseMultipartForm, Controller.downloadMasterFile); // any file
+
+router.post('/:id/upload-supporting-details', authenticate, parseMultipartForm, validateSupportingDetailsUpload, Controller.uploadSupportingDetails); // for all department use flex
+router.post('/:id/download-supporting-details', authenticate, parseMultipartForm, Controller.downloadSupportingDetails); // for all department use flex
 
 //router.put('/:id/prototype-status', authenticate, parseMultipartForm, Controller.updatePrototypeStatus);
 router.put('/:id/status/checking', authenticate, Controller.setStatusChecking); // addtional with controller not tested
@@ -31,6 +34,10 @@ router.put('/:id/approved-extension', authenticate, validateApproveExtension, Co
 router.put('/:id/declined-extension', authenticate, validateRejectExtension, Controller.rejectExtension); // new api
 // get all applications with pending extension request - only for approver team leader and above
 router.get('/extension-requests', authenticate, validateGetExtensionRequests, Controller.getExtensionRequests); // new api
+
+// Amendment System APIs
+router.put('/:id/request-amendment', authenticate, validateRequestAmendment, Controller.requestAmendment); // CFE/GMS Request Amendment
+router.get('/:id/amendment-history', authenticate, Controller.getAmendmentHistory); // View Amendment History
 
 // Trigger expiration notifications manually
 router.post('/notify-expiring', authenticate, Controller.notifyExpiringProposals);

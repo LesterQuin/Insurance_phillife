@@ -834,7 +834,7 @@ export const checkGroupName = async (req, res) => {
 };
 
 // Download Application Files
-export const downloadFiles = async (req, res) => {
+export const downloadMasterFile = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
@@ -880,7 +880,22 @@ export const downloadFiles = async (req, res) => {
                 const parsed = JSON.parse(targetFilePath);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     const indexParam = req.query.index || req.body.index;
-                    if (indexParam !== undefined) {
+                    const filePathParam = req.query.file_path || req.body.file_path;
+                    const fileNameParam = req.query.file_name || req.body.file_name;
+
+                    if (filePathParam) {
+                        const matchedPath = parsed.find(p => path.basename(p) === filePathParam || p === filePathParam);
+                        if (!matchedPath) {
+                            return error(res, `File not found with path/identifier: ${filePathParam}`, 404);
+                        }
+                        targetFilePath = matchedPath;
+                    } else if (fileNameParam) {
+                        const matchedPath = parsed.find(p => p.toLowerCase().endsWith(fileNameParam.toLowerCase()) || path.basename(p).toLowerCase().includes(fileNameParam.toLowerCase()));
+                        if (!matchedPath) {
+                            return error(res, `File not found matching name: ${fileNameParam}`, 404);
+                        }
+                        targetFilePath = matchedPath;
+                    } else if (indexParam !== undefined) {
                         const index = parseInt(indexParam, 10);
                         if (isNaN(index) || index < 0 || index >= parsed.length) {
                             return error(res, `Invalid file index. This application has ${parsed.length} uploaded files (valid index range: 0 to ${parsed.length - 1}).`, 400);
@@ -904,6 +919,85 @@ export const downloadFiles = async (req, res) => {
         return res.download(targetFilePath, originalName);
     } catch (err) {
         console.error('File Download Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Download Supporting Details File
+export const downloadSupportingDetails = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        const indexParam = req.query.index || req.body.index;
+        const filePathParam = req.query.file_path || req.body.file_path;
+        const fileNameParam = req.query.file_name || req.body.file_name;
+
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const files = await Model.getDepartmentFiles(appId);
+        if (!files || files.length === 0) {
+            return error(res, 'No supporting details files found for this application.', 404);
+        }
+
+        const loggedInId = Number(userId);
+        const creatorId = Number(app.user_id);
+        const loggedInUser = await User.getUserById(userId);
+        
+        const DEPT_ACTUARIAL_ID = 18;
+        const ROLE_TL_ID = 2;
+        const ROLE_SA_ID = 15;
+        const ROLE_CFE_ID = 3;
+
+        const isActuarial = loggedInUser && Number(loggedInUser.department_id) === DEPT_ACTUARIAL_ID;
+        const isSuperAdmin = loggedInUser && (Number(loggedInUser.role_id) === ROLE_SA_ID || loggedInUser.roleName === 'Super Admin');
+        const isTeamLeader = loggedInUser && (Number(loggedInUser.role_id) === ROLE_TL_ID || loggedInUser.roleName === 'Team Leader');
+        const isCFE = loggedInUser && (Number(loggedInUser.role_id) === ROLE_CFE_ID || loggedInUser.roleName === 'Corporate Financial Executive');
+
+        let isAuthorized = isSuperAdmin || isTeamLeader || isActuarial || (loggedInId === creatorId);
+        if (!isAuthorized) {
+            const deptId = loggedInUser ? Number(loggedInUser.department_id) : null;
+            const allowedDepts = [11, 12, 13, 20]; // GMS, GMS Support, AMS, EBAM
+            if (allowedDepts.includes(deptId) || isCFE) {
+                isAuthorized = true;
+            }
+        }
+
+        if (!isAuthorized) {
+            return error(res, 'You are not authorized to download supporting details for this application.', 403);
+        }
+
+        let targetFile = null;
+        if (filePathParam) {
+            targetFile = files.find(f => path.basename(f.file_path) === filePathParam || f.file_path === filePathParam);
+            if (!targetFile) {
+                return error(res, `File not found with path/identifier: ${filePathParam}`, 404);
+            }
+        } else if (fileNameParam) {
+            targetFile = files.find(f => f.file_name === fileNameParam);
+            if (!targetFile) {
+                return error(res, `File not found with original filename: ${fileNameParam}`, 404);
+            }
+        } else if (indexParam !== undefined) {
+            const index = parseInt(indexParam, 10);
+            if (isNaN(index) || index < 0 || index >= files.length) {
+                return error(res, `Invalid file index. This application has ${files.length} supporting details files (valid index range: 0 to ${files.length - 1}).`, 400);
+            }
+            targetFile = files[index];
+        } else {
+            targetFile = files[0];
+        }
+
+        const targetFilePath = targetFile.file_path;
+        if (!fs.existsSync(targetFilePath)) {
+            console.error(`[downloadSupportingDetails] File not found at: ${targetFilePath}`);
+            return error(res, 'File not found on server.', 404);
+        }
+
+        const originalName = targetFile.file_name || path.basename(targetFilePath);
+        return res.download(targetFilePath, originalName);
+    } catch (err) {
+        console.error('Download Supporting Details Error:', err);
         return error(res, err.message);
     }
 };
@@ -1583,7 +1677,7 @@ export const updateApplication = async (req, res) => {
 };
 
 // Upload Files separately
-export const uploadFiles = async (req, res) => {
+export const uploadMasterFile = async (req, res) => {
     try {
         const userId = req.user.user_id;
         const appId = req.params.id;
@@ -1666,6 +1760,68 @@ export const uploadFiles = async (req, res) => {
         return success(res, response, 'Files uploaded successfully.');
     } catch (err) {
         console.error('File Upload Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Upload Supporting Details separately
+export const uploadSupportingDetails = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const appId = req.params.id;
+        
+        const app = await Model.getApplicationById(appId);
+        if (!app) return error(res, 'Application not found', 404);
+
+        const departmentName = req.user.departmentName || 'unknown';
+        
+        const filesToProcess = [];
+        if (req.files) {
+            for (const key of Object.keys(req.files)) {
+                const item = req.files[key];
+                if (Array.isArray(item)) {
+                    filesToProcess.push(...item);
+                } else if (item) {
+                    filesToProcess.push(item);
+                }
+            }
+        }
+
+        if (filesToProcess.length === 0) {
+            return error(res, 'No files uploaded.', 400);
+        }
+
+        const targetDir = Helper.ensureCompanyDir(app.group_name, 'supporting_details');
+        const savedFiles = [];
+
+        for (const file of filesToProcess) {
+            const sanitizedDept = departmentName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            const uniqueFilename = `APP-${appId}-SUP-${sanitizedDept}-v${Helper.getFileTimestamp()}-${file.originalFilename.replace(/\s+/g, '_')}`;
+            const newFilePath = path.join(targetDir, uniqueFilename).replace(/\\/g, '/');
+
+            await fs.promises.rename(file.filepath, newFilePath);
+            savedFiles.push({ filePath: newFilePath, originalName: file.originalFilename });
+        }
+
+        await Model.saveDepartmentFiles(appId, departmentName, savedFiles, userId);
+
+        const updated = await Model.getApplicationById(appId);
+        const response = await Helper.buildApplicationResponse(updated);
+
+        io.emit('uploadSupportingDetails', response);
+
+        await auditLog(req, {
+            userId: userId,
+            action: AuditActions.UPDATE_APPLICATION,
+            entity: 'FinancialApplication',
+            entityId: appId,
+            status: AuditStatus.INFO,
+            metadata: { info: 'Supporting details uploaded', department: departmentName, files: savedFiles.map(f => f.filePath) }
+        });
+
+        return success(res, response, 'Supporting details uploaded successfully.');
+    } catch (err) {
+        console.error('Supporting Details Upload Error:', err);
         return error(res, err.message);
     }
 };
@@ -1889,3 +2045,117 @@ export const setStatusBooked = async (req, res) => {
         return error(res, err.message);
     }
 };
+
+// Ensure database table exists on module load
+Model.ensureAmendmentRequestsTable().catch(err => console.error('ensureAmendmentRequestsTable error:', err));
+
+// Request Amendment (CFE / GMS / Any Department)
+export const requestAmendment = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const applicationId = Number(req.params.id);
+        const { request_notes, target_dept_id } = req.body || {};
+        const requestDeptId = req.user.department_id ? Number(req.user.department_id) : null;
+        
+        // Target department: uses body target_dept_id if provided, otherwise toggles between Actuarial (18) and GMS (12)
+        const targetDeptId = target_dept_id ? Number(target_dept_id) : ((requestDeptId === 18) ? 12 : 18);
+        const ipAddress = normalizeIp(req.ip);
+
+        const amendmentId = await Model.requestAmendment({
+            applicationId,
+            requestNotes: request_notes || null,
+            requestDeptId,
+            targetDeptId,
+            ipAddress
+        }, userId);
+
+        const updatedApp = await Model.getApplicationById(applicationId);
+        const response = await Helper.buildApplicationResponse(updatedApp);
+        response.amendment_id = amendmentId;
+
+        io.emit('requestAmendment', response);
+
+        return success(res, response, 'Amendment request submitted successfully.');
+    } catch (err) {
+        console.error('Request Amendment Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Get Pending Amendment Requests Queue (Actuarial Queue)
+export const getAmendmentRequests = async (req, res) => {
+    try {
+        const targetDeptId = req.user.department_id ? Number(req.user.department_id) : null;
+        const list = await Model.getPendingAmendmentRequests(targetDeptId);
+        return success(res, list, 'Pending amendment requests fetched successfully.');
+    } catch (err) {
+        console.error('Get Amendment Requests Queue Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Approve Amendment (Actuarial / Leadership)
+export const approveAmendment = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const applicationId = Number(req.params.id);
+        const { response_notes } = req.body || {};
+        const ipAddress = normalizeIp(req.ip);
+
+        await Model.approveAmendment({
+            applicationId,
+            responseNotes: response_notes || null,
+            ipAddress
+        }, userId);
+
+        const updatedApp = await Model.getApplicationById(applicationId);
+        const response = await Helper.buildApplicationResponse(updatedApp);
+
+        io.emit('approveAmendment', response);
+
+        return success(res, response, 'Amendment request approved. Application is now open for updates/rates.');
+    } catch (err) {
+        console.error('Approve Amendment Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Decline Amendment (Actuarial / Leadership)
+export const declineAmendment = async (req, res) => {
+    try {
+        const userId = req.user.user_id;
+        const applicationId = Number(req.params.id);
+        const { response_notes } = req.body || {};
+        const ipAddress = normalizeIp(req.ip);
+
+        await Model.declineAmendment({
+            applicationId,
+            responseNotes: response_notes || null,
+            ipAddress
+        }, userId);
+
+        const updatedApp = await Model.getApplicationById(applicationId);
+        const response = await Helper.buildApplicationResponse(updatedApp);
+
+        io.emit('declineAmendment', response);
+
+        return success(res, response, 'Amendment request declined. Application status restored to Released.');
+    } catch (err) {
+        console.error('Decline Amendment Error:', err);
+        return error(res, err.message);
+    }
+};
+
+// Get Amendment History for an Application
+export const getAmendmentHistory = async (req, res) => {
+    try {
+        const applicationId = Number(req.params.id);
+        const history = await Model.getAmendmentHistoryByApplicationId(applicationId);
+        return success(res, history, 'Amendment history fetched successfully.');
+    } catch (err) {
+        console.error('Get Amendment History Error:', err);
+        return error(res, err.message);
+    }
+};
+
+

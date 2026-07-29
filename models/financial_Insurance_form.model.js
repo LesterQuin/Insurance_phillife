@@ -75,6 +75,8 @@ export const createApplication = async (data, userId) => {
             .input('borrower_age_76_80', sql.Bit, data.borrower_age_76_80 || false)
             .input('borrower_amount_76_80', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_76_80))
             .input('borrower_amount_18_65', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_18_65))
+            .input('borrower_amount_under_min', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_under_min))
+            .input('borrower_amount_over_max', sql.Decimal(18, 2), valueOrNull(data.borrower_amount_over_max))
             .input('channel_type_id', sql.Int, valueOrNull(data.channel_type_id))
             .input('channel_name', sql.NVarChar, valueOrNull(data.channel_name))
             .input('channel_number', sql.NVarChar, valueOrNull(data.channel_number))
@@ -94,14 +96,14 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, max_loan_amount, min_loan_amount, loan_portfolio_amount, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id, excel_file_path,
-                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, channel_type_id, channel_name, channel_number, channel_email, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date
+                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, borrower_amount_under_min, borrower_amount_over_max, channel_type_id, channel_name, channel_number, channel_email, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @business_nature_id, @sub_business_nature_id, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type,
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @max_loan_amount, @min_loan_amount, @loan_portfolio_amount, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id, @excel_file_path,
-                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @channel_type_id, @channel_name, @channel_number, @channel_email, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date
+                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @borrower_amount_under_min, @borrower_amount_over_max, @channel_type_id, @channel_name, @channel_number, @channel_email, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
@@ -383,6 +385,8 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
                 fia.borrower_age_76_80,
                 fia.borrower_amount_76_80,
                 fia.borrower_amount_18_65,
+                fia.borrower_amount_under_min,
+                fia.borrower_amount_over_max,
                 fia.proposal_status_id,
                 fia.channel_type_id,
                 fia.channel_name,
@@ -505,6 +509,17 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
             showMap[n.application_id] = n.show_in_pdf;
         });
 
+        // Bulk load actuarial to CFE notes
+        const toCfeNotesRes = await pool.request().query(`
+            SELECT application_id, notes 
+            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial_to_cfe'
+        `);
+        const toCfeNotesMap = {};
+        (toCfeNotesRes.recordset || []).forEach(n => {
+            toCfeNotesMap[n.application_id] = n.notes;
+        });
+
         // Bulk load actuarial files
         const actFilesRes = await pool.request().query(`
             SELECT application_id, file_path 
@@ -519,14 +534,39 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
             actFilesMap[f.application_id].push(f.file_path);
         });
 
+        // Bulk load all department files (supporting details)
+        const deptFilesRes = await pool.request().query(`
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            WHERE f.application_id IN (${appIds.join(',')})
+        `);
+        const deptFilesMap = {};
+        (deptFilesRes.recordset || []).forEach(f => {
+            if (!deptFilesMap[f.application_id]) {
+                deptFilesMap[f.application_id] = [];
+            }
+            deptFilesMap[f.application_id].push({
+                file_path: f.file_path,
+                file_name: f.file_name,
+                department: f.department,
+                created_at: f.created_at,
+                firstname: f.firstname,
+                lastname: f.lastname
+            });
+        });
+
         apps.forEach(app => {
             const appFiles = filesMap[app.application_id];
             app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
             app.actuarial_notes = notesMap[app.application_id] ?? null;
             app.actuarial_notes_show_in_pdf = showMap[app.application_id] !== false;
+            app.actuarial_to_cfe_notes = toCfeNotesMap[app.application_id] ?? null;
             
             const appActFiles = actFilesMap[app.application_id];
             app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
+
+            app.department_files = deptFilesMap[app.application_id] || [];
         });
     }
     return apps;
@@ -594,6 +634,8 @@ export const getPrototypes = async (userId = null) => {
                 fia.borrower_age_76_80,
                 fia.borrower_amount_76_80,
                 fia.borrower_amount_18_65,
+                fia.borrower_amount_under_min,
+                fia.borrower_amount_over_max,
                 fia.proposal_status_id,
                 fia.channel_type_id,
                 fia.channel_name,
@@ -703,6 +745,28 @@ export const getPrototypes = async (userId = null) => {
             actFilesMap[f.application_id].push(f.file_path);
         });
 
+        // Bulk load all department files (supporting details)
+        const deptFilesRes = await pool.request().query(`
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            WHERE f.application_id IN (${appIds.join(',')})
+        `);
+        const deptFilesMap = {};
+        (deptFilesRes.recordset || []).forEach(f => {
+            if (!deptFilesMap[f.application_id]) {
+                deptFilesMap[f.application_id] = [];
+            }
+            deptFilesMap[f.application_id].push({
+                file_path: f.file_path,
+                file_name: f.file_name,
+                department: f.department,
+                created_at: f.created_at,
+                firstname: f.firstname,
+                lastname: f.lastname
+            });
+        });
+
         apps.forEach(app => {
             const appFiles = filesMap[app.application_id];
             app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
@@ -711,6 +775,8 @@ export const getPrototypes = async (userId = null) => {
             
             const appActFiles = actFilesMap[app.application_id];
             app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
+
+            app.department_files = deptFilesMap[app.application_id] || [];
         });
     }
     return apps;
@@ -818,14 +884,76 @@ export const getApplicationById = async (id) => {
         app.actuarial_notes = actuarialNotesRes.recordset?.[0]?.notes ?? null;
         app.actuarial_notes_show_in_pdf = actuarialNotesRes.recordset?.[0]?.show_in_pdf !== false;
 
+        // Load actuarial to CFE notes
+        const toCfeNotesRes = await pool.request().input('appId', sql.Int, id).query(`
+            SELECT notes FROM DHUB_UAT.sg.financial_insurance_application_notes WHERE application_id = @appId AND department = 'actuarial_to_cfe'
+        `);
+        app.actuarial_to_cfe_notes = toCfeNotesRes.recordset?.[0]?.notes ?? null;
+
         // Load actuarial files
         const actuarialFilesRes = await pool.request().input('appId', sql.Int, id).query(`
             SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_department_files WHERE application_id = @appId AND department = 'actuarial'
         `);
         const actFiles = actuarialFilesRes.recordset || [];
         app.actuarial_files = actFiles.length > 0 ? JSON.stringify(actFiles.map(f => f.file_path)) : null;
+
+        // Load all department files (supporting details)
+        const departmentFilesRes = await pool.request().input('appId', sql.Int, id).query(`
+            SELECT f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            WHERE f.application_id = @appId
+        `);
+        app.department_files = departmentFilesRes.recordset || [];
     }
     return app;
+};
+
+// Save department files (supporting details)
+export const saveDepartmentFiles = async (applicationId, department, files, userId) => {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+        for (const file of files) {
+            if (file.filePath) {
+                const insertRequest = new sql.Request(transaction);
+                await insertRequest
+                    .input('appId', sql.Int, applicationId)
+                    .input('department', sql.NVarChar(100), department.toLowerCase())
+                    .input('file_path', sql.NVarChar(500), file.filePath)
+                    .input('file_name', sql.NVarChar(255), file.originalName)
+                    .input('userId', sql.Int, userId)
+                    .query(`
+                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_department_files 
+                        (application_id, department, file_path, file_name, uploaded_by_user_id, created_at)
+                        VALUES (@appId, @department, @file_path, @file_name, @userId, GETDATE())
+                    `);
+            }
+        }
+        await transaction.commit();
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+// Retrieve department files (supporting details)
+export const getDepartmentFiles = async (applicationId, department = null) => {
+    const pool = await poolPromise;
+    const request = pool.request().input('appId', sql.Int, applicationId);
+    let query = `
+        SELECT f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
+        FROM DHUB_UAT.sg.financial_insurance_application_department_files f
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+        WHERE f.application_id = @appId
+    `;
+    if (department) {
+        request.input('department', sql.NVarChar(100), department.toLowerCase());
+        query += ` AND f.department = @department`;
+    }
+    const res = await request.query(query);
+    return res.recordset || [];
 };
 
 // Check if group name exists
@@ -1106,6 +1234,8 @@ export const updateApplication = async (id, data, userId) => {
         addClause('borrower_age_76_80', data.borrower_age_76_80, sql.Bit);
         addClause('borrower_amount_76_80', data.borrower_amount_76_80, sql.Decimal(18, 2));
         addClause('borrower_amount_18_65', data.borrower_amount_18_65, sql.Decimal(18, 2));
+        addClause('borrower_amount_under_min', data.borrower_amount_under_min, sql.Decimal(18, 2));
+        addClause('borrower_amount_over_max', data.borrower_amount_over_max, sql.Decimal(18, 2));
         addClause('notes', data.notes, sql.NVarChar(sql.MAX));
 
         // Channel fields
@@ -1515,3 +1645,323 @@ export const getBulkApplicationAffiliates = async (applicationIds) => {
     `);
     return result.recordset ?? [];
 };
+
+// Request an Amendment
+export const requestAmendment = async (data, userId) => {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+        const { applicationId, requestNotes, requestDeptId, targetDeptId, ipAddress } = data;
+
+        // Insert into DHUB_UAT.sg.financial_insurance_amendment_requests table
+        const insertReq = new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .input('requested_by', sql.Int, userId)
+            .input('request_dept_id', sql.Int, valueOrNull(requestDeptId))
+            .input('target_dept_id', sql.Int, valueOrNull(targetDeptId))
+            .input('request_notes', sql.NVarChar(sql.MAX), valueOrNull(requestNotes))
+            .input('status', sql.NVarChar(50), 'PENDING');
+
+        const insertRes = await insertReq.query(`
+            INSERT INTO DHUB_UAT.sg.financial_insurance_amendment_requests (
+                application_id, requested_by, request_dept_id, target_dept_id, request_notes, status
+            ) VALUES (
+                @application_id, @requested_by, @request_dept_id, @target_dept_id, @request_notes, @status
+            );
+            SELECT SCOPE_IDENTITY() AS amendment_id;
+        `);
+
+        const amendmentId = insertRes.recordset[0].amendment_id;
+
+        // Clear extension request flag if any; application status_id remains unchanged until approved by Actuarial
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_application
+                SET extension_requested = 0 -- clear extension request if any
+                WHERE application_id = @application_id
+            `);
+
+        // Fetch application snapshot for audit history logging
+        const snapshotRes = await new sql.Request(transaction)
+            .input('appId', sql.Int, applicationId)
+            .query(`SELECT * FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId`);
+
+        const appSnapshot = snapshotRes.recordset[0] || {};
+        appSnapshot.amendment_id = amendmentId;
+        appSnapshot.amendment_request_notes = requestNotes;
+        appSnapshot.amendment_requested_by = userId;
+
+        // Log snapshot action to history logs
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .input('user_id', sql.Int, userId)
+            .input('action_type', sql.NVarChar, 'AMENDMENT_REQUESTED')
+            .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(appSnapshot))
+            .input('ip_address', sql.NVarChar, ipAddress || null)
+            .query(`
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+                VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
+            `);
+
+        await transaction.commit();
+        return amendmentId;
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+// Get pending amendment requests for queue
+export const getPendingAmendmentRequests = async (targetDeptId = null) => {
+    const pool = await poolPromise;
+    const request = pool.request();
+    let whereClause = "WHERE ar.status = 'PENDING'";
+
+    if (targetDeptId) {
+        request.input('target_dept_id', sql.Int, targetDeptId);
+        whereClause += " AND (ar.target_dept_id IS NULL OR ar.target_dept_id = @target_dept_id)";
+    }
+
+    const result = await request.query(`
+        SELECT 
+            ar.id AS amendment_id,
+            ar.application_id,
+            ar.requested_by,
+            ar.request_dept_id,
+            ar.target_dept_id,
+            ar.request_notes,
+            ar.status AS amendment_status,
+            ar.created_at AS request_created_at,
+            fia.group_name,
+            fia.minimum_age,
+            fia.maximum_age,
+            fia.status_id,
+            fis.status_name,
+            p.product_name AS plan_name,
+            p.acronym AS plan_acronym,
+            u.firstname + ' ' + u.lastname AS requester_name,
+            dept.name AS request_dept_name
+        FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
+        JOIN DHUB_UAT.sg.financial_insurance_application fia ON ar.application_id = fia.application_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_status fis ON fia.status_id = fis.status_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON ar.requested_by = u.user_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON ar.request_dept_id = dept.id AND dept.category = 'DEPARTMENT'
+        ${whereClause}
+        ORDER BY ar.created_at ASC
+    `);
+
+    return result.recordset ?? [];
+};
+
+// Approve an Amendment Request
+export const approveAmendment = async (data, userId) => {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+        const { applicationId, responseNotes, ipAddress } = data;
+
+        // Update latest pending amendment request record
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .input('response_notes', sql.NVarChar(sql.MAX), valueOrNull(responseNotes))
+            .input('responded_by', sql.Int, userId)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_amendment_requests
+                SET status = 'APPROVED',
+                    response_notes = @response_notes,
+                    responded_by = @responded_by,
+                    updated_at = GETDATE()
+                WHERE application_id = @application_id AND status = 'PENDING'
+            `);
+
+        // Update application status to Amend - Actuarial (Status 16) to allow editing rates, total premium, and evidence notes
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_application
+                SET status_id = 16,
+                    updated_at = GETDATE()
+                WHERE application_id = @application_id
+            `);
+
+        // Fetch updated snapshot
+        const snapshotRes = await new sql.Request(transaction)
+            .input('appId', sql.Int, applicationId)
+            .query(`SELECT * FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId`);
+
+        const appSnapshot = snapshotRes.recordset[0] || {};
+        appSnapshot.amendment_response_notes = responseNotes;
+        appSnapshot.responded_by = userId;
+        appSnapshot.amendment_decision = 'APPROVED';
+
+        // Log snapshot history
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .input('user_id', sql.Int, userId)
+            .input('action_type', sql.NVarChar, 'AMENDMENT_APPROVED')
+            .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(appSnapshot))
+            .input('ip_address', sql.NVarChar, ipAddress || null)
+            .query(`
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+                VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
+            `);
+
+        await transaction.commit();
+        return true;
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+// Decline an Amendment Request
+export const declineAmendment = async (data, userId) => {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+    try {
+        await transaction.begin();
+
+        const { applicationId, responseNotes, ipAddress } = data;
+
+        // Update latest pending amendment request record
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .input('response_notes', sql.NVarChar(sql.MAX), valueOrNull(responseNotes))
+            .input('responded_by', sql.Int, userId)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_amendment_requests
+                SET status = 'DECLINED',
+                    response_notes = @response_notes,
+                    responded_by = @responded_by,
+                    updated_at = GETDATE()
+                WHERE application_id = @application_id AND status = 'PENDING'
+            `);
+
+        // Restore application status to Released (Status 15)
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .query(`
+                UPDATE DHUB_UAT.sg.financial_insurance_application
+                SET status_id = 15,
+                    updated_at = GETDATE()
+                WHERE application_id = @application_id
+            `);
+
+        // Fetch updated snapshot
+        const snapshotRes = await new sql.Request(transaction)
+            .input('appId', sql.Int, applicationId)
+            .query(`SELECT * FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId`);
+
+        const appSnapshot = snapshotRes.recordset[0] || {};
+        appSnapshot.amendment_response_notes = responseNotes;
+        appSnapshot.responded_by = userId;
+        appSnapshot.amendment_decision = 'DECLINED';
+
+        // Log snapshot history
+        await new sql.Request(transaction)
+            .input('application_id', sql.Int, applicationId)
+            .input('user_id', sql.Int, userId)
+            .input('action_type', sql.NVarChar, 'AMENDMENT_DECLINED')
+            .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(appSnapshot))
+            .input('ip_address', sql.NVarChar, ipAddress || null)
+            .query(`
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+                VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
+            `);
+
+        await transaction.commit();
+        return true;
+    } catch (err) {
+        await transaction.rollback();
+        throw err;
+    }
+};
+
+// Helper: Ensure DHUB_UAT.sg.financial_insurance_amendment_requests table exists
+export const ensureAmendmentRequestsTable = async () => {
+    const pool = await poolPromise;
+    await pool.request().query(`
+        IF OBJECT_ID('DHUB_UAT.sg.financial_insurance_amendment_requests', 'U') IS NULL
+        BEGIN
+            CREATE TABLE DHUB_UAT.sg.financial_insurance_amendment_requests (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                application_id INT NOT NULL,
+                requested_by INT NOT NULL,
+                request_dept_id INT NULL,
+                target_dept_id INT NULL,
+                request_notes NVARCHAR(MAX) NULL,
+                status NVARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                response_notes NVARCHAR(MAX) NULL,
+                responded_by INT NULL,
+                created_at DATETIME DEFAULT GETDATE(),
+                updated_at DATETIME DEFAULT GETDATE()
+            );
+        END
+    `);
+};
+
+// Get Amendment History for an Application (joins requester and responder names)
+export const getAmendmentHistoryByApplicationId = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT 
+                ar.id AS amendment_id,
+                ar.application_id,
+                ar.requested_by,
+                req_u.firstname + ' ' + req_u.lastname AS requested_by_name,
+                req_dept.name AS request_dept_name,
+                ar.request_notes,
+                ar.status AS amendment_status,
+                ar.responded_by,
+                resp_u.firstname + ' ' + resp_u.lastname AS responded_by_name,
+                ar.response_notes,
+                ar.created_at AS requested_at,
+                ar.updated_at AS responded_at
+            FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users req_u ON ar.requested_by = req_u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users resp_u ON ar.responded_by = resp_u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups req_dept ON ar.request_dept_id = req_dept.id AND req_dept.category = 'DEPARTMENT'
+            WHERE ar.application_id = @application_id
+            ORDER BY ar.created_at DESC
+        `);
+    return result.recordset ?? [];
+};
+
+// Get Latest Amendment Request for an Application (for response formatting)
+export const getLatestAmendmentRequestByAppId = async (applicationId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .query(`
+            SELECT TOP 1
+                ar.id,
+                ar.status,
+                ar.request_notes,
+                ar.response_notes,
+                ar.requested_by,
+                req_u.firstname + ' ' + req_u.lastname AS requested_by_name,
+                req_dept.name AS request_dept_name,
+                ar.responded_by,
+                resp_u.firstname + ' ' + resp_u.lastname AS responded_by_name,
+                ar.created_at AS requested_at,
+                ar.updated_at AS responded_at
+            FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users req_u ON ar.requested_by = req_u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users resp_u ON ar.responded_by = resp_u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups req_dept ON ar.request_dept_id = req_dept.id AND req_dept.category = 'DEPARTMENT'
+            WHERE ar.application_id = @application_id
+            ORDER BY ar.created_at DESC
+        `);
+    return result.recordset && result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
+
+
