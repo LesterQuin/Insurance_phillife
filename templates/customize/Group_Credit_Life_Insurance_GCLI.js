@@ -177,6 +177,10 @@ export const generateGCLIPDFContent = (application, user, details) => {
     const standardHeader = isGCLI ? "Term of Loan" : "Rider";
     const standardSuffix = isGCLI ? " months" : "";
 
+    const startAge = (application.borrower_amount_under_min && parseFloat(application.borrower_amount_under_min) > 0) ? 18 : (application.minimum_age || 18);
+    const endAge = (application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0) ? 65 : (application.maximum_age || 65);
+    const ageLabel = `${startAge}-${endAge}`;
+
     const planName = (application.basic_plan?.name || "").trim();
     const lastSpaceIndex =
         planName.lastIndexOf(" ") !== -1
@@ -561,10 +565,30 @@ export const generateGCLIPDFContent = (application, user, details) => {
             <th>Benefit</th>
         </tr>
 
+        ${
+          application.minimum_age > 18 && application.borrower_amount_under_min && parseFloat(application.borrower_amount_under_min) > 0
+            ? `
+        <tr>
+            <td>18-${application.minimum_age - 1}</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(application.borrower_amount_under_min)}</td>
+        </tr>`
+            : ""
+        }
+
         <tr>
             <td>${application.minimum_age || 18}-${application.maximum_age || 65}</td>
             <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_65)}</td>
         </tr>
+
+        ${
+          application.maximum_age < 65 && application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0
+            ? `
+        <tr>
+            <td>${application.maximum_age + 1}-65</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(application.borrower_amount_over_max)}</td>
+        </tr>`
+            : ""
+        }
 
         ${
           application.borrower_age_66_70
@@ -605,8 +629,8 @@ export const generateGCLIPDFContent = (application, user, details) => {
 <div class="page-break"></div>
     <div class="section-group">
         <h2 style="margin-top:10px;">SINGLE RATE PER 1,000 </h2>
-            <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers ${application.minimum_age}-${application.maximum_age}</p>
-        ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, application.minimum_age, application.maximum_age)}
+            <p style="margin-top: -10px; margin-bottom: 10px; font-weight: bold;">For borrowers ${ageLabel}</p>
+        ${generateChunkedRateTables(rates18_65, maturity, standardHeader, standardSuffix, startAge, endAge)}
         <br>
         ${
           application.borrower_age_66_70
@@ -655,7 +679,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
             3. <strong>Eligibility Requirements</strong><br>
             <div style="text-indent: 20px;">
                 Any in good health and actively-at-work debtor of the Policyholder who is at
-                least ${application.minimum_age} years old and who has not attained his ${application.maximum_age + 1}th birth anniversary
+                least ${startAge} years old and who has not attained his ${endAge + 1}th birth anniversary
                 at the time of loan application. Actively-at-work means
             </div>
             <ul>

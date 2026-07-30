@@ -369,17 +369,20 @@ export const saveActuarialFiles = async (applicationId, filePaths, userId) => {
         await transaction.begin();
 
 
-        for (const filePath of filePaths) {
-            if (filePath) {
+        for (const file of filePaths) {
+            if (file) {
+                const filePath = typeof file === 'string' ? file : file.filePath;
+                const fileName = typeof file === 'string' ? path.basename(file) : file.originalName;
                 const insertRequest = new sql.Request(transaction);
                 await insertRequest
                     .input('appId', sql.Int, applicationId)
                     .input('department', sql.NVarChar(100), 'actuarial')
                     .input('file_path', sql.NVarChar(500), filePath)
-                    .input('file_name', sql.NVarChar(255), path.basename(filePath))
+                    .input('file_name', sql.NVarChar(255), fileName)
+                    .input('userId', sql.Int, userId)
                     .query(`
-                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_department_files (application_id, department, file_path, file_name)
-                        VALUES (@appId, @department, @file_path, @file_name)
+                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_department_files (application_id, department, file_path, file_name, uploaded_by_user_id, created_at)
+                        VALUES (@appId, @department, @file_path, @file_name, @userId, GETDATE())
                     `);
             }
         }

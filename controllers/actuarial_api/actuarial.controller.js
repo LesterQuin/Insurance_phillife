@@ -722,7 +722,7 @@ export const uploadActuarialFiles = async (req, res) => {
             const newFilePath = path.join(targetDir, uniqueFilename).replace(/\\/g, '/');
 
             await fs.promises.rename(file.filepath, newFilePath);
-            newFilePaths.push(newFilePath);
+            newFilePaths.push({ filePath: newFilePath, originalName: file.originalFilename });
         }
 
         await ActuarialModel.saveActuarialFiles(appId, newFilePaths, userId);
