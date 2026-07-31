@@ -1081,7 +1081,10 @@ export const saveDraft = async (req, res) => {
             finalAppId = applicationId;
 
             // Handle Excel file for existing draft
-            const excelFile = req.files?.excel_file;
+            let excelFile = req.files?.excel_file;
+            if (Array.isArray(excelFile)) {
+                excelFile = excelFile[0];
+            }
             if (excelFile) {
                 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
                 const oldFilePath = existingDraft.excel_file_path;
@@ -1105,7 +1108,10 @@ export const saveDraft = async (req, res) => {
             finalAppId = newRecord.application_id;
 
             // Handle Excel file for new draft
-            const excelFile = req.files?.excel_file;
+            let excelFile = req.files?.excel_file;
+            if (Array.isArray(excelFile)) {
+                excelFile = excelFile[0];
+            }
             if (excelFile) {
                 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
                 const uniqueFilename = `APP-${finalAppId}-${Helper.getFileTimestamp()}-${excelFile.originalFilename}`;
@@ -1555,7 +1561,7 @@ export const getApplicationById = async (req, res) => {
             return error(res, 'You are not authorized to view this application.', 403);
         }
 
-        const response = await Helper.buildApplicationResponse(app);
+        const response = await Helper.buildApplicationResponse(app, userId);
 
         return success(res, response);
     } catch (err) {
@@ -1652,7 +1658,10 @@ export const updateApplication = async (req, res) => {
         const appId = req.params.id;
 
         // Handle Excel file during update with application_id in filename
-        const excelFile = req.files?.excel_file; // Assuming req.files is populated by formidable
+        let excelFile = req.files?.excel_file; // Assuming req.files is populated by formidable
+        if (Array.isArray(excelFile)) {
+            excelFile = excelFile[0];
+        }
         if (excelFile) {
             const tempFilePath = excelFile.filepath;
             const originalFilename = excelFile.originalFilename;

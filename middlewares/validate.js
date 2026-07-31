@@ -978,8 +978,18 @@ body('basic_plan_id')
                 }
             }
 
+            // GCI (Plan ID 4) Specific Validations
+            if (planId === 4) {
+                // Mutual Exclusivity for Accidental Death/Disability Riders (Select 1 out of 4)
+                const accidentRiderIds = [22, 23, 24, 25];
+                const selectedAccidentRiders = riders.filter(r => accidentRiderIds.includes(Number(r.rider_id)));
+                if (selectedAccidentRiders.length > 1) {
+                    throw new Error('Select only 1 out of the 4 Group Accidental Death Benefit/Disability Riders.');
+                }
+            }
+
             // --- Validation for Level/Salary Ranking Riders (Mapped by Designation) ---
-            if ((planId === 2 || planId === 3) && (coverageTypeId === 32 || coverageTypeId === 34)) {
+            if ((planId === 2 || planId === 3 || planId === 4) && (coverageTypeId === 32 || coverageTypeId === 34)) {
                 let designations = [];
                 if (coverageTypeId === 32 && req.body.level_ranking) {
                     designations = req.body.level_ranking.map(r => r.designation);
@@ -1019,6 +1029,16 @@ body('basic_plan_id')
                             const rId = rider.rider_id ? rider.rider_id.toString() : '';
                             const amount = val.amount != null ? Number(val.amount) : 0;
                             if (['19', '20', '21'].includes(rId) && amount < 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
+                        } else if (planId === 4) { // GCI specific checks
+                            const rId = rider.rider_id ? rider.rider_id.toString() : '';
+                            const amount = val.amount != null ? Number(val.amount) : 0;
+                            const unit = val.unit != null ? Number(val.unit) : 0;
+
+                            if (rId === '28' && amount !== 0 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300 for all ranks.');
+                            if (rId === '29' && amount !== 0 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500 for all ranks.');
+                            if (rId === '31' && amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000 for all ranks.');
+                            if (rId === '33' && unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 or 2 Units for all ranks.');
+                            if (['22', '23', '24', '25', '26', '27', '30', '32', '34'].includes(rId) && amount < 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
                         }
                     }
                 }
@@ -1051,6 +1071,18 @@ body('basic_plan_id')
                     } else if (planId === 3) {
                         if (['19', '20', '21'].includes(riderId) && amount < 0) {
                             throw new Error(`${riderDef.rider_name} requires a valid amount.`);
+                        }
+                    } else if (planId === 4) {
+                        if (riderId === '28') { // Group Hospital Income Rider
+                            if (amount !== 0 && (amount < 100 || amount > 300)) throw new Error('Group Hospital Income Rider amount must be between 100 and 300.');
+                        } else if (riderId === '29') { // Group Accidental Medical Expense Reimbursement Rider
+                            if (amount !== 0 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500.');
+                        } else if (riderId === '31') { // Burial (Memorial/Service)
+                            if (amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
+                        } else if (riderId === '33') { // Group Dengue Rider
+                            if (unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
+                        } else if (['22', '23', '24', '25', '26', '27', '30', '32', '34'].includes(riderId)) { // Valid Amount Required for these riders
+                            if (amount < 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
                         }
                     } else {
                         // General Validation for other plans (fallback to name checks if ID not specific)
@@ -1220,11 +1252,11 @@ body('basic_plan_id')
             if (val != null && val !== '') throw new Error('Loan-specific amounts are only applicable for GCLI products.');
             return true;
         }),
-    // Reject age bracket amounts for plans other than GCLI, GPA, GYRT
+    // Reject age bracket amounts for plans other than GCLI, GPA, GYRT, GCI
     body(['borrower_amount_18_65', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80'])
-        .if(body('plan_id').not().isIn(['1', '2', '3']))
+        .if(body('plan_id').not().isIn(['1', '2', '3', '4']))
         .custom(val => {
-            if (val != null && val !== '') throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT).');
+            if (val != null && val !== '') throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT, GCI).');
             return true;
         }),
 
@@ -1298,7 +1330,7 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             const coverageTypeId = Number(req.body.coverage_type_id);
 
-            if (planId === 2 || planId === 3) {
+            if (planId === 2 || planId === 3 || planId === 4) {
                 if (coverageTypeId === 33) { 
                     if (value == null) {
                         throw new Error('Uniform Coverage Amount is required and cannot be null for this coverage type.');
@@ -1321,7 +1353,7 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             const coverageTypeId = Number(req.body.coverage_type_id);
 
-            if (planId === 2 || planId === 3) {
+            if (planId === 2 || planId === 3 || planId === 4) {
                 if (coverageTypeId === 32) { 
                     if (value == null || value.length < 2) {
                         throw new Error('Level Ranking is required for this coverage type and must have at least 2 entries.');
@@ -1346,7 +1378,7 @@ body('basic_plan_id')
             const planId = Number(req.body.plan_id);
             const coverageTypeId = Number(req.body.coverage_type_id);
 
-            if (planId === 2 || planId === 3) {
+            if (planId === 2 || planId === 3 || planId === 4) {
                 if (coverageTypeId === 34) { // By Salary Rank
                     if (value == null || value.length < 2) {
                         throw new Error('Salary Ranking is required and must have at least 2 entries.');
@@ -1733,14 +1765,14 @@ export const validateRates = [
                     // Branch A: Handle Nested Age Objects (Senior specific pricing)
                     const isNestedObject = !Array.isArray(data) && typeof data === 'object' && data !== null;
                     // GYRT and GPA require nested objects (Scale 1/2 logic or Seniors)
-                    const shouldBeNested = isSeniorBracket || [1, 2, 3].includes(planId);
+                    const shouldBeNested = isSeniorBracket || [1, 2, 3, 4].includes(planId);
 
                     if (shouldBeNested && isNestedObject) {
                         // Enforce that all specific ages within the bracket range are provided
                         const [startAge, endAge] = key.split('-').map(Number);
                         const missingAges = []; // This check is for the keys in the object, not the items within each age array.
 
-                        if ([1, 2, 3].includes(planId)) {
+                        if ([1, 2, 3, 4].includes(planId)) {
                             const hasAgeKeys = Object.keys(data).some(k => k.startsWith('age_'));
                             // For GCLI (Plan 1), basic_plan is mandatory for the main bracket if not using detailed ages.
                             if (planId === 1 && key === '18-65' && !hasAgeKeys) {
@@ -1754,7 +1786,7 @@ export const validateRates = [
                             }
 
                             if (key === '18-65') {
-                                if (planId === 2 || planId === 3) {
+                                if (planId === 2 || planId === 3 || planId === 4) {
                                     const hasDetailedAges = Object.keys(data).some(k => k.startsWith('age_'));
                                     if (numLives <= 30 || hasDetailedAges) {
                                         const expectedBands = ['age_18_24', 'age_25_29', 'age_30_34'];
@@ -1863,7 +1895,7 @@ export const validateRates = [
                             }
 
                             // GYRT/GPA specific validation (for basic_plan, rates, age_XX keys)
-                            if ([2, 3].includes(planId)) {
+                            if ([2, 3, 4].includes(planId)) {
                                 if (planId === 3 && isSeniorBracket) {
                                     throw new Error(`Rates for age bracket ${key} are disabled for GPA products.`);
                                 }
@@ -1904,7 +1936,7 @@ export const validateRates = [
                                         for (const rid of requiredRiderIds) {
                                             if (!inputRiderIds.has(rid)) {
                                                 const label = riderNameMap.get(rid.toString()) || `Rider ID ${rid}`;
-                                                throw new Error(`${planId === 2 ? 'GYRT' : 'GPA'} ${ageKey} is missing a rate for ${label}. ${errorSuffix}`);
+                                                throw new Error(`${planId === 2 ? 'GYRT' : planId === 3 ? 'GPA' : 'GCI'} ${ageKey} is missing a rate for ${label}. ${errorSuffix}`);
                                             }
                                         }
                                         for (const rid of inputRiderIds) {
@@ -1913,7 +1945,7 @@ export const validateRates = [
                                                 if (planId === 2 && isSeniorBracket) {
                                                     throw new Error(`GYRT senior age bracket ${key} (${ageKey}) contains ${label}, which is not allowed for seniors (only ALCR ID 10 is accepted). ${errorSuffix}`);
                                                 }
-                                                throw new Error(`${planId === 2 ? 'GYRT' : 'GPA'} ${ageKey} contains unselected or invalid rider ID ${rid}. ${errorSuffix}`);
+                                                throw new Error(`${planId === 2 ? 'GYRT' : planId === 3 ? 'GPA' : 'GCI'} ${ageKey} contains unselected or invalid rider ID ${rid}. ${errorSuffix}`);
                                             }
                                         }
                                     });
@@ -1929,7 +1961,7 @@ export const validateRates = [
                                     } else {
                                         const inputRiderIds = new Set(ageItems.map(item => (item.rider_id !== undefined && item.rider_id !== null) ? item.rider_id.toString() : '0'));
                                         for (const rid of requiredRiderIds) {
-                                            if (!inputRiderIds.has(rid)) throw new Error(`${planId === 2 ? 'GYRT' : 'GPA'} ${ageKey} is missing a rate for ${riderNameMap.get(rid) || rid}. ${errorSuffix}`);
+                                            if (!inputRiderIds.has(rid)) throw new Error(`${planId === 2 ? 'GYRT' : planId === 3 ? 'GPA' : 'GCI'} ${ageKey} is missing a rate for ${riderNameMap.get(rid) || rid}. ${errorSuffix}`);
                                         }
                                         ageItems.forEach(item => {
                                             if (item.rate === undefined || item.rate === null || item.rate === '') throw new Error(`Rate missing in ${ageKey}.`);
@@ -1940,7 +1972,7 @@ export const validateRates = [
                         }
                     } else { // Branch B: Standard Flat Array Logic (18-64 or legacy senior input)
                         if (shouldBeNested) {
-                            throw new Error(`Data for '${key}' must be a nested age/band object for this product configuration (GCLI/GYRT/GPA). ${errorSuffix}`);
+                            throw new Error(`Data for '${key}' must be a nested age/band object for this product configuration (GCLI/GYRT/GPA/GCI). ${errorSuffix}`);
                         }
 
                         if (!Array.isArray(data)) throw new Error(`Data for ${key} must be an array.`);
@@ -2478,12 +2510,12 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
                 return true;
             })
     ),
-    // Reject age bracket amounts for plans other than GCLI, GPA, GYRT
+    // Reject age bracket amounts for plans other than GCLI, GPA, GYRT, GCI
     body(['borrower_amount_18_65', 'borrower_amount_66_70', 'borrower_amount_71_75', 'borrower_amount_76_80']).optional({ nullable: true })
         .custom((value, { req }) => {
             const planId = req.body.plan_id !== undefined ? Number(req.body.plan_id) : req.existingApplication?.plan_id;
-            if (value != null && ![1, 2, 3].includes(planId)) {
-                throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT).');
+            if (value != null && ![1, 2, 3, 4].includes(planId)) {
+                throw new Error('Age bracket amounts are only applicable for selected product types (GCLI, GPA, GYRT, GCI).');
             }
             return true;
         }),
@@ -2565,7 +2597,10 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
                 throw new Error(`Invalid coverage_type_id (${value}). Valid options: ${validOptions}`);
             }
 
-        const excelFile = req.files?.excel_file;
+        let excelFile = req.files?.excel_file;
+        if (Array.isArray(excelFile)) {
+            excelFile = excelFile[0];
+        }
         const hasExistingFile = req.existingApplication?.excel_file_path;
 
         // 1. Mandatory check removed here to allow separate upload via the /:id/upload-excel API.

@@ -41,10 +41,12 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
                 ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' 
                 : planId === 3 
                     ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa' 
-                    : null;
+                    : planId === 4
+                        ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gci'
+                        : null;
 
         if (!tableName) {
-            throw new Error(`Invalid plan_id (${planId}) for saving rates. Valid plan IDs are 1 (GCLI), 2 (GYRT), or 3 (GPA).`);
+            throw new Error(`Invalid plan_id (${planId}) for saving rates. Valid plan IDs are 1 (GCLI), 2 (GYRT), 3 (GPA), or 4 (GCI).`);
         }
 
         await new sql.Request(transaction)
@@ -91,7 +93,7 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
                         .input('premium_rate', sql.VarChar(50), rateValue)
                         .input('created_by', sql.Int, userId);
 
-                    if ([2, 3].includes(planId)) {
+                    if ([2, 3, 4].includes(planId)) {
                         await request.query(`INSERT INTO ${tableName} (application_id, basic_plan_id, rider_id, borrower_category, attained_age, age_band, premium_rate, created_by) 
                             VALUES (@application_id, @basic_plan_id, @rider_id, @borrower_category, @attained_age, @age_band, @premium_rate, @created_by)`);
                     } else {
@@ -172,8 +174,12 @@ export const getApplicationRates = async (applicationId) => {
     if (!planId) return [];
 
     let query = '';
-    if (planId === 2 || planId === 3) {
-        const targetTable = planId === 2 ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' : 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa';
+    if (planId === 2 || planId === 3 || planId === 4) {
+        const targetTable = planId === 2 
+            ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' 
+            : planId === 3 
+                ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa'
+                : 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gci';
         // Query for product specific table
         query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r

@@ -7,6 +7,7 @@ import * as User from '../models/user/user_model.js';
 import { generateGCLIPDFContent } from '../templates/customize/Group_Credit_Life_Insurance_GCLI.js';
 import { generateGPAPDFContent } from '../templates/customize/Group_Personal_Accident_Insurance_GPA.js';
 import { generateGYRTPDFContent } from '../templates/customize/Group_Term_Life_Insurance_GYRT.js';
+import { generateGCIPDFContent } from '../templates/customize/Group_Critical_Illness_Insurance_GCI.js';
 import { generateBarangayPDFContent } from '../templates/prototype/prototype_BarangayProtectPlan.js';
 import { generateStudentsGTLIPPDFContent } from '../templates/prototype/prototype_StudentsGroupTermLifeInsurancePlan.js';
 import { generateStudentsGPAPDFContent } from '../templates/prototype/prototype_StudentsGroupPersonalAccidentPlan.js';
@@ -297,8 +298,8 @@ export const formatDbRatesForTemplate = (dbRows, category, planId, app) => {
         return isNaN(num) ? String(val) : num.toFixed(3);
     };
 
-    // Special handling for GPA (3) or GYRT (2): Always restructure into a nested format with basic_rate and riders.
-    if ([2, 3].includes(planId)) {
+    // Special handling for GPA (3), GYRT (2), or GCI (4): Always restructure into a nested format with basic_rate and riders.
+    if ([2, 3, 4].includes(planId)) {
         const result = {
             basic_plan_id: filtered[0]?.basic_plan_id || null,
             basic_plan_name: filtered[0]?.basic_plan_name || null,
@@ -451,7 +452,7 @@ export const formatDbRatesForTemplate = (dbRows, category, planId, app) => {
 };
 
 // Helper to build structured response for a single application
-export const buildApplicationResponse = async (app) => {
+export const buildApplicationResponse = async (app, loggedInUserId = null) => {
     const subGroupTypes = await Model.getApplicationSubGroups(app.application_id);
     const paymentTermsRaw = await Model.getApplicationPaymentTerms(app.application_id);
     const riders = await Model.getApplicationRiders(app.application_id);
@@ -534,9 +535,11 @@ export const buildApplicationResponse = async (app) => {
     const extension_request_status_id = app.extension_request_status_id;
     const extension_request_status_name = app.extension_request_status_name;
 
+    const creatorName = [creator_firstname, creator_middlename, creator_lastname, creator_suffix].filter(Boolean).join(' ') || 'System';
+
     return {
         ...cleanedApp,
-        user_full_name: [creator_firstname, creator_middlename, creator_lastname, creator_suffix].filter(Boolean).join(' '),
+        user_full_name: creatorName,
         contact_person: {
             full_name: [contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname].filter(Boolean).join(' '),
             salutation: contact_person_salutation,
@@ -563,7 +566,7 @@ export const buildApplicationResponse = async (app) => {
                 file_path: path.basename(f.file_path),
                 department: f.uploader_department || f.department,
                 uploaded_at: f.created_at,
-                uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : 'Unknown'
+                uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : creatorName
             })),
         installation_requirements: {
             signed_proposal: signed_proposal_path ? path.basename(signed_proposal_path) : null,
@@ -577,13 +580,15 @@ export const buildApplicationResponse = async (app) => {
             auth_id: authorized_id_path ? path.basename(authorized_id_path) : null,
             booking_date: booking_date || null
         },
-        supporting_details: (department_files || []).map(f => ({
-            file_name: f.file_name,
-            file_path: path.basename(f.file_path),
-            department: f.uploader_department || f.department,
-            uploaded_at: f.created_at,
-            uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : 'Unknown'
-        })),
+        supporting_details: (department_files || [])
+            .filter(f => !loggedInUserId || Number(f.uploaded_by_user_id) === Number(loggedInUserId))
+            .map(f => ({
+                file_name: f.file_name,
+                file_path: path.basename(f.file_path),
+                department: f.uploader_department || f.department,
+                uploaded_at: f.created_at,
+                uploaded_by: f.firstname && f.lastname ? `${f.firstname} ${f.lastname}` : creatorName
+            })),
         business_nature_id: app.business_nature_id,
         sub_business_nature_id: app.sub_business_nature_id,
         status: { id: status_id, name: status_name },
@@ -778,6 +783,7 @@ export const generateProposalHtml = async (id) => {
     // Route to specialized templates for Customized Proposals (Type 31)
     if (planId === 2) return generateGYRTPDFContent(application, user, details);
     if (planId === 3) return generateGPAPDFContent(application, user, details);
+    if (planId === 4) return generateGCIPDFContent(application, user, details);
     return generateGCLIPDFContent(application, user, details); // Default/fallback for Plan ID 1
 };
 

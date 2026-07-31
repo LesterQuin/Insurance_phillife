@@ -546,9 +546,9 @@ export const downloadRatesTemplate = async (req, res) => {
                 const colName = `Rider_${acronym.trim()}`;
                 
                 if (isSeniorBracket) {
-                    // For senior brackets, only allow ALCR (rider_id 10) to be editable in GYRT (plan_id 2).
+                    // For senior brackets, only allow ALCR (rider_id 10 for GYRT, rider_id 30 for GCI) to be editable.
                     // GCLI (plan_id 1) senior brackets don't allow riders at all.
-                    if (planId === 2 && r.rider_id.toString() === '10') {
+                    if ((planId === 2 && r.rider_id.toString() === '10') || (planId === 4 && r.rider_id.toString() === '30')) {
                         row[colName] = findExistingRate(bracket, ageOrBand, term, r.rider_id);
                     } else {
                         row[colName] = 'N/A';
@@ -607,8 +607,8 @@ export const downloadRatesTemplate = async (req, res) => {
                 addRow('18-65', 'rates');
             }
 
-            // Active Senior Brackets: individual ages (only active in GYRT)
-            if (planId === 2) {
+            // Active Senior Brackets: individual ages (active in GYRT and GCI)
+            if (planId === 2 || planId === 4) {
                 const seniorBrackets = ['66-70', '71-75', '76-80'];
                 seniorBrackets.forEach(bracket => {
                     const bracketFlag = `borrower_age_${bracket.replace('-', '_')}`;

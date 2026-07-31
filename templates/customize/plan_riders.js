@@ -69,6 +69,234 @@ export const getPlanBenefitDescription = (planId) => {
             <p style="margin: 0 0 15px 0; text-indent: 30px; font-size: 11pt;">
                 A group insurance plan that pays out a certain percentage of the amount of insurance in case of sustained accidental injuries effected directly and independently of all other causes and as a result of such injuries has sustained, within 180 days after the date of accident, in accordance with a particular schedule of payment.
             </p>`,
+
+    6: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Critical Illness Plan - Top 5 (GCI5P)</strong></p>
+            <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt;">
+                Pays a pre-determined lump sum amount of Critical Illness Benefit upon receipt of due proof satisfactory to the Company if the Insured is first diagnosed, by a qualified physician, of having any one of the covered Critical Illnesses:
+            </p>
+            <div style="font-size: 11pt; line-height: 1.5; margin-left: 20px; text-align: justify; margin-bottom: 15px;">
+                <p style="margin: 5px 0 2px 0;"><strong>1. Cancer</strong></p>
+                <div style="margin-left: 15px;">
+                    <p style="margin: 0; text-indent: 20px;">Cancer shall mean the presence of a malignant tumor positively diagnosed with histological confirmation and characterized by the uncontrolled growth of malignant cells with invasion and destruction of normal tissue. The diagnosis must be confirmed by an Oncologist. Leukemia, lymphoma, myelodysplastic syndrome, essential thrombocythemia, polycythemia rubra vera, and microinvasive carcinoma of the breast or cervix uteri are covered.</p>
+                    <strong style="font-size: 10pt; color: #555; display: block; margin-top: 5px;">Exclusions:</strong>
+                    <ul style="margin: 2px 0 5px 0; padding-left: 15px; font-size: 10pt; color: #555; list-style-type: disc;">
+                        <li>Any tumor histologically classified as pre-malignant, non-invasive, carcinoma in-situ, having either borderline malignancy, or having low malignant potential;</li>
+                        <li>Lobular carcinoma-in-situ of the breast unless the condition requires mastectomy;</li>
+                        <li>All tumors of the prostate unless histologically classified as having a Gleason score of 7 or above or having progressed to at least TNM classification T2bN0M0;</li>
+                        <li>Gastric MALT Lymphoma, if the condition can be treated with Helicobacter eradication;</li>
+                        <li>Gastrointestinal stromal tumor (GIST) Stage I and II according to the AJCC Cancer Staging Manual, Seventh Edition (2010); and</li>
+                        <li>The AJCC Cancer Staging Manual, Seventh Edition.</li>
+                    </ul>
+                </div>
+
+                <p style="margin: 5px 0 2px 0;"><strong>2. Heart Attack</strong></p>
+                <div style="margin-left: 15px;">
+                    <p style="margin: 0; text-indent: 20px;">Heart Attack shall mean the death of a portion of heart muscle (myocardial infarction) resulting from ischemia of one or more coronary arteries as evidenced by all of the following:</p>
+                    <ul style="margin: 2px 0 2px 0; padding-left: 15px; list-style-type: disc;">
+                        <li>Presence of the typical chest pain;</li>
+                        <li>New characteristic electrocardiographic (ECG) changes;</li>
+                        <li>Characteristic rise of cardiac (heart) enzymes, inclusive of CKMB above the normal levels, or Cardiac Troponin T or I equal to or above 0.5 ng/ml;</li>
+                        <li>Diagnostic elevation of Troponin T or I at 0.5 mcg/L (0.5ng/mL) and above; and</li>
+                        <li>Left ventricular ejection fraction less than 50% measured three (3) months or more after the event.</li>
+                    </ul>
+                    <strong style="font-size: 10pt; color: #555; display: block; margin-top: 5px;">Exclusions:</strong>
+                    <ul style="margin: 2px 0 5px 0; padding-left: 15px; font-size: 10pt; color: #555; list-style-type: disc;">
+                        <li>Other acute coronary syndromes;</li>
+                        <li>Angina without myocardial infarction; and</li>
+                        <li>A rise in cardiac biomarkers or Troponin T or I following an intra-arterial cardiac procedure including, but not limited to, coronary angiography and coronary angioplasty.</li>
+                    </ul>
+                </div>
+
+                <p style="margin: 5px 0 2px 0;"><strong>3. Stroke</strong></p>
+                <div style="margin-left: 15px;">
+                    <p style="margin: 0; text-indent: 20px;">Stroke shall mean the death of brain cells due to an acute cerebrovascular event caused by hemorrhage (including subarachnoid hemorrhage) or intracranial thrombosis, or embolism from an extracranial source with:</p>
+                    <ol style="margin: 2px 0 2px 0; padding-left: 15px; list-style-type: lower-alpha;">
+                        <li>New objective neurological deficits on clinical examination; and</li>
+                        <li>Acute onset of new neurological symptoms.</li>
+                    </ol>
+                    <p style="margin: 5px 0 0 0; text-indent: 20px;">The neurological deficit must persist for more than thirty (30) days following the date of diagnosis. The diagnosis must be supported by imaging findings and confirmed by a Consultant Neurologist.</p>
+                    <strong style="font-size: 10pt; color: #555; display: block; margin-top: 5px;">Exclusions:</strong>
+                    <ul style="margin: 2px 0 5px 0; padding-left: 15px; font-size: 10pt; color: #555; list-style-type: disc;">
+                        <li>Prolonged Reversible Ischemic Neurological Deficit (PRIND) and Transient Ischemic Attack (TIA);</li>
+                        <li>Neurological deficits due to general hypoxia, infection, inflammatory disease, migraine, or medical intervention;</li>
+                        <li>Traumatic injury to brain tissue or blood vessels;</li>
+                        <li>Death of tissue of the optic nerve or retina / eye stroke; and</li>
+                        <li>Incidental imaging findings (CT- or MRI-scan) without clearly related clinical symptoms (silent stroke).</li>
+                    </ul>
+                </div>
+
+                <p style="margin: 5px 0 2px 0;"><strong>4. Kidney Failure</strong></p>
+                <div style="margin-left: 15px;">
+                    <p style="margin: 0; text-indent: 20px;">Kidney Failure shall mean the chronic and irreversible failure of both kidneys to function, as a result of which either regular hemodialysis or peritoneal dialysis is instituted, or renal transplantation is carried out. The dialysis must be medically necessary and confirmed by a Consultant Nephrologist. Acute reversible kidney failure with temporary renal dialysis is not covered.</p>
+                </div>
+
+                <p style="margin: 5px 0 2px 0;"><strong>5. Coronary Artery Bypass Surgery</strong></p>
+                <div style="margin-left: 15px;">
+                    <p style="margin: 0; text-indent: 20px;">Coronary Artery Bypass Surgery shall mean the actual undergoing of open chest coronary artery bypass surgery by way of thoracotomy to correct or treat coronary artery disease but not including angioplasty, stent insertion, laser or other intraarterial procedures, and key-hole coronary artery by-pass surgery. The diagnosis must be supported by angiographic evidence of significant coronary artery obstruction and the procedure must be considered medically necessary by a consultant cardiologist.</p>
+                    <p style="margin: 5px 0 0 0; text-indent: 20px;">The narrowing or blockage of coronary arteries must satisfy any of the following criteria:</p>
+                    <ul style="margin: 2px 0 5px 0; padding-left: 15px; font-size: 10pt; color: #555; list-style-type: disc;">
+                        <li>Over 50% left main coronary artery stenosis;</li>
+                        <li>Over 70% stenosis of the proximal left anterior descending (LAD) and proximal circumflex arteries;</li>
+                        <li>Three-vessel disease in asymptomatic patients or those with mild or stable angina;</li>
+                        <li>Three-vessel disease with proximal LAD stenosis in patients with poor left ventricular (LV) function; or</li>
+                        <li>Over 70% proximal LAD stenosis with either an ejection fraction (EF) below 50% or demonstrable ischemia on non-invasive testing.</li>
+                    </ul>
+                </div>
+
+        <hr style="border: none; border-top: 1px dashed #ccc; margin: 10px 0;">
+
+        <p style="margin: 0; font-size: 11pt; text-indent: 10px;">
+            <strong>FOR PRE-EXISTING CANCER</strong>
+        </p>
+
+        <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            Full Recovery is defined as all of the following conditions arising for at least two (2) continuous and uninterrupted years prior to the effective date of this Plan. Did not receive any medical advice or treatment of pre-existing Cancer, except for purposes of prevention of recurrence of cancer:
+        </p>
+
+        <ol style="margin: 0 0 10px 30px; padding-left: 15px; list-style-type: lower-alpha; font-size: 11pt; line-height: 1.5; text-align: justify;">
+            <li>Did not receive any medical advice or treatment, except for purposes of prevention of recurrence or cancer spread;</li>
+            <li>No signs and symptoms of the pre-existing Cancer;</li>
+            <li>Can continuously perform all activities of daily living;</li>
+            <li>No emergency room care;</li>
+            <li>No minor and/or major surgical operation;</li>
+            <li>No confinement in a clinic, hospital, or nursing facility due to the pre-existing Cancer or arising as a complication of the pre-existing Cancer, or as a complication of its treatment; and</li>
+            <li>No recurrence, relapse, or progression.</li>
+        </ol>
+
+        <p style="margin: 0 15px 15px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            Full recovery must be confirmed by the Insured’s attending oncologist or surgeon. The confirmation should cover the entire two (2)-year period and must be accompanied by the results of all the medical examinations, procedures, and treatment performed to prove that the Insured is cancer-free. Insurer reserves the right to require from the Insured further proof to establish full recovery.
+        </p>
+
+        <p style="margin: 0; font-size: 11pt; text-indent: 10px;">
+            <strong>FOR OTHER PRE-EXISTING ILLNESSES</strong>
+        </p>
+
+        <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            Full Recovery is defined as all of the following conditions arising for at least two (2) continuous and uninterrupted years prior to the effective date of this Plan:
+        </p>
+
+        <ol style="margin: 0 0 10px 30px; padding-left: 15px; list-style-type: lower-alpha; font-size: 11pt; line-height: 1.5; text-align: justify;">
+            <li>Did not receive any medical advice or treatment for other pre-existing illnesses;</li>
+            <li>No recurrence, relapse, progression, signs and symptoms of the pre-existing illness;</li>
+            <li>Can continuously perform all activities of daily living;</li>
+            <li>No emergency room care;</li>
+            <li>No minor and/or major surgical operation; and</li>
+            <li>No confinement in a clinic, hospital, or nursing facility due to the pre-existing illness or arising as a complication of the pre-existing illness, or as a complication of its treatment.</li>
+        </ol>
+
+        <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            All of the following supporting documents must be submitted for all pre-existing illnesses as proofs or medical evidence of full recovery:
+        </p>
+
+        <ol style="margin: 0 0 10px 30px; padding-left: 15px; list-style-type: lower-alpha; font-size: 11pt; line-height: 1.5; text-align: justify;">
+            <li>Attending Specialist’s Statement;</li>
+            <li>Treatment History Report;</li>
+            <li>Operative Technique or Surgical Report;</li>
+            <li>Histo-pathological or biopsy report;</li>
+            <li>Clinic and/or hospital records.</li>
+        </ol>
+
+        <p style="margin: 0 15px 15px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            Insurer reserves the right to require from the Insured further proof to establish full recovery.
+        </p>
+
+        <p style="margin: 0; font-size: 11pt; text-indent: 10px;">
+            <strong>WAITING PERIOD</strong>
+        </p>
+
+        <p style="margin: 0 15px 15px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            No payment shall be made under this Plan for any Critical Illness diagnosed that commenced within ninety (90) days from the effective date of coverage of this Plan or from the last reinstatement date or the date of increase in benefits.
+        </p>
+
+        <p style="margin: 0; font-size: 11pt; text-indent: 10px;">
+            <strong>SURVIVAL PERIOD</strong>
+        </p>
+
+        <p style="margin: 0 15px 15px 0; text-indent: 30px; font-size: 11pt; text-align: justify; line-height: 1.5;">
+            Further to the conditions defined in the BENEFITS, the Insured must survive for at least thirty (30) days following such first diagnosis or the minimum assessment periods for covered Critical Illnesses as provided under the descriptions for each of the Critical Illnesses, whichever is longer.
+        </p>`,
+
+    7: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Critical Illness Plan - Top 45 (GCI45P)</strong></p>
+            <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt;">
+                Pays a pre-determined lump sum amount of Critical Illness Benefit upon receipt of due proof satisfactory to the Company if the Insured is first diagnosed, by a qualified physician, of having any one of the covered Critical Illnesses:
+            </p>
+            <table style="width:100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 5px; margin-bottom: 15px;">
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.33%; text-align:left;">1. Cancer</td>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.33%; text-align:left;">16. Dissecting aortic aneurysm</td>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.34%; text-align:left;">31. Major burns</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">2. Heart attack</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">17. Eisenmenger’s syndrome</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">32. Major head trauma</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">3. Stroke</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">18. Elephantiasis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">33. Medullary cystic disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">4. Kidney failure</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">19. Encephalitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">34. Motor neuron disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">5. Coronary artery bypass surgery</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">20. End-stage lung disease</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">35. Multiple sclerosis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">6. Alzheimer’s disease</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">21. Fulminant viral hepatitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">36. Muscular dystrophy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">7. Amyotrophic Lateral Sclerosis (ALS)</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">22. Heart valve replacement</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">37. Myasthenia gravis (MG)</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">8. Apallic syndrome</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">23. HIV due to blood transfusion</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">38. Necrotizing fasciitis (NF)</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">9. Aplastic anemia</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">24. Occupationally-acquired HIV</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">39. Paralysis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">10. Bacterial meningitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">25. Liver cirrhosis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">40. Parkinson’s disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">11. Benign brain tumor</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">26. Loss of hearing</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">41. Poliomyelitis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">12. Cardiomyopathy</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">27. Loss of independent existence</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">42. Primary pulmonary arterial hypertension</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">13. Chronic adrenal insufficiency (Addison’s disease)</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">28. Loss of limbs</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">43. Progressive bulbar palsy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">14. Chronic recurrent pancreatitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">29. Loss of sight</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">44. Progressive muscular atrophy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">15. Coma</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">30. Loss of speech</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">45. Terminal Illness</td>
+                </tr>
+            </table>`,
   };
   return descriptions[planId] || "";    
 };

@@ -245,7 +245,10 @@ export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
 };
 
 export const parseExcelRatesMiddleware = async (req, res, next) => {
-    const excelFile = req.files?.excel_file;
+    let excelFile = req.files?.excel_file;
+    if (Array.isArray(excelFile)) {
+        excelFile = excelFile[0];
+    }
     if (!excelFile) {
         return res.status(400).json({ status: false, message: 'No Excel file provided. Please upload a file with the key "excel_file".' });
     }

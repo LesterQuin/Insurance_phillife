@@ -537,7 +537,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
 
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
-            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname, dept.name AS uploader_department
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
             FROM DHUB_UAT.sg.financial_insurance_application_department_files f
             LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
@@ -553,6 +553,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
                 file_name: f.file_name,
                 department: f.department,
                 created_at: f.created_at,
+                uploaded_by_user_id: f.uploaded_by_user_id,
                 firstname: f.firstname,
                 lastname: f.lastname,
                 uploader_department: f.uploader_department
@@ -750,7 +751,7 @@ export const getPrototypes = async (userId = null) => {
 
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
-            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname, dept.name AS uploader_department
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
             FROM DHUB_UAT.sg.financial_insurance_application_department_files f
             LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
@@ -766,6 +767,7 @@ export const getPrototypes = async (userId = null) => {
                 file_name: f.file_name,
                 department: f.department,
                 created_at: f.created_at,
+                uploaded_by_user_id: f.uploaded_by_user_id,
                 firstname: f.firstname,
                 lastname: f.lastname,
                 uploader_department: f.uploader_department
@@ -904,7 +906,7 @@ export const getApplicationById = async (id) => {
 
         // Load all department files (supporting details)
         const departmentFilesRes = await pool.request().input('appId', sql.Int, id).query(`
-            SELECT f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname, dept.name AS uploader_department
+            SELECT f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
             FROM DHUB_UAT.sg.financial_insurance_application_department_files f
             LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
