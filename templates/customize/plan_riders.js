@@ -294,6 +294,194 @@ export const getRiderBenefitDescription = (riderId) => {
 
     15: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Medical Rider (GMR)</strong></p>
             <p style="margin: 0 0 15px 0; text-indent: 30px; font-size: 11pt;">Provides medical benefits and coverage for healthcare-related expenses.</p>`,
+    16: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Mosquito-Borne Disease Rider (GMBDR)</strong></p>
+            <p style="margin: 0 0 15px 0; text-indent: 30px; font-size: 11pt;">This benefit provides protection due to Dengue Fever or Dengue without warning signs or Severe Dengue, Dengue Hemorrhagic Fever or Dengue with warning signs, or Japanese Encephalitis or Zika Virus infection.</p>`,
+    17: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Critical Illness Rider - Top 5 (GCI5R)</strong></p>
+            <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt;">
+                Pays a pre-determined lump sum amount of Critical Illness Benefit upon receipt of due proof satisfactory to the Company if the Insured is first diagnosed, by a qualified physician, of having any one of the covered Critical Illnesses:
+            </p>
+            <table style="width:100%; border-collapse: collapse; font-size: 9pt; margin-top: 5px; margin-bottom: 15px;">
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">1. Cancer</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">2. Heart attack</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">3. Stroke</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">4. Kidney failure</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">5. Coronary artery bypass surgery</td></tr>
+            </table>`,
+    18: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Critical Illness Rider - Top 45 (GCI45R)</strong></p>
+            <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt;">
+                Pays a pre-determined lump sum amount of Critical Illness Benefit upon receipt of due proof satisfactory to the Company if the Insured is first diagnosed, by a qualified physician, of having any one of the covered Critical Illnesses:
+            </p>
+            <table style="width:100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 5px; margin-bottom: 15px;">
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.33%; text-align:left;">1. Cancer</td>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.33%; text-align:left;">16. Dissecting aortic aneurysm</td>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.34%; text-align:left;">31. Major burns</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">2. Heart attack</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">17. Eisenmenger’s syndrome</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">32. Major head trauma</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">3. Stroke</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">18. Elephantiasis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">33. Medullary cystic disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">4. Kidney failure</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">19. Encephalitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">34. Motor neuron disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">5. Coronary artery bypass surgery</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">20. End-stage lung disease</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">35. Multiple sclerosis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">6. Alzheimer’s disease</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">21. Fulminant viral hepatitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">36. Muscular dystrophy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">7. Amyotrophic Lateral Sclerosis (ALS)</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">22. Heart valve replacement</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">37. Myasthenia gravis (MG)</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">8. Apallic syndrome</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">23. HIV due to blood transfusion</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">38. Necrotizing fasciitis (NF)</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">9. Aplastic anemia</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">24. Occupationally-acquired HIV</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">39. Paralysis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">10. Bacterial meningitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">25. Liver cirrhosis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">40. Parkinson’s disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">11. Benign brain tumor</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">26. Loss of hearing</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">41. Poliomyelitis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">12. Cardiomyopathy</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">27. Loss of independent existence</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">42. Primary pulmonary arterial hypertension</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">13. Chronic adrenal insufficiency (Addison’s disease)</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">28. Loss of limbs</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">43. Progressive bulbar palsy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">14. Chronic recurrent pancreatitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">29. Loss of sight</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">44. Progressive muscular atrophy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">15. Coma</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">30. Loss of speech</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">45. Terminal Illness</td>
+                </tr>
+            </table>`,
+    19: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Mosquito-Borne Disease Rider (GMBDR)</strong></p>
+            <p style="margin: 0 0 15px 0; text-indent: 30px; font-size: 11pt;">This benefit provides protection due to Dengue Fever or Dengue without warning signs or Severe Dengue, Dengue Hemorrhagic Fever or Dengue with warning signs, or Japanese Encephalitis or Zika Virus infection.</p>`,
+    20: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Critical Illness Rider - Top 5 (GCI5R)</strong></p>
+            <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt;">
+                Pays a pre-determined lump sum amount of Critical Illness Benefit upon receipt of due proof satisfactory to the Company if the Insured is first diagnosed, by a qualified physician, of having any one of the covered Critical Illnesses:
+            </p>
+            <table style="width:100%; border-collapse: collapse; font-size: 9pt; margin-top: 5px; margin-bottom: 15px;">
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">1. Cancer</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">2. Heart attack</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">3. Stroke</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">4. Kidney failure</td></tr>
+                <tr><td style="border:1px solid #ccc; padding:6px; vertical-align: top;">5. Coronary artery bypass surgery</td></tr>
+            </table>`,
+    21: `<p style="margin: 0; font-size: 11pt; text-indent: 10px;"><strong>Group Critical Illness Rider - Top 45 (GCI45R)</strong></p>
+            <p style="margin: 0 0 10px 0; text-indent: 30px; font-size: 11pt;">
+                Pays a pre-determined lump sum amount of Critical Illness Benefit upon receipt of due proof satisfactory to the Company if the Insured is first diagnosed, by a qualified physician, of having any one of the covered Critical Illnesses:
+            </p>
+            <table style="width:100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 5px; margin-bottom: 15px;">
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.33%; text-align:left;">1. Cancer</td>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.33%; text-align:left;">16. Dissecting aortic aneurysm</td>
+                    <td style="border:1px solid #ccc; padding:4px; width: 33.34%; text-align:left;">31. Major burns</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">2. Heart attack</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">17. Eisenmenger’s syndrome</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">32. Major head trauma</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">3. Stroke</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">18. Elephantiasis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">33. Medullary cystic disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">4. Kidney failure</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">19. Encephalitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">34. Motor neuron disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">5. Coronary artery bypass surgery</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">20. End-stage lung disease</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">35. Multiple sclerosis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">6. Alzheimer’s disease</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">21. Fulminant viral hepatitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">36. Muscular dystrophy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">7. Amyotrophic Lateral Sclerosis (ALS)</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">22. Heart valve replacement</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">37. Myasthenia gravis (MG)</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">8. Apallic syndrome</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">23. HIV due to blood transfusion</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">38. Necrotizing fasciitis (NF)</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">9. Aplastic anemia</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">24. Occupationally-acquired HIV</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">39. Paralysis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">10. Bacterial meningitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">25. Liver cirrhosis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">40. Parkinson’s disease</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">11. Benign brain tumor</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">26. Loss of hearing</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">41. Poliomyelitis</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">12. Cardiomyopathy</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">27. Loss of independent existence</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">42. Primary pulmonary arterial hypertension</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">13. Chronic adrenal insufficiency (Addison’s disease)</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">28. Loss of limbs</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">43. Progressive bulbar palsy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">14. Chronic recurrent pancreatitis</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">29. Loss of sight</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">44. Progressive muscular atrophy</td>
+                </tr>
+                <tr>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">15. Coma</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">30. Loss of speech</td>
+                    <td style="border:1px solid #ccc; padding:4px; text-align:left;">45. Terminal Illness</td>
+                </tr>
+            </table>`,
   };
     return riders[riderId] || "";
 };

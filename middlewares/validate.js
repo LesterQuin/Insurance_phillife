@@ -959,6 +959,23 @@ body('basic_plan_id')
                 if (selectedAccidentRiders.length > 1) {
                     throw new Error('Select only 1 out of the 4 Group Accidental Death Benefit/Disability Riders.');
                 }
+
+                // Mutual Exclusivity for Critical Illness Riders (Select only 1 out of 2)
+                const ciRiderIds = [17, 18];
+                const selectedCIRiders = riders.filter(r => ciRiderIds.includes(Number(r.rider_id)));
+                if (selectedCIRiders.length > 1) {
+                    throw new Error('Select only 1 out of the 2 Group Critical Illness Riders (GCI5R / GCI45R).');
+                }
+            }
+
+            // GPA (Plan ID 3) Specific Validations
+            if (planId === 3) {
+                // Mutual Exclusivity for Critical Illness Riders (Select only 1 out of 2)
+                const ciRiderIds = [20, 21];
+                const selectedCIRiders = riders.filter(r => ciRiderIds.includes(Number(r.rider_id)));
+                if (selectedCIRiders.length > 1) {
+                    throw new Error('Select only 1 out of the 2 Group Critical Illness Riders (GCI5R / GCI45R).');
+                }
             }
 
             // --- Validation for Level/Salary Ranking Riders (Mapped by Designation) ---
@@ -997,7 +1014,11 @@ body('basic_plan_id')
                             if (rId === 9 && amount !== 0 && amount < 500) throw new Error('Group Accidental Medical Expense Reimbursement Rider amount must be at least 500 for all ranks.');
                             if (rId === 11 && amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000 for all ranks.');
                             if (rId === 13 && unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 or 2 Units for all ranks.');
-                            if (['6', '7', '10', '12'].includes(rId) && amount < 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
+                            if (['6', '7', '10', '12', '16', '17', '18'].includes(rId) && amount < 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
+                        } else if (planId === 3) { // GPA specific checks
+                            const rId = rider.rider_id ? rider.rider_id.toString() : '';
+                            const amount = val.amount != null ? Number(val.amount) : 0;
+                            if (['19', '20', '21'].includes(rId) && amount < 0) throw new Error(`Rider ${rId} requires a valid positive amount for all ranks.`);
                         }
                     }
                 }
@@ -1024,8 +1045,12 @@ body('basic_plan_id')
                             if (amount !== 0 && amount !== 50000) throw new Error('Burial (Memorial/Service) amount must be fixed at 50,000.');
                         } else if (riderId === 13) { // Group Dengue Rider
                             if (unit !== 0 && ![1, 2].includes(unit)) throw new Error('Group Dengue Rider must be 1 Unit (30,000) or 2 Units (60,000).');
-                        } else if (['6', '7', '10', '12'].includes(riderId)) { // Valid Amount Required for these riders
+                        } else if (['6', '7', '10', '12', '16', '17', '18'].includes(riderId)) { // Valid Amount Required for these riders
                             if (amount < 0) throw new Error(`${riderDef.rider_name} requires a valid amount.`);
+                        }
+                    } else if (planId === 3) {
+                        if (['19', '20', '21'].includes(riderId) && amount < 0) {
+                            throw new Error(`${riderDef.rider_name} requires a valid amount.`);
                         }
                     } else {
                         // General Validation for other plans (fallback to name checks if ID not specific)

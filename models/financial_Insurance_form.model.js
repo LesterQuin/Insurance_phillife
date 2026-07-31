@@ -1733,30 +1733,47 @@ export const getPendingAmendmentRequests = async (targetDeptId = null) => {
     }
 
     const result = await request.query(`
-        SELECT 
+		SELECT 
             ar.id AS amendment_id,
             ar.application_id,
             ar.requested_by,
             ar.request_dept_id,
+            reqDept.name AS request_dept_name,
             ar.target_dept_id,
+            targetDept.name AS target_dept_name,
             ar.request_notes,
             ar.status AS amendment_status,
             ar.created_at AS request_created_at,
             fia.group_name,
+            fia.email,
             fia.minimum_age,
             fia.maximum_age,
             fia.status_id,
             fis.status_name,
+            ps.name AS proposal_status_name,
+            topl.name AS type_of_proposal_name,
             p.product_name AS plan_name,
             p.acronym AS plan_acronym,
-            u.firstname + ' ' + u.lastname AS requester_name,
-            dept.name AS request_dept_name
+            u.firstname + ' ' + u.lastname AS requester_name
         FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-        JOIN DHUB_UAT.sg.financial_insurance_application fia ON ar.application_id = fia.application_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_status fis ON fia.status_id = fis.status_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON ar.requested_by = u.user_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON ar.request_dept_id = dept.id AND dept.category = 'DEPARTMENT'
+        JOIN DHUB_UAT.sg.financial_insurance_application fia
+            ON ar.application_id = fia.application_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_status fis
+            ON fia.status_id = fis.status_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+            ON fia.proposal_status_id = ps.id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+            ON fia.type_of_proposal_id = topl.id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+            ON fia.plan_id = p.product_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+            ON ar.requested_by = u.user_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups reqDept
+            ON ar.request_dept_id = reqDept.id
+            AND reqDept.category = 'DEPARTMENT'
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups targetDept
+            ON ar.target_dept_id = targetDept.id
+            AND targetDept.category = 'DEPARTMENT'
         ${whereClause}
         ORDER BY ar.created_at ASC
     `);
@@ -1924,7 +1941,10 @@ export const getAmendmentHistoryByApplicationId = async (applicationId) => {
                 ar.application_id,
                 ar.requested_by,
                 req_u.firstname + ' ' + req_u.lastname AS requested_by_name,
+                ar.request_dept_id,
                 req_dept.name AS request_dept_name,
+                ar.target_dept_id,
+                target_dept.name AS target_dept_name,
                 ar.request_notes,
                 ar.status AS amendment_status,
                 ar.responded_by,
@@ -1933,11 +1953,18 @@ export const getAmendmentHistoryByApplicationId = async (applicationId) => {
                 ar.created_at AS requested_at,
                 ar.updated_at AS responded_at
             FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users req_u ON ar.requested_by = req_u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users resp_u ON ar.responded_by = resp_u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups req_dept ON ar.request_dept_id = req_dept.id AND req_dept.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users req_u
+                ON ar.requested_by = req_u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users resp_u
+                ON ar.responded_by = resp_u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups req_dept
+                ON ar.request_dept_id = req_dept.id
+                AND req_dept.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups target_dept
+                ON ar.target_dept_id = target_dept.id
+                AND target_dept.category = 'DEPARTMENT'
             WHERE ar.application_id = @application_id
-            ORDER BY ar.created_at DESC
+            ORDER BY ar.created_at DESC;
         `);
     return result.recordset ?? [];
 };
