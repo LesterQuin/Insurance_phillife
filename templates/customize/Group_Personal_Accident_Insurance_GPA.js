@@ -345,13 +345,25 @@ const renderGPATables = (application, rates18_65, details) => {
       <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
         <thead>
           <tr style="background-color: #f2f2f2;">
+            ${details?.ratesCustomRemaining ? `<th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Age Bracket</th>` : ''}
             ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
           </tr>
         </thead>
         <tbody>
           <tr>
+            ${details?.ratesCustomRemaining ? `<td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${application.minimum_age || 18}-${application.maximum_age || 65}</td>` : ''}
             ${columns.map(col => `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${getRateDisplay(col)}</td>`).join('')}
           </tr>
+          ${details?.ratesCustomRemaining ? `
+          <tr>
+            <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${(application.maximum_age || 65) + 1}-65</td>
+            ${columns.map(col => {
+              if (Number(col.id) === 7) return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">Free</td>`;
+              const rateVal = getRateForRider(details.ratesCustomRemaining, col.id, col.isBasic);
+              return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${formatRate(rateVal, 2)}</td>`;
+            }).join('')}
+          </tr>
+          ` : ''}
         </tbody>
       </table>
     `;

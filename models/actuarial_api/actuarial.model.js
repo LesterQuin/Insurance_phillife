@@ -26,7 +26,7 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
         const appRes = await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
             .query(`
-                SELECT fia.plan_id, bp.basic_plan_name 
+                SELECT fia.plan_id, fia.number_of_lives, fia.minimum_age, fia.maximum_age, bp.basic_plan_name 
                 FROM DHUB_UAT.sg.financial_insurance_application fia
                 LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
                 WHERE fia.application_id = @appId
@@ -34,6 +34,11 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
         
         const planId = appRes.recordset[0]?.plan_id || 1; 
         const basicPlanName = appRes.recordset[0]?.basic_plan_name || 'Basic Plan';
+        const numLives = appRes.recordset[0]?.number_of_lives || 0;
+        const minAge = appRes.recordset[0]?.minimum_age || 18;
+        const maxAge = appRes.recordset[0]?.maximum_age || 65;
+        const isCustomAge = minAge !== 18 || maxAge !== 65;
+        const isScale2 = numLives > 30;
 
         const tableName = planId === 1
             ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli'
@@ -53,12 +58,19 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
             .input('appId', sql.Int, applicationId)
             .query(`DELETE FROM ${tableName} WHERE application_id = @appId`);
 
-        const categories = {
-            '18-65': '18_65',
-            '66-70': '66_70',
-            '71-75': '71_75',
-            '76-80': '76_80'
-        };
+        const categories = {};
+        if (planId !== 1 && isScale2 && isCustomAge) {
+            categories[`${minAge}-${maxAge}`] = `${minAge}_${maxAge}`;
+            if (maxAge < 65) {
+                categories[`${maxAge + 1}-65`] = `${maxAge + 1}_65`;
+            }
+        } else {
+            categories['18-65'] = '18_65';
+        }
+
+        categories['66-70'] = '66_70';
+        categories['71-75'] = '71_75';
+        categories['76-80'] = '76_80';
 
         for (const [jsonKey, dbCategory] of Object.entries(categories)) {
             const data = ratesData[jsonKey] || (jsonKey === '18-65' ? ratesData['18-64'] : null);

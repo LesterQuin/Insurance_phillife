@@ -1721,7 +1721,20 @@ export const validateRates = [
 
             const planId = Number(app.plan_id);
             const numLives = Number(app.number_of_lives);
-            const keys = ['18-65', '66-70', '71-75', '76-80'];
+            const minAge = app.minimum_age || 18;
+            const maxAge = app.maximum_age || 65;
+            const isCustomAge = minAge !== 18 || maxAge !== 65;
+            const isScale2 = numLives > 30;
+
+            let mainBrackets = ['18-65'];
+            if (planId !== 1 && isScale2 && isCustomAge) {
+                mainBrackets = [`${minAge}-${maxAge}`];
+                if (maxAge < 65) {
+                    mainBrackets.push(`${maxAge + 1}-65`);
+                }
+            }
+
+            const keys = [...mainBrackets, '66-70', '71-75', '76-80'];
             let hasData = false;
             const ADDITIONAL_LIFE_RIDER_ID = '10'; 
             
@@ -1743,49 +1756,49 @@ export const validateRates = [
             }
 
             for (const key of keys) {
-                const isSeniorBracket = key !== '18-65';
+                const isSeniorBracket = ['66-70', '71-75', '76-80'].includes(key);
                 const bracketFlag = isSeniorBracket ? `borrower_age_${key.replace('-', '_')}` : null;
                 const isEnabledInApp = isSeniorBracket ? !!app[bracketFlag] : true;
 
                 const data = req.body[key] || (key === '18-65' ? req.body['18-64'] : null);
-
+ 
                 // Check Requirement: If enabled in application, must be present in request body
                 if (isEnabledInApp && !data) {
                     throw new Error(`Rates for age bracket '${key}' are required because it is active for this application.`);
                 }
-
+ 
                 // Check Restriction: If NOT enabled in application, must NOT be in request body
                 if (isSeniorBracket && !isEnabledInApp && data) {
                     throw new Error(`Rates for '${key}' cannot be added because the age bracket was not selected in the application.`);
                 }
-
+ 
                 if (data) {
                     hasData = true;
-
+ 
                     // Branch A: Handle Nested Age Objects (Senior specific pricing)
                     const isNestedObject = !Array.isArray(data) && typeof data === 'object' && data !== null;
                     // GYRT and GPA require nested objects (Scale 1/2 logic or Seniors)
                     const shouldBeNested = isSeniorBracket || [1, 2, 3, 4].includes(planId);
-
+ 
                     if (shouldBeNested && isNestedObject) {
                         // Enforce that all specific ages within the bracket range are provided
                         const [startAge, endAge] = key.split('-').map(Number);
                         const missingAges = []; // This check is for the keys in the object, not the items within each age array.
-
+ 
                         if ([1, 2, 3, 4].includes(planId)) {
                             const hasAgeKeys = Object.keys(data).some(k => k.startsWith('age_'));
                             // For GCLI (Plan 1), basic_plan is mandatory for the main bracket if not using detailed ages.
                             if (planId === 1 && key === '18-65' && !hasAgeKeys) {
                                 if (!data['basic_plan']) missingAges.push('basic_plan');
                             }
-
+ 
                             // For GCLI, riders can be in a separate 'rates' key OR nested inside 'basic_plan' items.
                             if (planId === 1 && key === '18-65' && selectedRiderIds.size > 0) {
                                 const hasNestedRiders = data['basic_plan']?.some(item => item.riders && item.riders.length > 0);
                                 if (!data['rates'] && !hasNestedRiders) missingAges.push('rates');
                             }
-
-                            if (key === '18-65') {
+ 
+                            if (mainBrackets.includes(key)) {
                                 if (planId === 2 || planId === 3 || planId === 4) {
                                     const hasDetailedAges = Object.keys(data).some(k => k.startsWith('age_'));
                                     if (numLives <= 30 || hasDetailedAges) {
@@ -1801,6 +1814,7 @@ export const validateRates = [
 
                         if (isSeniorBracket || (planId === 1 && key !== '18-65')) {
                             for (let age = startAge; age <= endAge; age++) {
+                                if (planId === 4 && age >= 70) continue;
                                 if (!data[`age_${age}`]) missingAges.push(`age_${age}`);
                             }
                         }

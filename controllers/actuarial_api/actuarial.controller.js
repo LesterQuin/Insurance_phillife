@@ -603,8 +603,17 @@ export const downloadRatesTemplate = async (req, res) => {
                     addRow('18-65', `age_${age}`);
                 }
             } else {
-                // Bracket 18-65: flat rates row
-                addRow('18-65', 'rates');
+                // Bracket 18-65: flat rates row (or split brackets if customized age range)
+                const minAge = app.minimum_age || 18;
+                const maxAge = app.maximum_age || 65;
+                if (minAge !== 18 || maxAge !== 65) {
+                    addRow(`${minAge}-${maxAge}`, 'rates');
+                    if (maxAge < 65) {
+                        addRow(`${maxAge + 1}-65`, 'rates');
+                    }
+                } else {
+                    addRow('18-65', 'rates');
+                }
             }
 
             // Active Senior Brackets: individual ages (active in GYRT and GCI)
@@ -615,6 +624,7 @@ export const downloadRatesTemplate = async (req, res) => {
                     if (app[bracketFlag]) {
                         const [startAge, endAge] = bracket.split('-').map(Number);
                         for (let age = startAge; age <= endAge; age++) {
+                            if (planId === 4 && age >= 70) continue;
                             addRow(bracket, `age_${age}`);
                         }
                     }

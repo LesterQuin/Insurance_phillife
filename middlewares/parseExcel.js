@@ -48,13 +48,23 @@ export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
     });
 
     const planId = Number(app.plan_id);
+    const minAge = app.minimum_age || 18;
+    const maxAge = app.maximum_age || 65;
+    const isCustomAge = minAge !== 18 || maxAge !== 65;
+    const numLives = Number(app.number_of_lives);
+    const isScale2 = numLives > 30;
 
-    // Initialize ratesData structure
-    const ratesData = {
-        '18-65': {
-            basic_plan_id: app.basic_plan_id
+    let defaultBracket = '18-65';
+    const ratesData = {};
+    if (planId !== 1 && isScale2 && isCustomAge) {
+        defaultBracket = `${minAge}-${maxAge}`;
+        ratesData[defaultBracket] = { basic_plan_id: app.basic_plan_id };
+        if (maxAge < 65) {
+            ratesData[`${maxAge + 1}-65`] = { basic_plan_id: app.basic_plan_id };
         }
-    };
+    } else {
+        ratesData['18-65'] = { basic_plan_id: app.basic_plan_id };
+    }
 
     // Initialize senior brackets if enabled in application
     const seniorBrackets = ['66-70', '71-75', '76-80'];
@@ -82,11 +92,10 @@ export const parseExcelToRatesJSON = async (filePath, app, selectedRiders) => {
         const rawBracket = normRow['bracket'] || normRow['agebracket'] || normRow['borrowerbracket'] || normRow['agecategory'];
         let bracketStr = rawBracket ? String(rawBracket).trim() : null;
         if (!bracketStr) {
-            // Default to 18-65 if not specified
-            bracketStr = '18-65';
+            bracketStr = defaultBracket;
         }
-        if (bracketStr === '18-64') {
-            bracketStr = '18-65';
+        if (bracketStr === '18-64' || bracketStr === '18-65') {
+            bracketStr = defaultBracket;
         }
 
         // If the bracket is not active or invalid, skip it

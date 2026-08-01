@@ -661,12 +661,27 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
         },
         amount_loans: amount_loans_id ? { id: amount_loans_id, name: amount_loans_name } : null,
         riders,
-        rates: {
-            "18-65": formatDbRatesForTemplate(ratesRows, '18_65', planId, app),
-            "66-70": formatDbRatesForTemplate(ratesRows, '66_70', planId, app),
-            "71-75": formatDbRatesForTemplate(ratesRows, '71_75', planId, app),
-            "76-80": formatDbRatesForTemplate(ratesRows, '76_80', planId, app)
-        },
+        rates: (() => {
+            const minAge = app.minimum_age || 18;
+            const maxAge = app.maximum_age || 65;
+            const isCustomAge = minAge !== 18 || maxAge !== 65;
+            const numLives = Number(app.number_of_lives);
+            const isScale2 = numLives > 30;
+
+            const ratesObj = {};
+            if (planId !== 1 && isScale2 && isCustomAge) {
+                ratesObj[`${minAge}-${maxAge}`] = formatDbRatesForTemplate(ratesRows, `${minAge}_${maxAge}`, planId, app);
+                if (maxAge < 65) {
+                    ratesObj[`${maxAge + 1}-65`] = formatDbRatesForTemplate(ratesRows, `${maxAge + 1}_65`, planId, app);
+                }
+            } else {
+                ratesObj["18-65"] = formatDbRatesForTemplate(ratesRows, '18_65', planId, app);
+            }
+            ratesObj["66-70"] = formatDbRatesForTemplate(ratesRows, '66_70', planId, app);
+            ratesObj["71-75"] = formatDbRatesForTemplate(ratesRows, '71_75', planId, app);
+            ratesObj["76-80"] = formatDbRatesForTemplate(ratesRows, '76_80', planId, app);
+            return ratesObj;
+        })(),
         validity: {
             expiry_date: expiryDate,
             proposal_days_remaining: proposalDaysRemaining,
@@ -755,7 +770,26 @@ export const generateProposalHtml = async (id) => {
         maxAmount66_70: appData.borrower_amount_66_70 || 0,
         maxAmount71_75: appData.borrower_amount_71_75 || 0,
         maxAmount76_80: appData.borrower_amount_76_80 || 0,
-        rates18_65: formatDbRatesForTemplate(ratesRows, '18_65', planId, application),
+        rates18_65: (() => {
+            const minAge = application.minimum_age || 18;
+            const maxAge = application.maximum_age || 65;
+            const isCustomAge = minAge !== 18 || maxAge !== 65;
+            const numLives = Number(application.number_of_lives);
+            const isScale2 = numLives > 30;
+            return (planId !== 1 && isScale2 && isCustomAge)
+                ? formatDbRatesForTemplate(ratesRows, `${minAge}_${maxAge}`, planId, application)
+                : formatDbRatesForTemplate(ratesRows, '18_65', planId, application);
+        })(),
+        ratesCustomRemaining: (() => {
+            const minAge = application.minimum_age || 18;
+            const maxAge = application.maximum_age || 65;
+            const isCustomAge = minAge !== 18 || maxAge !== 65;
+            const numLives = Number(application.number_of_lives);
+            const isScale2 = numLives > 30;
+            return (planId !== 1 && isScale2 && isCustomAge && maxAge < 65)
+                ? formatDbRatesForTemplate(ratesRows, `${maxAge + 1}_65`, planId, application)
+                : null;
+        })(),
         rates66_70: formatDbRatesForTemplate(ratesRows, '66_70', planId, application),
         rates71_75: formatDbRatesForTemplate(ratesRows, '71_75', planId, application),
         rates76_80: formatDbRatesForTemplate(ratesRows, '76_80', planId, application),
