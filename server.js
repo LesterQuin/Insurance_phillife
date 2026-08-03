@@ -15,7 +15,7 @@ import actuarialRoutes from './routes/actuarial_api/actuarial.routes.js';
 import chatMessageRoutes from './routes/chat_message/chat_message.routes.js';
 import installationRequirementsRoutes from './routes/requirements/installation_requirements.route.js';
 import ebamRoutes from './routes/ebam_api/ebam_api.routes.js';
-import { server, app, corsOptions } from './socket-io/socket_setup.js'; // // Mar: 05/14/2025 added
+import { server, app, corsOptions } from './socket-io/socket_setup.js'; 
 
 dotenv.config();
 
@@ -67,4 +67,28 @@ cron.schedule('0 0 * * *', () => {
 });
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+console.log(`[Startup] Attempting to listen on PORT: ${process.env.PORT} (Fallback: 5000)`);
+
+server.on('error', (err) => {
+    console.error('❌ Server listener error occurred:', err);
+    if (err.stack) {
+        console.error('Stack trace:', err.stack);
+    }
+});
+
+try {
+    server.listen(PORT, () => console.log(`✅ Server running on port/pipe ${PORT}`));
+} catch (err) {
+    console.error('❌ Synchronous catch during server.listen:', err);
+}
+
+// Uncomment this to checkk if the email was sending a notif immediately, this also run at startup if uncommented and comment the server.listen above
+
+// server.listen(PORT, () => {
+//     console.log(`Server running on port ${PORT}`);
+//     // Startup Safeguard: Run immediate check for expiring proposals on server boot
+//     console.log('[Startup] Running check for expiring proposals...');
+//     notifyExpiringProposals().catch(err => {
+//         console.error('[Startup] Error running startup expiring proposals check:', err);
+//     });
+// });

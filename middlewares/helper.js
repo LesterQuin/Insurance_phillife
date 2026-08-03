@@ -463,6 +463,7 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
     const planId = Number(app.plan_id);
     const STATUS_BOOKED = 7;
     const STATUS_CLOSED = 6;
+    const STATUS_DRAFT = 11;
 
     // Countdown Logic: Prioritizes explicit expiry_date, otherwise defaults to 8 days from creation
     const createdAt = new Date(app.created_at);
@@ -475,12 +476,20 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
     const effectiveNow = new Date(Math.max(now.getTime(), createdAt.getTime()));
     
     const currentStatus = Number(app.status_id);
-    const isExpiredByTime = effectiveNow > expiryDate;
+    const isExpiredByTime = currentStatus !== STATUS_DRAFT && effectiveNow > expiryDate;
     const isFinalized = currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED || isExpiredByTime;
     
-    const proposalDaysRemaining = (currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED) 
-        ? 0 
-        : Math.max(0, Math.ceil((expiryDate.getTime() - effectiveNow.getTime()) / (1000 * 60 * 60 * 24)));
+    let proposalDaysRemaining = 0;
+    if (currentStatus === STATUS_BOOKED || currentStatus === STATUS_CLOSED) {
+        proposalDaysRemaining = 0;
+    } else if (currentStatus === STATUS_DRAFT) {
+        const defaultExpiry = new Date(createdAt);
+        // if (true) defaultExpiry.setDate(defaultExpiry.getDate() + 30); // Production: default to 30 days
+        defaultExpiry.setDate(defaultExpiry.getDate() + 8); // Testing: default to 8 days
+        proposalDaysRemaining = Math.max(0, Math.ceil((defaultExpiry.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24)));
+    } else {
+        proposalDaysRemaining = Math.max(0, Math.ceil((expiryDate.getTime() - effectiveNow.getTime()) / (1000 * 60 * 60 * 24)));
+    }
 
     const policyDaysBeforeRenew = (currentStatus === STATUS_BOOKED)
         ? Math.max(0, Math.ceil((expiryDate.getTime() - effectiveNow.getTime()) / (1000 * 60 * 60 * 24)))
@@ -581,7 +590,7 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
             booking_date: booking_date || null
         },
         supporting_details: (department_files || [])
-            .filter(f => !loggedInUserId || Number(f.uploaded_by_user_id) === Number(loggedInUserId))
+            // .filter(f => !loggedInUserId || Number(f.uploaded_by_user_id) === Number(loggedInUserId))
             .map(f => ({
                 file_name: f.file_name,
                 file_path: path.basename(f.file_path),
@@ -683,11 +692,11 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
             return ratesObj;
         })(),
         validity: {
-            expiry_date: expiryDate,
+            expiry_date: currentStatus === STATUS_DRAFT ? null : expiryDate,
             proposal_days_remaining: proposalDaysRemaining,
             policy_days_before_renew_remaining: policyDaysBeforeRenew,
             is_expired: (currentStatus === STATUS_CLOSED || isExpiredByTime) && currentStatus !== STATUS_BOOKED,
-            countdown_active: !isFinalized && currentStatus !== STATUS_BOOKED && currentStatus !== STATUS_CLOSED,
+            countdown_active: !isFinalized && currentStatus !== STATUS_BOOKED && currentStatus !== STATUS_CLOSED && currentStatus !== STATUS_DRAFT,
             extension_requested: !!app.extension_requested,
             extension_status_id: extension_request_status_id || null,
             extension_status_name: extension_request_status_name || (

@@ -13,6 +13,8 @@ import { transporter } from './user/user_controller.js';
 import { expirationNotificationTemplate } from '../templates/expirationNotificationTemplate.js';
 import { bookedNotificationTemplate } from '../templates/bookedNotificationTemplate.js';
 import { closedNotificationTemplate } from '../templates/closedNotificationTemplate.js';
+import { extensionApprovedTemplate } from '../templates/extensionApprovedTemplate.js';
+import { extensionDeclinedTemplate } from '../templates/extensionDeclinedTemplate.js';
 // Constants for extension request statuses
 const EXTENSION_STATUS_APPROVED = 62;
 const EXTENSION_STATUS_DECLINED = 63;
@@ -394,6 +396,31 @@ export const approveExtension = async (req, res) => {
 
         io.emit('approveExtension', response);
 
+        // Notify the creator of the approval via email
+        try {
+            const creator = await User.getUserById(app.user_id);
+            if (creator && creator.email) {
+                const creatorName = [creator.firstname, creator.lastname].filter(Boolean).join(' ');
+                const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
+                const appUrl = `${process.env.APP_BASE_URL || 'http://localhost:5000'}/applications/${app.application_id}`;
+                
+                await transporter.sendMail({
+                    from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                    to: creator.email,
+                    subject: `Extension Approved: ${app.group_name}`,
+                    html: extensionApprovedTemplate(
+                        creatorName,
+                        app.group_name,
+                        proposalNumber,
+                        newExpiry.toLocaleDateString(),
+                        appUrl
+                    )
+                });
+            }
+        } catch (mailErr) {
+            console.error('[approveExtension] Failed to send approval email to creator:', mailErr);
+        }
+
         return success(res, response, 'Extension approved successfully.');
     } catch (err) {
         return error(res, err.message);
@@ -434,6 +461,30 @@ export const rejectExtension = async (req, res) => {
         const response = await Helper.buildApplicationResponse(updated);
 
         io.emit('rejectExtension', response);
+
+        // Notify the creator of the decline via email
+        try {
+            const creator = await User.getUserById(app.user_id);
+            if (creator && creator.email) {
+                const creatorName = [creator.firstname, creator.lastname].filter(Boolean).join(' ');
+                const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
+                const appUrl = `${process.env.APP_BASE_URL || 'http://localhost:5000'}/applications/${app.application_id}`;
+                
+                await transporter.sendMail({
+                    from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                    to: creator.email,
+                    subject: `Extension Request Declined: ${app.group_name}`,
+                    html: extensionDeclinedTemplate(
+                        creatorName,
+                        app.group_name,
+                        proposalNumber,
+                        appUrl
+                    )
+                });
+            }
+        } catch (mailErr) {
+            console.error('[rejectExtension] Failed to send decline email to creator:', mailErr);
+        }
 
         return success(res, response, 'Extension request denied.');
     } catch (err) {
@@ -586,24 +637,27 @@ export const notifyExpiringProposals = async (req, res) => {
                     creator ? `${creator.firstname} ${creator.lastname}` : 'System'
                 );
 
-                // Notify CFE
-                if (creator && creator.email) {
-                    await transporter.sendMail({
-                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: creator.email,
-                        subject: `Account Automatically CLOSED: ${app.group_name}`,
-                        html: emailHtml
-                    });
-                }
+                // Notify CFE and Registered Client (wrapped in try-catch so failures don't halt the scheduler)
+                try {
+                    if (creator && creator.email) {
+                        await transporter.sendMail({
+                            from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                            to: creator.email,
+                            subject: `Account Automatically CLOSED: ${app.group_name}`,
+                            html: emailHtml
+                        });
+                    }
 
-                // Notify Registered Client Email
-                if (app.email) {
-                    await transporter.sendMail({
-                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: app.email,
-                        subject: `Notice of Proposal Closure: ${app.group_name}`,
-                        html: emailHtml
-                    });
+                    if (app.email) {
+                        await transporter.sendMail({
+                            from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                            to: app.email,
+                            subject: `Notice of Proposal Closure: ${app.group_name}`,
+                            html: emailHtml
+                        });
+                    }
+                } catch (emailErr) {
+                    console.error(`[Scheduler] Failed to send automatic closure emails for App ID ${app.application_id}:`, emailErr);
                 }
 
                 continue; // Move to next application
@@ -612,24 +666,28 @@ export const notifyExpiringProposals = async (req, res) => {
             if ([5, 3, 1].includes(diffDays)) {
                 const creator = await User.getUserById(app.user_id);
                 
-                // Notify CFE (Creator)
-                if (creator && creator.email) {
-                    await transporter.sendMail({
-                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: creator.email,
-                        subject: `Urgent: Proposal for ${app.group_name} expires in ${diffDays} days`,
-                        html: expirationNotificationTemplate(creator.lastname, app.group_name, diffDays, `${process.env.APP_BASE_URL}/applications/${app.application_id}`)
-                    });
-                }
+                try {
+                    // Notify CFE (Creator)
+                    if (creator && creator.email) {
+                        await transporter.sendMail({
+                            from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                            to: creator.email,
+                            subject: `Urgent: Proposal for ${app.group_name} expires in ${diffDays} days`,
+                            html: expirationNotificationTemplate(creator.lastname, app.group_name, diffDays, `${process.env.APP_BASE_URL}/applications/${app.application_id}`)
+                        });
+                    }
 
-                // Notify Registered Client Email
-                if (app.email) {
-                    await transporter.sendMail({
-                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: app.email,
-                        subject: `Urgent: Your proposal for ${app.group_name} expires in ${diffDays} days`,
-                        html: expirationNotificationTemplate(app.contact_person_lastname, app.group_name, diffDays, `${process.env.APP_BASE_URL}/applications/${app.application_id}`)
-                    });
+                    // Notify Registered Client Email
+                    if (app.email) {
+                        await transporter.sendMail({
+                            from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                            to: app.email,
+                            subject: `Urgent: Your proposal for ${app.group_name} expires in ${diffDays} days`,
+                            html: expirationNotificationTemplate(app.contact_person_lastname, app.group_name, diffDays, `${process.env.APP_BASE_URL}/applications/${app.application_id}`)
+                        });
+                    }
+                } catch (emailErr) {
+                    console.error(`[Scheduler] Failed to send warning emails for App ID ${app.application_id}:`, emailErr);
                 }
             }
         }
@@ -1305,14 +1363,43 @@ export const getAllApplications = async (req, res) => {
             filterUserId = [userId, ...subordinates];
         }
 
-        const rawApplications = await Model.getAllApplications(filterUserId, isActuarial); // Fetch raw data
-        if (rawApplications.length === 0) { // Check if any applications were found
-            return success(res, [], 'Applications fetched successfully.');
+        const { status } = req.query;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.per_page || req.query.limit, 10) || 10;
+
+        const { apps, total } = await Model.getAllApplicationsPaginated(filterUserId, isActuarial, status, page, limit);
+        if (apps.length === 0) { // Check if any applications were found
+            return success(res, {
+                data: [],
+                pagination: {
+                    current_page: page,
+                    last_page: 1,
+                    per_page: limit,
+                    total: 0,
+                    from: 0,
+                    to: 0
+                }
+            }, 'Applications fetched successfully.');
         }
 
         // Use Promise.all with map to build responses concurrently
-        const formattedApplications = await Promise.all(rawApplications.map(app => Helper.buildApplicationResponse(app)));
-        return success(res, formattedApplications, 'Applications fetched successfully.');
+        const formattedApplications = await Promise.all(apps.map(app => Helper.buildApplicationResponse(app)));
+        
+        const lastPage = Math.ceil(total / limit) || 1;
+        const from = (page - 1) * limit + 1;
+        const to = (page - 1) * limit + apps.length;
+
+        return success(res, {
+            data: formattedApplications,
+            pagination: {
+                current_page: page,
+                last_page: lastPage,
+                per_page: limit,
+                total: total,
+                from: from,
+                to: to
+            }
+        }, 'Applications fetched successfully.');
     } catch (err) {
         console.error('Service Error:', err);
         return error(res, err.message);
@@ -1639,6 +1726,8 @@ export const updateApplication = async (req, res) => {
             } else {
                 updateData.status_id = STATUS_PENDING;
             }
+            // Reset created_at to now on transition from Draft to active status
+            updateData.created_at = new Date();
         }
 
         const cleanedProposal = Helper.cleanProposalFields(updateData);

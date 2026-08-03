@@ -318,7 +318,7 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
 };
 
 // Get all applications
-export const getAllApplications = async (userId = null, excludeDrafts = false) => {
+export const getAllApplications = async (userId = null, excludeDrafts = false, statusFilter = null) => {
     const pool = await poolPromise;
     const request = pool.request();
 
@@ -336,6 +336,16 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
 
     if (excludeDrafts) {
         whereCondition += ' AND fia.status_id <> 11';
+    }
+
+    if (statusFilter) {
+        if (!isNaN(statusFilter)) {
+            request.input('status_filter_id', sql.Int, parseInt(statusFilter, 10));
+            whereCondition += ' AND fia.status_id = @status_filter_id';
+        } else {
+            request.input('status_filter_name', sql.NVarChar(100), statusFilter.trim());
+            whereCondition += ' AND LOWER(fis.status_name) = LOWER(@status_filter_name)';
+        }
     }
 
     const res = await request
@@ -574,6 +584,294 @@ export const getAllApplications = async (userId = null, excludeDrafts = false) =
         });
     }
     return apps;
+};
+
+// Get all applications with pagination support
+export const getAllApplicationsPaginated = async (userId = null, excludeDrafts = false, statusFilter = null, page = 1, limit = 10) => {
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    let whereCondition = '(@user_id IS NULL OR fia.user_id = @user_id)';
+    
+    if (Array.isArray(userId)) {
+        const idParams = userId.map((id, i) => {
+            request.input(`uId${i}`, sql.Int, id);
+            return `@uId${i}`;
+        }).join(',');
+        whereCondition = `fia.user_id IN (${idParams})`;
+    } else {
+        request.input('user_id', sql.Int, userId);
+    }
+
+    if (excludeDrafts) {
+        whereCondition += ' AND fia.status_id <> 11';
+    }
+
+    if (statusFilter) {
+        if (!isNaN(statusFilter)) {
+            request.input('status_filter_id', sql.Int, parseInt(statusFilter, 10));
+            whereCondition += ' AND fia.status_id = @status_filter_id';
+        } else {
+            request.input('status_filter_name', sql.NVarChar(100), statusFilter.trim());
+            whereCondition += ' AND LOWER(fis.status_name) = LOWER(@status_filter_name)';
+        }
+    }
+
+    // 1. Get total count matching the filters
+    const countRes = await request.query(`
+        SELECT COUNT(DISTINCT fia.application_id) AS total
+        FROM DHUB_UAT.sg.financial_insurance_application fia
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
+        WHERE ${whereCondition}
+    `);
+    const total = countRes.recordset?.[0]?.total || 0;
+
+    // 2. Fetch page slice using ROW_NUMBER CTE (compatible with SQL Server 2008 and above)
+    const startRow = (page - 1) * limit + 1;
+    const endRow = page * limit;
+
+    const res = await request.query(`
+        WITH PaginatedApps AS (
+            SELECT
+                fia.application_id,
+                fia.user_id,
+                fia.group_name,
+                fia.business_nature,
+                fia.business_nature_id,
+                fia.sub_business_nature_id,
+                fia.number_of_lives,
+                fia.business_address,
+                fia.contact_number,
+                fia.fax_number,
+                fia.email,
+                fia.contact_person_salutation,
+                fia.contact_person_firstname,
+                fia.contact_person_mi,
+                fia.contact_person_lastname,
+                fia.designation,
+                fia.proposal_addressee,
+                fia.addressee_designation,
+                fia.minimum_age,
+                fia.maximum_age,
+                fia.payment_mode_id,
+                fia.status_id,
+                fia.group_classification_id,
+                fia.other_group_classification,
+                fia.business_type_id,
+                fia.other_business_type,
+                fia.group_type_id,
+                fia.other_group_type,
+                fia.plan_id,
+                fia.basic_plan_id,
+                fia.prototype_id,
+                fia.type_of_proposal_id,
+                fia.amount_loans_id,
+                fia.max_loan_amount,
+                fia.min_loan_amount,
+                fia.loan_portfolio_amount,
+                fia.loans_amount,
+                fia.coverage_type_id,
+                fia.borrower_age_66_70,
+                fia.borrower_amount_66_70,
+                fia.borrower_age_71_75,
+                fia.borrower_amount_71_75,
+                fia.borrower_age_76_80,
+                fia.borrower_amount_76_80,
+                fia.borrower_amount_18_65,
+                fia.borrower_amount_under_min,
+                fia.borrower_amount_over_max,
+                fia.proposal_status_id,
+                fia.channel_type_id,
+                fia.channel_name,
+                fia.channel_number,
+                fia.channel_email,
+                fia.commission_rate,
+                fia.service_fee,
+                fia.total_annual_premium,
+                fia.notes,
+                fia.excel_file_path,
+                fia.evidence_notes,
+                fia.created_at,
+                fia.updated_at,
+                fia.expiry_date,
+                fia.extension_requested,
+                fia.extension_request_status_id,
+                ext.name AS extension_request_status_name,
+                fis.status_name,
+                ps.name AS proposal_status_name,
+                gc.name AS group_classification_name,
+                bt.name AS business_type_name,
+                gt.name AS group_type_name,
+                pm.name AS payment_mode_name,
+                topl.name AS type_of_proposal_name,
+                p.product_name AS plan_name,
+                p.acronym AS plan_acronym,
+                bp.basic_plan_name,
+                bp.acronym AS basic_plan_acronym,
+                pp.name AS prototype_plan_name,
+                pp.acronym AS prototype_plan_acronym,
+                ind.name AS business_nature_name,
+                subind.name AS sub_business_nature_name,
+                al.name AS amount_loans_name,
+                ct.name AS coverage_type_name,
+                ml.month_name AS loan_maturity_month_name,
+                chant.name AS channel_type_name,
+                u.firstname AS creator_firstname,
+                u.middlename AS creator_middlename,
+                u.lastname AS creator_lastname,
+                u.suffix AS creator_suffix,
+                req.signed_proposal_path,
+                req.group_app_path,
+                req.dti_path,
+                req.sec_reg_path,
+                req.articles_of_inc_path,
+                req.by_laws_path,
+                req.business_permit_path,
+                req.masterlist_file_path,
+                req.authorized_id_path,
+                req.booking_date,
+                ROW_NUMBER() OVER (ORDER BY fia.created_at DESC) AS RowNum
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
+                ON fia.status_id = fis.status_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
+                ON fia.group_classification_id = gc.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
+                ON fia.business_type_id = bt.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gt
+                ON fia.group_type_id = gt.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups pm
+                ON fia.payment_mode_id = pm.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+                ON fia.type_of_proposal_id = topl.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+                ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+                ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+                ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al
+                ON fia.amount_loans_id = al.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct
+                ON fia.coverage_type_id = ct.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
+                ON fia.channel_type_id = chant.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries ind
+                ON fia.business_nature_id = ind.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
+                ON fia.sub_payment_term_id = ml.month_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries subind
+                ON fia.sub_business_nature_id = subind.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+                ON fia.user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+                ON fia.proposal_status_id = ps.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ext
+                ON fia.extension_request_status_id = ext.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+                ON fia.application_id = req.application_id
+            WHERE ${whereCondition}
+        )
+        SELECT *
+        FROM PaginatedApps
+        WHERE RowNum BETWEEN ${startRow} AND ${endRow}
+        ORDER BY RowNum;
+    `);
+
+    const apps = res.recordset ?? [];
+    if (apps.length > 0) {
+        const appIds = apps.map(a => a.application_id);
+        const filesRes = await pool.request().query(`
+            SELECT application_id, file_path 
+            FROM DHUB_UAT.sg.financial_insurance_application_files 
+            WHERE application_id IN (${appIds.join(',')})
+        `);
+        const filesMap = {};
+        (filesRes.recordset || []).forEach(f => {
+            if (!filesMap[f.application_id]) {
+                filesMap[f.application_id] = [];
+            }
+            filesMap[f.application_id].push(f.file_path);
+        });
+
+        // Bulk load actuarial notes
+        const notesRes = await pool.request().query(`
+            SELECT application_id, notes, show_in_pdf 
+            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
+        `);
+        const notesMap = {};
+        const showMap = {};
+        (notesRes.recordset || []).forEach(n => {
+            notesMap[n.application_id] = n.notes;
+            showMap[n.application_id] = n.show_in_pdf;
+        });
+
+        // Bulk load actuarial to CFE notes
+        const toCfeNotesRes = await pool.request().query(`
+            SELECT application_id, notes 
+            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial_to_cfe'
+        `);
+        const toCfeNotesMap = {};
+        (toCfeNotesRes.recordset || []).forEach(n => {
+            toCfeNotesMap[n.application_id] = n.notes;
+        });
+
+        // Bulk load actuarial files
+        const actFilesRes = await pool.request().query(`
+            SELECT application_id, file_path 
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files 
+            WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
+        `);
+        const actFilesMap = {};
+        (actFilesRes.recordset || []).forEach(f => {
+            if (!actFilesMap[f.application_id]) {
+                actFilesMap[f.application_id] = [];
+            }
+            actFilesMap[f.application_id].push(f.file_path);
+        });
+
+        // Bulk load all department files (supporting details)
+        const deptFilesRes = await pool.request().query(`
+            SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
+            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
+            WHERE f.application_id IN (${appIds.join(',')})
+        `);
+        const deptFilesMap = {};
+        (deptFilesRes.recordset || []).forEach(f => {
+            if (!deptFilesMap[f.application_id]) {
+                deptFilesMap[f.application_id] = [];
+            }
+            deptFilesMap[f.application_id].push({
+                file_path: f.file_path,
+                file_name: f.file_name,
+                department: f.department,
+                created_at: f.created_at,
+                uploaded_by_user_id: f.uploaded_by_user_id,
+                firstname: f.firstname,
+                lastname: f.lastname,
+                uploader_department: f.uploader_department
+            });
+        });
+
+        apps.forEach(app => {
+            const appFiles = filesMap[app.application_id];
+            app.excel_file_path = appFiles ? JSON.stringify(appFiles) : null;
+            app.actuarial_notes = notesMap[app.application_id] ?? null;
+            app.actuarial_notes_show_in_pdf = showMap[app.application_id] !== false;
+            app.actuarial_to_cfe_notes = toCfeNotesMap[app.application_id] ?? null;
+            
+            const appActFiles = actFilesMap[app.application_id];
+            app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
+
+            app.department_files = deptFilesMap[app.application_id] || [];
+        });
+    }
+
+    return { apps, total };
 };
 
 export const getExtensionRequests = async (userIds = null) => {
@@ -1259,6 +1557,7 @@ export const updateApplication = async (id, data, userId) => {
         addClause('extension_requested', data.extension_requested, sql.Bit);
         addClause('extension_request_status_id', data.extension_request_status_id, sql.Int);
         addClause('expiry_date', data.expiry_date, sql.DateTime);
+        addClause('created_at', data.created_at, sql.DateTime);
         addClause('evidence_notes', data.evidence_notes, sql.NVarChar(sql.MAX));
 
         // Add excel_file_path to update clause
