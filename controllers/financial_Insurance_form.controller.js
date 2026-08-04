@@ -343,13 +343,44 @@ export const getExtensionRequests = async (req, res) => {
             filterUserIds = [...subordinates, userId];
         }
 
-        const pendingIds = await Model.getExtensionRequests(filterUserIds);
-        if (pendingIds.length === 0) return success(res, [], 'No pending extension requests.');
+        const { group_name, email, product, preparedBy } = req.query;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.per_page || req.query.limit, 10) || 10;
+
+        const filters = { group_name, email, plan: product, creator: preparedBy };
+        const { pendingIds, total } = await Model.getExtensionRequestsPaginated(filterUserIds, page, limit, filters);
+        if (pendingIds.length === 0) {
+            return success(res, {
+                data: [],
+                pagination: {
+                    current_page: page,
+                    last_page: 1,
+                    per_page: limit,
+                    total: 0,
+                    from: 0,
+                    to: 0
+                }
+            }, 'No pending extension requests.');
+        }
 
         const requests = await Promise.all(pendingIds.map(id => Model.getApplicationById(id)));
-        const response = await Promise.all(requests.map(app => Helper.buildApplicationResponse(app)));
+        const responseData = await Promise.all(requests.map(app => Helper.buildApplicationResponse(app)));
 
-        return success(res, response, 'Pending extension requests fetched successfully.');
+        const lastPage = Math.ceil(total / limit) || 1;
+        const from = (page - 1) * limit + 1;
+        const to = (page - 1) * limit + pendingIds.length;
+
+        return success(res, {
+            data: responseData,
+            pagination: {
+                current_page: page,
+                last_page: lastPage,
+                per_page: limit,
+                total: total,
+                from: from,
+                to: to
+            }
+        }, 'Pending extension requests fetched successfully.');
     } catch (err) {
         return error(res, err.message);
     }
@@ -1363,11 +1394,12 @@ export const getAllApplications = async (req, res) => {
             filterUserId = [userId, ...subordinates];
         }
 
-        const { status } = req.query;
+        const { status, group_name, email, product, preparedBy } = req.query;
         const page = parseInt(req.query.page, 10) || 1;
         const limit = parseInt(req.query.per_page || req.query.limit, 10) || 10;
 
-        const { apps, total } = await Model.getAllApplicationsPaginated(filterUserId, isActuarial, status, page, limit);
+        const filters = { group_name, email, plan: product, creator: preparedBy };
+        const { apps, total } = await Model.getAllApplicationsPaginated(filterUserId, isActuarial, status, page, limit, filters);
         if (apps.length === 0) { // Check if any applications were found
             return success(res, {
                 data: [],

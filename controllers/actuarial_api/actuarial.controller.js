@@ -821,8 +821,41 @@ export const downloadActuarialFiles = async (req, res) => {
 // Get Pending Amendment Requests Queue for Actuarial
 export const getApplicationsPendingAmendments = async (req, res) => {
     try {
-        const list = await MainModel.getPendingAmendmentRequests(18); // 18 = Actuarial Dept
-        return success(res, list, 'Pending amendment requests fetched successfully.');
+        const { group_name, email, product, preparedBy } = req.query;
+        const page = parseInt(req.query.page, 10) || 1;
+        const limit = parseInt(req.query.per_page || req.query.limit, 10) || 10;
+
+        const filters = { group_name, email, plan: product, creator: preparedBy };
+        const { list, total } = await MainModel.getPendingAmendmentRequestsPaginated(18, page, limit, filters); // 18 = Actuarial Dept
+        if (list.length === 0) {
+            return success(res, {
+                data: [],
+                pagination: {
+                    current_page: page,
+                    last_page: 1,
+                    per_page: limit,
+                    total: 0,
+                    from: 0,
+                    to: 0
+                }
+            }, 'No pending amendment requests.');
+        }
+
+        const lastPage = Math.ceil(total / limit) || 1;
+        const from = (page - 1) * limit + 1;
+        const to = (page - 1) * limit + list.length;
+
+        return success(res, {
+            data: list,
+            pagination: {
+                current_page: page,
+                last_page: lastPage,
+                per_page: limit,
+                total: total,
+                from: from,
+                to: to
+            }
+        }, 'Pending amendment requests fetched successfully.');
     } catch (err) {
         console.error('Actuarial Amendment Queue Error:', err);
         return error(res, err.message);

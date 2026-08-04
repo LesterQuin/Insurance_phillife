@@ -587,7 +587,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
 };
 
 // Get all applications with pagination support
-export const getAllApplicationsPaginated = async (userId = null, excludeDrafts = false, statusFilter = null, page = 1, limit = 10) => {
+export const getAllApplicationsPaginated = async (userId = null, excludeDrafts = false, statusFilter = null, page = 1, limit = 10, filters = {}) => {
     const pool = await poolPromise;
     const request = pool.request();
 
@@ -613,8 +613,39 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
             whereCondition += ' AND fia.status_id = @status_filter_id';
         } else {
             request.input('status_filter_name', sql.NVarChar(100), statusFilter.trim());
-            whereCondition += ' AND LOWER(fis.status_name) = LOWER(@status_filter_name)';
+            whereCondition += " AND LOWER(fis.status_name) LIKE '%' + LOWER(@status_filter_name) + '%'";
         }
+    }
+
+    if (filters.group_name) {
+        request.input('group_name_filter', sql.NVarChar(255), filters.group_name.trim());
+        whereCondition += " AND fia.group_name LIKE '%' + @group_name_filter + '%'";
+    }
+
+    if (filters.email) {
+        request.input('email_filter', sql.NVarChar(255), filters.email.trim());
+        whereCondition += " AND fia.email LIKE '%' + @email_filter + '%'";
+    }
+
+    if (filters.plan) {
+        request.input('plan_filter', sql.NVarChar(255), filters.plan.trim());
+        whereCondition += ` AND (
+            p.product_name LIKE '%' + @plan_filter + '%' OR 
+            p.acronym LIKE '%' + @plan_filter + '%' OR 
+            bp.basic_plan_name LIKE '%' + @plan_filter + '%' OR 
+            bp.acronym LIKE '%' + @plan_filter + '%' OR 
+            pp.name LIKE '%' + @plan_filter + '%' OR 
+            pp.acronym LIKE '%' + @plan_filter + '%'
+        )`;
+    }
+
+    if (filters.creator) {
+        request.input('creator_filter', sql.NVarChar(255), filters.creator.trim());
+        whereCondition += ` AND (
+            u.firstname LIKE '%' + @creator_filter + '%' OR 
+            u.lastname LIKE '%' + @creator_filter + '%' OR 
+            (u.firstname + ' ' + u.lastname) LIKE '%' + @creator_filter + '%'
+        )`;
     }
 
     // 1. Get total count matching the filters
@@ -622,6 +653,10 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
         SELECT COUNT(DISTINCT fia.application_id) AS total
         FROM DHUB_UAT.sg.financial_insurance_application fia
         LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
         WHERE ${whereCondition}
     `);
     const total = countRes.recordset?.[0]?.total || 0;
@@ -895,6 +930,89 @@ export const getExtensionRequests = async (userIds = null) => {
 
     const result = await request.query(query);
     return result.recordset.map(r => r.application_id);
+};
+
+export const getExtensionRequestsPaginated = async (userIds = null, page = 1, limit = 10, filters = {}) => {
+    const pool = await poolPromise;
+    const request = pool.request();
+
+    let whereClause = "WHERE fia.extension_requested = 1";
+
+    if (userIds) {
+        if (Array.isArray(userIds)) {
+            const idParams = userIds.map((id, i) => {
+                request.input(`uId${i}`, sql.Int, id);
+                return `@uId${i}`;
+            }).join(',');
+            whereClause += ` AND fia.user_id IN (${idParams})`;
+        } else {
+            request.input('user_id', sql.Int, userIds);
+            whereClause += ` AND fia.user_id = @user_id`;
+        }
+    }
+
+    if (filters.group_name) {
+        request.input('group_name_filter', sql.NVarChar(255), filters.group_name.trim());
+        whereClause += " AND fia.group_name LIKE '%' + @group_name_filter + '%'";
+    }
+
+    if (filters.email) {
+        request.input('email_filter', sql.NVarChar(255), filters.email.trim());
+        whereClause += " AND fia.email LIKE '%' + @email_filter + '%'";
+    }
+
+    if (filters.plan) {
+        request.input('plan_filter', sql.NVarChar(255), filters.plan.trim());
+        whereClause += ` AND (
+            p.product_name LIKE '%' + @plan_filter + '%' OR 
+            p.acronym LIKE '%' + @plan_filter + '%' OR 
+            bp.basic_plan_name LIKE '%' + @plan_filter + '%' OR 
+            bp.acronym LIKE '%' + @plan_filter + '%' OR 
+            pp.name LIKE '%' + @plan_filter + '%' OR 
+            pp.acronym LIKE '%' + @plan_filter + '%'
+        )`;
+    }
+
+    if (filters.creator) {
+        request.input('creator_filter', sql.NVarChar(255), filters.creator.trim());
+        whereClause += ` AND (
+            u.firstname LIKE '%' + @creator_filter + '%' OR 
+            u.lastname LIKE '%' + @creator_filter + '%' OR 
+            (u.firstname + ' ' + u.lastname) LIKE '%' + @creator_filter + '%'
+        )`;
+    }
+
+    // 1. Get total count
+    const countRes = await request.query(`
+        SELECT COUNT(DISTINCT fia.application_id) AS total 
+        FROM DHUB_UAT.sg.financial_insurance_application fia
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+        ${whereClause}
+    `);
+    const total = countRes.recordset?.[0]?.total || 0;
+
+    // 2. Fetch page slice using ROW_NUMBER
+    const startRow = (page - 1) * limit + 1;
+    const endRow = page * limit;
+
+    const res = await request.query(`
+        WITH Paginated AS (
+            SELECT fia.application_id, ROW_NUMBER() OVER (ORDER BY fia.created_at DESC) AS RowNum
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            ${whereClause}
+        )
+        SELECT application_id FROM Paginated WHERE RowNum BETWEEN ${startRow} AND ${endRow}
+    `);
+
+    const pendingIds = res.recordset.map(r => r.application_id);
+    return { pendingIds, total };
 };
 
 // Get prototypes (type 30)
@@ -2082,6 +2200,126 @@ export const getPendingAmendmentRequests = async (targetDeptId = null) => {
     return result.recordset ?? [];
 };
 
+export const getPendingAmendmentRequestsPaginated = async (targetDeptId = null, page = 1, limit = 10, filters = {}) => {
+    const pool = await poolPromise;
+    const request = pool.request();
+    let whereClause = "WHERE ar.status = 'PENDING'";
+
+    if (targetDeptId) {
+        request.input('target_dept_id', sql.Int, targetDeptId);
+        whereClause += " AND (ar.target_dept_id IS NULL OR ar.target_dept_id = @target_dept_id)";
+    }
+
+    if (filters.group_name) {
+        request.input('group_name_filter', sql.NVarChar(255), filters.group_name.trim());
+        whereClause += " AND fia.group_name LIKE '%' + @group_name_filter + '%'";
+    }
+
+    if (filters.email) {
+        request.input('email_filter', sql.NVarChar(255), filters.email.trim());
+        whereClause += " AND fia.email LIKE '%' + @email_filter + '%'";
+    }
+
+    if (filters.plan) {
+        request.input('plan_filter', sql.NVarChar(255), filters.plan.trim());
+        whereClause += ` AND (
+            p.product_name LIKE '%' + @plan_filter + '%' OR 
+            p.acronym LIKE '%' + @plan_filter + '%' OR 
+            bp.basic_plan_name LIKE '%' + @plan_filter + '%' OR 
+            bp.acronym LIKE '%' + @plan_filter + '%' OR 
+            pp.name LIKE '%' + @plan_filter + '%' OR 
+            pp.acronym LIKE '%' + @plan_filter + '%'
+        )`;
+    }
+
+    if (filters.creator) {
+        request.input('creator_filter', sql.NVarChar(255), filters.creator.trim());
+        whereClause += ` AND (
+            u.firstname LIKE '%' + @creator_filter + '%' OR 
+            u.lastname LIKE '%' + @creator_filter + '%' OR 
+            (u.firstname + ' ' + u.lastname) LIKE '%' + @creator_filter + '%'
+        )`;
+    }
+
+    // 1. Get total count
+    const countRes = await request.query(`
+        SELECT COUNT(DISTINCT ar.id) AS total
+        FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
+        JOIN DHUB_UAT.sg.financial_insurance_application fia
+            ON ar.application_id = fia.application_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p 
+            ON fia.plan_id = p.product_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+            ON fia.basic_plan_id = bp.basic_plan_id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+            ON fia.prototype_id = pp.id
+        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u 
+            ON ar.requested_by = u.user_id
+        ${whereClause}
+    `);
+    const total = countRes.recordset?.[0]?.total || 0;
+
+    // 2. Fetch page slice using ROW_NUMBER
+    const startRow = (page - 1) * limit + 1;
+    const endRow = page * limit;
+
+    const res = await request.query(`
+        WITH Paginated AS (
+            SELECT 
+                ar.id AS amendment_id,
+                ar.application_id,
+                ar.requested_by,
+                ar.request_dept_id,
+                reqDept.name AS request_dept_name,
+                ar.target_dept_id,
+                targetDept.name AS target_dept_name,
+                ar.request_notes,
+                ar.status AS amendment_status,
+                ar.created_at AS request_created_at,
+                fia.group_name,
+                fia.email,
+                fia.minimum_age,
+                fia.maximum_age,
+                fia.status_id,
+                fis.status_name,
+                ps.name AS proposal_status_name,
+                topl.name AS type_of_proposal_name,
+                p.product_name AS plan_name,
+                p.acronym AS plan_acronym,
+                u.firstname + ' ' + u.lastname AS requester_name,
+                ROW_NUMBER() OVER (ORDER BY ar.created_at ASC) AS RowNum
+            FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
+            JOIN DHUB_UAT.sg.financial_insurance_application fia
+                ON ar.application_id = fia.application_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status fis
+                ON fia.status_id = fis.status_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+                ON fia.proposal_status_id = ps.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+                ON fia.type_of_proposal_id = topl.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+                ON fia.plan_id = p.product_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+                ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+                ON fia.prototype_id = pp.id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+                ON ar.requested_by = u.user_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups reqDept
+                ON ar.request_dept_id = reqDept.id
+                AND reqDept.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups targetDept
+                ON ar.target_dept_id = targetDept.id
+                AND targetDept.category = 'DEPARTMENT'
+            ${whereClause}
+        )
+        SELECT * FROM Paginated WHERE RowNum BETWEEN ${startRow} AND ${endRow} ORDER BY RowNum;
+    `);
+
+    const list = res.recordset ?? [];
+    return { list, total };
+};
+
 // Approve an Amendment Request
 export const approveAmendment = async (data, userId) => {
     const pool = await poolPromise;
@@ -2297,6 +2535,3 @@ export const getLatestAmendmentRequestByAppId = async (applicationId) => {
         `);
     return result.recordset && result.recordset.length > 0 ? result.recordset[0] : null;
 };
-
-
-

@@ -956,7 +956,8 @@ export const getProposalNotificationRecipients = async (creatorUserId) => {
 
     // List of static internal recipients (Add any user IDs, fallback emails, or custom salutation titles here)
     const staticUsers = [
-        { id: 17, fallbackEmail: 'marvinc@phillife.com.ph', fallbackLastName: 'Catapang', salutationName: 'Sir Marvin' },
+        { id: 6, fallbackEmail: 'lehzter@gmail.com', fallbackLastName: 'Quinones', salutationName: 'Sir Lester' },
+        // { id: 17, fallbackEmail: 'marvinc@phillife.com.ph', fallbackLastName: 'Catapang', salutationName: 'Sir Marvin' },
         // To add another user by ID or email, simply add objects here:
         // { id: 25, fallbackEmail: 'john.doe@phillife.com.ph', fallbackLastName: 'Kwong' },
         // { email: 'customteam@phillife.com.ph', salutationName: 'EBAM Team' }
