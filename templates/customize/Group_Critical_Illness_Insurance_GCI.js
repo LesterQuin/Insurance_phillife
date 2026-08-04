@@ -602,6 +602,16 @@ export const generateGCIPDFContent = (application, user, details) => {
   const selectedRiders = (application.riders || []).filter(r => r.rider_id !== null && r.rider_id !== 0);
   const hasManyRiders = selectedRiders.length > 8;
 
+  const getTerminationAge = () => {
+    if (application.borrower_age_76_80) return 81;
+    if (application.borrower_age_71_75) return 76;
+    if (application.borrower_age_66_70) return 71;
+    const hasRemaining = !!details?.ratesCustomRemaining;
+    if (hasRemaining) return 66;
+    return (application.maximum_age || 65) + 1;
+  };
+  const terminationAge = getTerminationAge();
+
   const encloseText = `<p style="text-align: justify; text-indent: 30px;">Enclosed are the proposed premium rates, coverage details, benefits, terms and conditions, and other pertinent provisions for your review and evaluation. We have carefully developed this proposal to offer comprehensive critical illness protection that aligns with your organization's needs and objectives.</p>`;
 
   const appreciateText = `<p style="text-align: justify; text-indent: 30px;">We appreciate the opportunity to present this proposal and trust that it will meet your organization's requirements. We look forward to building a long-term, mutually beneficial partnership founded on trust, reliability, and excellent service.</p>`;
@@ -884,9 +894,9 @@ export const generateGCIPDFContent = (application, user, details) => {
                 </p>
                 <p>3. <strong>Termination Age</strong></p>
                 <ul style="margin-top: 2px; margin-left: 5mm; padding-left: 15px; font-size: 12pt;">
-                    <li><strong>${planName}</strong> : Coverage terminates at age 65.</li>
+                    <li><strong>${planName}</strong> : Coverage terminates at age ${terminationAge}.</li>
                     ${(application.riders || []).map(r => `
-                        <li><strong>${r.rider_name?.includes(`(${r.acronym})`) ? r.rider_name : `${r.rider_name || "Rider"}${r.acronym ? ` (${r.acronym})` : ""}`}</strong> : Coverage terminates at age 65.</li>
+                        <li><strong>${r.rider_name?.includes(`(${r.acronym})`) ? r.rider_name : `${r.rider_name || "Rider"}${r.acronym ? ` (${r.acronym})` : ""}`}</strong> : Coverage terminates at age ${terminationAge}.</li>
                     `).join("")}
                 </ul>
                 <div style="margin-bottom: 12px;">4. <strong>Participation Requirements</strong>:

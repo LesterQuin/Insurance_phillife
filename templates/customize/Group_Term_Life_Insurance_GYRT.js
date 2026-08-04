@@ -641,6 +641,16 @@ export const generateGYRTPDFContent = (application, user, details) => {
   const selectedRiders = (application.riders || []).filter(r => r.rider_id !== null && r.rider_id !== 0);
   const hasManyRiders = selectedRiders.length > 8;
 
+  const getTerminationAge = () => {
+    if (application.borrower_age_76_80) return 81;
+    if (application.borrower_age_71_75) return 76;
+    if (application.borrower_age_66_70) return 71;
+    const hasRemaining = !!details?.ratesCustomRemaining;
+    if (hasRemaining) return 66;
+    return (application.maximum_age || 65) + 1;
+  };
+  const terminationAge = getTerminationAge();
+
   const encloseText = `<p style="text-align: justify; text-indent: 30px;">Enclosed are the proposed premium rates, coverage details, benefits, terms and conditions, and other pertinent provisions for your review and evaluation. 
             We have carefully developed this proposal to offer comprehensive life insurance protection that aligns with your organization's needs and objectives.</p>`;
 
@@ -1098,7 +1108,7 @@ export const generateGYRTPDFContent = (application, user, details) => {
                     ? application.basic_plan.name
                     : `${application.basic_plan?.name || "Basic Plan"}${application.basic_plan?.acronym ? ` (${application.basic_plan.acronym})` : ""}`
                 }
-            </strong> : Coverage terminates at age 65.
+            </strong> : Coverage terminates at age ${terminationAge}.
         </li>
 
         ${(application.riders || [])
@@ -1111,7 +1121,7 @@ export const generateGYRTPDFContent = (application, user, details) => {
                             ? r.rider_name
                             : `${r.rider_name || "Rider"}${r.acronym ? ` (${r.acronym})` : ""}`
                         }
-                    </strong> : Coverage terminates at age 65.
+                    </strong> : Coverage terminates at age ${terminationAge}.
                 </li>
             `,
           )

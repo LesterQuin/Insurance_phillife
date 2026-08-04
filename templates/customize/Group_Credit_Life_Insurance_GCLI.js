@@ -178,7 +178,13 @@ export const generateGCLIPDFContent = (application, user, details) => {
     const standardSuffix = isGCLI ? " months" : "";
 
     const startAge = (application.borrower_amount_under_min && parseFloat(application.borrower_amount_under_min) > 0) ? 18 : (application.minimum_age || 18);
-    const endAge = (application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0) ? 65 : (application.maximum_age || 65);
+    const getEndAge = () => {
+        if (application.borrower_age_76_80) return 80;
+        if (application.borrower_age_71_75) return 75;
+        if (application.borrower_age_66_70) return 70;
+        return (application.maximum_age || 65);
+    };
+    const endAge = (application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0) ? 65 : getEndAge();
     const ageLabel = `${startAge}-${endAge}`;
 
     const planName = (application.basic_plan?.name || "").trim();
