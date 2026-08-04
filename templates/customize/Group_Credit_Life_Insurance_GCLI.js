@@ -45,12 +45,12 @@ const generateGCLITableHTML = (ratesArray) => {
     <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 10pt;">
         <thead>
             <tr style="background-color: #f9f9f9;">
-                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
-                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
-                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
-                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
-                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
-                <th style="font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
+                <th style="width: 16.66%; font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
+                <th style="width: 16.66%; font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
+                <th style="width: 16.66%; font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
+                <th style="width: 16.66%; font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
+                <th style="width: 16.66%; font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">Term of Loan</th>
+                <th style="width: 16.66%; font-weight: bold; border: 1px solid #ddd; padding: 6px; font-size: 9pt; text-align: center;">GCLIP</th>
             </tr>
         </thead>
         <tbody>
@@ -209,6 +209,7 @@ export const generateGCLIPDFContent = (application, user, details) => {
 <head>
 <meta charset="UTF-8">
 <title>Group Credit Life Insurance Proposal (GCLIP)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         @page {
             size: A4;
@@ -236,13 +237,13 @@ export const generateGCLIPDFContent = (application, user, details) => {
         }
         .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         table { 
-            width: 100%; border-collapse: collapse; margin-top: 15px; 
+            width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; word-break: break-word;
         }
         table, th, td { 
             border: 1px solid #000; 
         }
         th, td { 
-            padding: 8px; text-align: center; 
+            padding: 8px; text-align: center; white-space: normal; word-wrap: break-word; word-break: break-word;
         }
         .age-tables-container {
             display: flex;
@@ -257,8 +258,8 @@ export const generateGCLIPDFContent = (application, user, details) => {
         min-width: 200px;
         max-width: 100%;
         }
-        .compact-table { width: 100%; font-size: 8.5pt; border: 1px solid #999; }
-        .compact-table th, .compact-table td { padding: 3px 5px; border: 1px solid #999; text-align: left; }
+        .compact-table { width: 100%; font-size: 8.5pt; border: 1px solid #999; table-layout: fixed; word-wrap: break-word; word-break: break-word; }
+        .compact-table th, .compact-table td { padding: 3px 5px; border: 1px solid #999; text-align: left; white-space: normal; word-wrap: break-word; word-break: break-word; }
         .note { 
             font-size: 14px; margin-top: 10px; 
         }
@@ -559,10 +560,9 @@ export const generateGCLIPDFContent = (application, user, details) => {
                 <div class="section-group">
                 <h2 style="margin-top:10px;">Classification of Benefits</h2>
     <table>
-
         <tr>
-            <th>Classification</th>
-            <th>Benefit</th>
+            <th style="width: 35%;">Classification</th>
+            <th style="width: 65%;">Benefit</th>
         </tr>
 
         ${

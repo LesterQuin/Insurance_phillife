@@ -291,6 +291,13 @@ const renderGPATables = (application, rates18_65, details) => {
     });
   });
 
+  // Chunk columns into groups of max 6 to prevent horizontal overflow in PDF
+  const MAX_COLS = 6;
+  const colChunks = [];
+  for (let i = 0; i < columns.length; i += MAX_COLS) {
+    colChunks.push(columns.slice(i, i + MAX_COLS));
+  }
+
   // Setup classifications/rows based on coverage type
   let rows = [];
   if (coverageTypeId === 32) {
@@ -307,33 +314,38 @@ const renderGPATables = (application, rates18_65, details) => {
   }
 
 
-  // 1. Benefits Table HTML
+  // 1. Benefits Table HTML (Chunked)
   let benefitsHtml = `
     <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">Benefits:</h3>
-    <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
-      <thead>
-        <tr style="background-color: #f2f2f2;">
-          <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Classification</th>
-          ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
-        </tr>
-      </thead>
-      <tbody>
-        ${rows.map(row => `
-          <tr>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${row.label}</td>
-            ${columns.map(col => {
-              const display = getBenefitDisplay(application, col.id, row.id, col.isBasic);
-              return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${display}</td>`;
-            }).join('')}
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
   `;
+  benefitsHtml += colChunks.map(chunk => {
+    const colWidth = 65 / chunk.length;
+    return `
+      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 15px;">
+        <thead>
+          <tr style="background-color: #f2f2f2;">
+            <th style="width: 35%; padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Classification</th>
+            ${chunk.map(col => `<th style="width: ${colWidth}%; padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(row => `
+            <tr>
+              <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${row.label}</td>
+              ${chunk.map(col => {
+                const display = getBenefitDisplay(application, col.id, row.id, col.isBasic);
+                return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${display}</td>`;
+              }).join('')}
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    `;
+  }).join('');
 
   // Check lives threshold
   if (lives > 30) {
-    // 2. Rate per 1,000 Table HTML (flat rates)
+    // 2. Rate per 1,000 Table HTML (flat rates - Chunked)
     const getRateDisplay = (col) => {
       if (Number(col.id) === 7) return 'Free';
       const rateVal = getRateForRider(rates18_65, col.id, col.isBasic);
@@ -342,68 +354,92 @@ const renderGPATables = (application, rates18_65, details) => {
 
     let ratesHtml = `
       <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">${paymentMode} Rate per 1,000</h3>
-      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            ${details?.ratesCustomRemaining ? `<th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Age Bracket</th>` : ''}
-            ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            ${details?.ratesCustomRemaining ? `<td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${application.minimum_age || 18}-${application.maximum_age || 65}</td>` : ''}
-            ${columns.map(col => `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${getRateDisplay(col)}</td>`).join('')}
-          </tr>
-          ${details?.ratesCustomRemaining ? `
-          <tr>
-            <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${(application.maximum_age || 65) + 1}-65</td>
-            ${columns.map(col => {
-              if (Number(col.id) === 7) return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">Free</td>`;
-              const rateVal = getRateForRider(details.ratesCustomRemaining, col.id, col.isBasic);
-              return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${formatRate(rateVal, 2)}</td>`;
-            }).join('')}
-          </tr>
-          ` : ''}
-        </tbody>
-      </table>
     `;
+    ratesHtml += colChunks.map(chunk => {
+      const hasFirstCol = !!details?.ratesCustomRemaining;
+      const firstColWidth = 35;
+      const colWidth = (100 - (hasFirstCol ? firstColWidth : 0)) / chunk.length;
+      return `
+        <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 15px;">
+          <thead>
+            <tr style="background-color: #f2f2f2;">
+              ${details?.ratesCustomRemaining ? `<th style="width: 35%; padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Age Bracket</th>` : ''}
+              ${chunk.map(col => `<th style="width: ${colWidth}%; padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              ${details?.ratesCustomRemaining ? `<td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${application.minimum_age || 18}-${application.maximum_age || 65}</td>` : ''}
+              ${chunk.map(col => `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${getRateDisplay(col)}</td>`).join('')}
+            </tr>
+            ${details?.ratesCustomRemaining ? `
+            <tr>
+              <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${(application.maximum_age || 65) + 1}-65</td>
+              ${chunk.map(col => {
+                if (Number(col.id) === 7) return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">Free</td>`;
+                const rateVal = getRateForRider(details.ratesCustomRemaining, col.id, col.isBasic);
+                return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">${formatRate(rateVal, 2)}</td>`;
+              }).join('')}
+            </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      `;
+    }).join('');
 
-    // 3. Premium Table HTML (computed premiums)
+    // 3. Premium Table HTML (computed premiums - Chunked)
     let premiumHtml = `
       <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">${paymentMode} Premium per Head (Php):</h3>
-      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Classification</th>
-            ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
-            <th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">TOTAL</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map(row => {
-            let rowTotal = 0;
-            const cells = columns.map(col => {
-              if (Number(col.id) === 7) {
-                return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">Free</td>`;
-              }
-              const benefitAmt = getBenefitAmount(application, col.id, row.id, col.isBasic);
-              const rateVal = getRateForRider(rates18_65, col.id, col.isBasic);
-              const premium = (benefitAmt / 1000) * rateVal;
-              rowTotal += premium;
-              return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${formatNumber(premium)}</td>`;
-            });
-
-            return `
-              <tr>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${row.label}</td>
-                ${cells.join('')}
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; background-color: #fafafa; font-size: 8.5pt;">${formatNumber(rowTotal)}</td>
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
     `;
+    premiumHtml += colChunks.map((chunk, chunkIdx) => {
+      const isLastChunk = chunkIdx === colChunks.length - 1;
+      const firstColWidth = 25;
+      const lastColWidth = isLastChunk ? 15 : 0;
+      const remainingWidth = 100 - firstColWidth - lastColWidth;
+      const colWidth = remainingWidth / chunk.length;
+
+      return `
+        <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 15px;">
+          <thead>
+            <tr style="background-color: #f2f2f2;">
+              <th style="width: 25%; padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Classification</th>
+              ${chunk.map(col => `<th style="width: ${colWidth}%; padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+              ${isLastChunk ? `<th style="width: 15%; padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; font-size: 8.5pt;">TOTAL</th>` : ''}
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(row => {
+              let rowTotal = 0;
+              columns.forEach(col => {
+                if (Number(col.id) === 7) return;
+                const benefitAmt = getBenefitAmount(application, col.id, row.id, col.isBasic);
+                const rateVal = getRateForRider(rates18_65, col.id, col.isBasic);
+                const premium = (benefitAmt / 1000) * rateVal;
+                rowTotal += premium;
+              });
+
+              const cells = chunk.map(col => {
+                if (Number(col.id) === 7) {
+                  return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">Free</td>`;
+                }
+                const benefitAmt = getBenefitAmount(application, col.id, row.id, col.isBasic);
+                const rateVal = getRateForRider(rates18_65, col.id, col.isBasic);
+                const premium = (benefitAmt / 1000) * rateVal;
+                return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${formatNumber(premium)}</td>`;
+              });
+
+              return `
+                <tr>
+                  <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${row.label}</td>
+                  ${cells.join('')}
+                  <td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; background-color: #fafafa; font-size: 8.5pt;">${formatNumber(rowTotal)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }).join('');
 
     // Grand Total Premium
     let grandTotalHtml = `
@@ -424,30 +460,35 @@ const renderGPATables = (application, rates18_65, details) => {
     
     let ratesTableHtml = `
       <h3 style="margin-top: 15px; margin-bottom: 5px; color: #0d47a1; font-size: 11pt;">${paymentMode} Rate per 1,000</h3>
-      <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 20px;">
-        <thead>
-          <tr style="background-color: #f2f2f2;">
-            <th style="padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Attained Age</th>
-            ${columns.map(col => `<th style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${ageKeys.map(ageKey => {
-            const ageLabel = formatAgeLabel(ageKey);
-            return `
-              <tr>
-                <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${ageLabel}</td>
-                ${columns.map(col => {
-                  if (Number(col.id) === 7) return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">Free</td>`;
-                  const rate = getAgeBasedRateForRider(rates18_65, ageKey, col.id, col.isBasic);
-                  return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${formatRate(rate, 3)}</td>`;
-                }).join('')}
-              </tr>
-            `;
-          }).join('')}
-        </tbody>
-      </table>
     `;
+    ratesTableHtml += colChunks.map(chunk => {
+      const colWidth = 65 / chunk.length;
+      return `
+        <table class="compact-table" style="width: 100%; border-collapse: collapse; font-size: 9pt; margin-bottom: 15px;">
+          <thead>
+            <tr style="background-color: #f2f2f2;">
+              <th style="width: 35%; padding: 6px; border: 1px solid #ddd; text-align: left; font-size: 8.5pt;">Attained Age</th>
+              ${chunk.map(col => `<th style="width: ${colWidth}%; padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${col.label}</th>`).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${ageKeys.map(ageKey => {
+              const ageLabel = formatAgeLabel(ageKey);
+              return `
+                <tr>
+                  <td style="padding: 6px; border: 1px solid #ddd; text-align: left; font-weight: bold; font-size: 8.5pt;">${ageLabel}</td>
+                  ${chunk.map(col => {
+                    if (Number(col.id) === 7) return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">Free</td>`;
+                    const rate = getAgeBasedRateForRider(rates18_65, ageKey, col.id, col.isBasic);
+                    return `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-size: 8.5pt;">${formatRate(rate, 3)}</td>`;
+                  }).join('')}
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }).join('');
 
     // Grand Total Premium
     let grandTotalHtml = `
@@ -475,7 +516,6 @@ export const generateGPAPDFContent = (application, user, details) => {
   const addresseeLastName =
     application.proposal_addressee?.split(" ").pop() || "";
 
-  // Defaulting details to avoid errors if they are not provided
   const {
     totalAnnualPremium = 0,
     maxAmount18_65 = 0,
@@ -493,6 +533,14 @@ export const generateGPAPDFContent = (application, user, details) => {
     page2FooterPhotoUri = null,
   } = details || {};
   const maturity = details?.maturity || 0; // Get maturity from details
+
+  const selectedRiders = (application.riders || []).filter(r => r.rider_id !== null && r.rider_id !== 0);
+  const hasManyRiders = selectedRiders.length > 8;
+
+  const encloseText = `<p style="text-align: justify; text-indent: 30px;">Enclosed are the proposed premium rates, coverage details, benefits, terms and conditions, and other pertinent provisions for your review and evaluation. 
+            We have carefully developed this proposal to offer comprehensive life insurance protection that aligns with your organization's needs and objectives.</p>`;
+
+  const appreciateText = `<p style="text-align: justify; text-indent: 30px;">We appreciate the opportunity to present this proposal and trust that it will meet your organization's life insurance requirements. We look forward to building a long-term, mutually beneficial partnership founded on trust, reliability, and excellent service.</p>`;
 
   const cfeFullName = `${user.firstname} ${user.lastname}`;
 
@@ -534,6 +582,7 @@ export const generateGPAPDFContent = (application, user, details) => {
 <head>
 <meta charset="UTF-8">
 <title>Group Personal Accident Insurance Proposal (GPA)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         @page {
             size: A4;
@@ -562,13 +611,13 @@ export const generateGPAPDFContent = (application, user, details) => {
         }
         .plan-details table:not(.layout-table), .plan-details ul, .plan-details .note, .plan-details p { break-inside: auto; page-break-inside: auto; }
         table { 
-            width: 100%; border-collapse: collapse; margin-top: 15px; 
+            width: 100%; border-collapse: collapse; margin-top: 15px; table-layout: fixed; word-wrap: break-word; word-break: break-word;
         }
         table, th, td { 
             border: 1px solid #000; 
         }
         th, td { 
-            padding: 8px; text-align: center; 
+            padding: 8px; text-align: center; white-space: normal; word-wrap: break-word; word-break: break-word;
         }
         .age-tables-container {
             display: flex;
@@ -583,8 +632,8 @@ export const generateGPAPDFContent = (application, user, details) => {
         min-width: 200px;
         max-width: 100%;
         }
-        .compact-table { width: 100%; font-size: 8.5pt; border: 1px solid #999; }
-        .compact-table th, .compact-table td { padding: 3px 5px; border: 1px solid #999; text-align: left; }
+        .compact-table { width: 100%; font-size: 8.5pt; border: 1px solid #999; table-layout: fixed; word-wrap: break-word; word-break: break-word; }
+        .compact-table th, .compact-table td { padding: 3px 5px; border: 1px solid #999; text-align: left; white-space: normal; word-wrap: break-word; word-break: break-word; }
         .note { 
             font-size: 14px; margin-top: 10px; 
         }
@@ -856,31 +905,30 @@ export const generateGPAPDFContent = (application, user, details) => {
                 }
             </ul>
 
-            <p style="text-align: justify; text-indent: 30px;">Enclosed are the proposed premium rates, coverage details, benefits, terms and conditions, and other pertinent provisions for your review and evaluation. 
-            We have carefully developed this proposal to offer comprehensive life insurance protection that aligns with your organization's needs and objectives.</p>
-    </div>
-
-<div class="page-break"></div>
-    <div class="main-content">
-    ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
-
-    ${
-      page2FooterPhotoUri
-        ? `
-        <div class="page2-footer">
-            <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
-        </div>
-    `
-        : ""
-    }
-
-    <div class="subsequent-header-gradient"></div> <br>
-            <p style="text-align: justify; text-indent: 30px;">We appreciate the opportunity to present this proposal and trust that it will meet your organization's life insurance requirements. We look forward to building a long-term, mutually beneficial partnership founded on trust, reliability, and excellent service.</p>
-
-            <p style="text-align: justify; text-indent: 30px;">
-            Should you require any additional information or wish to discuss any aspect of this proposal, please feel free to contact our Sales Representative ${salesRepName} at ${salesRepNumber} or via email at ${salesRepEmail}.
-            We will be pleased to assist you and discuss the proposal at your convenience.
-            </p>
+            ${encloseText}
+            ${!hasManyRiders ? appreciateText : ""}
+     </div>
+ 
+ <div class="page-break"></div>
+     <div class="main-content">
+     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" class="content-logo" />` : ""}
+ 
+     ${
+       page2FooterPhotoUri
+         ? `
+         <div class="page2-footer">
+             <img src="${page2FooterPhotoUri}" style="width: 100%; display: block;"  />
+         </div>
+     `
+         : ""
+     }
+ 
+     <div class="subsequent-header-gradient"></div> <br>
+             ${hasManyRiders ? appreciateText : ""}
+             <p style="text-align: justify; text-indent: 30px;">
+             Should you require any additional information or wish to discuss any aspect of this proposal, please feel free to contact our Sales Representative ${salesRepName} at ${salesRepNumber} or via email at ${salesRepEmail}.
+             We will be pleased to assist you and discuss the proposal at your convenience.
+             </p>
 
             <p style="text-align: justify; text-indent: 30px;">
             Thank you for your time and thoughtful consideration. We look forward to the opportunity to serve your organization and to receiving your favorable response.<br><br>
