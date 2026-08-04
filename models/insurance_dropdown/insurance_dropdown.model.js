@@ -11,7 +11,7 @@ export const getIndustries = async () => {
                 ,[is_active]
                 ,[created_at]
                 ,[updated_at]
-            FROM [DHUB_UAT].[sg].[financial_insurance_industries]
+            FROM [IAF].[sg].[financial_insurance_industries]
             WHERE [is_active] = 1
             ORDER BY [id] ASC
         `);

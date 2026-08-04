@@ -13,7 +13,7 @@ const logApplicationAction = async (transaction, { applicationId, userId, action
         .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(changes))
         .input('ip_address', sql.NVarChar, ipAddress || null)
         .query(`
-            INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+            INSERT INTO IAF.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
             VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
         `);
 };
@@ -91,7 +91,7 @@ export const createApplication = async (data, userId) => {
             .input('excel_file_path', sql.NVarChar(sql.MAX), valueOrNull(data.excel_file_path))
             .input('company_tin', sql.NVarChar(50), valueOrNull(data.company_tin))
             .query(`
-                INSERT INTO DHUB_UAT.sg.financial_insurance_application (
+                INSERT INTO IAF.sg.financial_insurance_application (
                     user_id, group_name, business_nature, business_nature_id, sub_business_nature_id, number_of_lives, business_address, contact_number, fax_number, email,
                     contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname, designation, proposal_addressee, addressee_designation, group_classification_id,
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
@@ -130,7 +130,7 @@ export const createApplication = async (data, userId) => {
                         .input('application_id', sql.Int, applicationId)
                         .input('sub_group_type_id', sql.Int, subGroupId)
                         .query(`
-                            INSERT INTO DHUB_UAT.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
+                            INSERT INTO IAF.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id)
                             VALUES (@application_id, @sub_group_type_id);
                         `);
                 }
@@ -160,7 +160,7 @@ export const createApplication = async (data, userId) => {
                             .input('rider_id', sql.Int, rider.rider_id)
                             .input('rider_amount', sql.Decimal(18, 2), valueOrNull(finalValue.amount))
                             .input('rider_unit', sql.Int, valueOrNull(finalValue.unit))
-                            .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
+                            .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
             }
@@ -174,7 +174,7 @@ export const createApplication = async (data, userId) => {
                     .input('designation', sql.NVarChar, rank.designation)
                     .input('amount', sql.Decimal(18, 2), rank.amount)
                     .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount) 
-                    .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                    .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                 
                 const rankingId = rankResult.recordset[0].id;
                 await insertRankingRiders(rankingId, rank.designation, data.riders);
@@ -191,7 +191,7 @@ export const createApplication = async (data, userId) => {
                     .input('amount', sql.Decimal(18, 2), rank.amount)
                     .input('salary_multiplier', sql.NVarChar, rank.salary_multiplier)
                     .input('total_coverage_amount', sql.Decimal(18, 2), totalAmount)
-                    .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                    .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                 
                 const rankingId = rankResult.recordset[0].id;
                 await insertRankingRiders(rankingId, rank.designation, data.riders);
@@ -204,7 +204,7 @@ export const createApplication = async (data, userId) => {
                 .input('amount', sql.Decimal(18, 2), uniformAmount)
                 .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                 .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
-                .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
+                .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
         }
 
         if (data.riders && Array.isArray(data.riders) && data.riders.length > 0) {
@@ -216,7 +216,7 @@ export const createApplication = async (data, userId) => {
                     .input('rider_amount', sql.Decimal(18, 2), valueOrNull(rider.amount))
                     .input('rider_unit', sql.Int, valueOrNull(rider.unit))
                     .query(`
-                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_rider
+                        INSERT INTO IAF.sg.financial_insurance_application_rider
                         (application_id, rider_id, rider_amount, rider_unit)
                         VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
                     `);
@@ -233,7 +233,7 @@ export const createApplication = async (data, userId) => {
                         .input('tin_number', sql.NVarChar(50), valueOrNull(affiliate.tin_number))
                         .input('address', sql.NVarChar(500), valueOrNull(affiliate.address))
                         .query(`
-                            INSERT INTO DHUB_UAT.sg.financial_insurance_application_affiliate (application_id, company_name, tin_number, address)
+                            INSERT INTO IAF.sg.financial_insurance_application_affiliate (application_id, company_name, tin_number, address)
                             VALUES (@application_id, @company_name, @tin_number, @address);
                         `);
                 }
@@ -256,7 +256,7 @@ export const createApplication = async (data, userId) => {
                         .input('application_id', sql.Int, applicationId)
                         .input('file_path', sql.NVarChar(500), p)
                         .input('file_name', sql.NVarChar(255), path.basename(p))
-                        .query('INSERT INTO DHUB_UAT.sg.financial_insurance_application_files (application_id, file_path, file_name) VALUES (@application_id, @file_path, @file_name)');
+                        .query('INSERT INTO IAF.sg.financial_insurance_application_files (application_id, file_path, file_name) VALUES (@application_id, @file_path, @file_name)');
                 }
             }
         }
@@ -283,7 +283,7 @@ export const getBulkCoverageRankings = async (applicationIds) => {
 
     const result = await request.query(`
         SELECT application_id, designation, amount, salary_multiplier, uniform_coverage_amount, total_coverage_amount
-        FROM DHUB_UAT.sg.financial_insurance_coverage_ranking
+        FROM IAF.sg.financial_insurance_coverage_ranking
         WHERE application_id IN (${idParams})`);
     return result.recordset ?? [];
 };
@@ -309,9 +309,9 @@ export const getBulkCoverageRankingRiders = async (applicationIds) => {
             cr.designation,
             crr.rider_amount,
             crr.rider_unit
-        FROM DHUB_UAT.sg.financial_insurance_coverage_ranking_rider crr
-        JOIN DHUB_UAT.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
-        JOIN DHUB_UAT.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
+        FROM IAF.sg.financial_insurance_coverage_ranking_rider crr
+        JOIN IAF.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
+        JOIN IAF.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
         WHERE cr.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -448,44 +448,44 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
                 req.masterlist_file_path,
                 req.authorized_id_path,
                 req.booking_date
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gt
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups pm
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+            LEFT JOIN IAF.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+            LEFT JOIN IAF.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp
                 ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries ind
+            LEFT JOIN IAF.sg.financial_insurance_industries ind
                 ON fia.business_nature_id = ind.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries subind
+            LEFT JOIN IAF.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN IAF.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ps
                 ON fia.proposal_status_id = ps.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ext
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ext
                 ON fia.extension_request_status_id = ext.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+            LEFT JOIN IAF.sg.financial_insurance_installation_requirements req
                 ON fia.application_id = req.application_id
             WHERE ${whereCondition}
             ORDER BY fia.created_at DESC;
@@ -496,7 +496,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
         const appIds = apps.map(a => a.application_id);
         const filesRes = await pool.request().query(`
             SELECT application_id, file_path 
-            FROM DHUB_UAT.sg.financial_insurance_application_files 
+            FROM IAF.sg.financial_insurance_application_files 
             WHERE application_id IN (${appIds.join(',')})
         `);
         const filesMap = {};
@@ -510,7 +510,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
         // Bulk load actuarial notes
         const notesRes = await pool.request().query(`
             SELECT application_id, notes, show_in_pdf 
-            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            FROM IAF.sg.financial_insurance_application_notes 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
         `);
         const notesMap = {};
@@ -523,7 +523,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
         // Bulk load actuarial to CFE notes
         const toCfeNotesRes = await pool.request().query(`
             SELECT application_id, notes 
-            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            FROM IAF.sg.financial_insurance_application_notes 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial_to_cfe'
         `);
         const toCfeNotesMap = {};
@@ -534,7 +534,7 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
         // Bulk load actuarial files
         const actFilesRes = await pool.request().query(`
             SELECT application_id, file_path 
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files 
+            FROM IAF.sg.financial_insurance_application_department_files 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
         `);
         const actFilesMap = {};
@@ -548,9 +548,9 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
             SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
+            FROM IAF.sg.financial_insurance_application_department_files f
+            LEFT JOIN IAF.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id IN (${appIds.join(',')})
         `);
         const deptFilesMap = {};
@@ -651,12 +651,12 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
     // 1. Get total count matching the filters
     const countRes = await request.query(`
         SELECT COUNT(DISTINCT fia.application_id) AS total
-        FROM DHUB_UAT.sg.financial_insurance_application fia
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+        FROM IAF.sg.financial_insurance_application fia
+        LEFT JOIN IAF.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
+        LEFT JOIN IAF.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+        LEFT JOIN IAF.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+        LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+        LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
         WHERE ${whereCondition}
     `);
     const total = countRes.recordset?.[0]?.total || 0;
@@ -766,44 +766,44 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
                 req.authorized_id_path,
                 req.booking_date,
                 ROW_NUMBER() OVER (ORDER BY fia.created_at DESC) AS RowNum
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gt
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups pm
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+            LEFT JOIN IAF.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+            LEFT JOIN IAF.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp
                 ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries ind
+            LEFT JOIN IAF.sg.financial_insurance_industries ind
                 ON fia.business_nature_id = ind.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries subind
+            LEFT JOIN IAF.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN IAF.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ps
                 ON fia.proposal_status_id = ps.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ext
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ext
                 ON fia.extension_request_status_id = ext.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+            LEFT JOIN IAF.sg.financial_insurance_installation_requirements req
                 ON fia.application_id = req.application_id
             WHERE ${whereCondition}
         )
@@ -818,7 +818,7 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
         const appIds = apps.map(a => a.application_id);
         const filesRes = await pool.request().query(`
             SELECT application_id, file_path 
-            FROM DHUB_UAT.sg.financial_insurance_application_files 
+            FROM IAF.sg.financial_insurance_application_files 
             WHERE application_id IN (${appIds.join(',')})
         `);
         const filesMap = {};
@@ -832,7 +832,7 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
         // Bulk load actuarial notes
         const notesRes = await pool.request().query(`
             SELECT application_id, notes, show_in_pdf 
-            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            FROM IAF.sg.financial_insurance_application_notes 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
         `);
         const notesMap = {};
@@ -845,7 +845,7 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
         // Bulk load actuarial to CFE notes
         const toCfeNotesRes = await pool.request().query(`
             SELECT application_id, notes 
-            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            FROM IAF.sg.financial_insurance_application_notes 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial_to_cfe'
         `);
         const toCfeNotesMap = {};
@@ -856,7 +856,7 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
         // Bulk load actuarial files
         const actFilesRes = await pool.request().query(`
             SELECT application_id, file_path 
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files 
+            FROM IAF.sg.financial_insurance_application_department_files 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
         `);
         const actFilesMap = {};
@@ -870,9 +870,9 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
             SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
+            FROM IAF.sg.financial_insurance_application_department_files f
+            LEFT JOIN IAF.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id IN (${appIds.join(',')})
         `);
         const deptFilesMap = {};
@@ -913,7 +913,7 @@ export const getExtensionRequests = async (userIds = null) => {
     const pool = await poolPromise;
     const request = pool.request();
 
-    let query = `SELECT application_id FROM DHUB_UAT.sg.financial_insurance_application WHERE extension_requested = 1`;
+    let query = `SELECT application_id FROM IAF.sg.financial_insurance_application WHERE extension_requested = 1`;
 
     if (userIds) {
         if (Array.isArray(userIds)) {
@@ -985,11 +985,11 @@ export const getExtensionRequestsPaginated = async (userIds = null, page = 1, li
     // 1. Get total count
     const countRes = await request.query(`
         SELECT COUNT(DISTINCT fia.application_id) AS total 
-        FROM DHUB_UAT.sg.financial_insurance_application fia
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+        FROM IAF.sg.financial_insurance_application fia
+        LEFT JOIN IAF.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+        LEFT JOIN IAF.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+        LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+        LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
         ${whereClause}
     `);
     const total = countRes.recordset?.[0]?.total || 0;
@@ -1001,11 +1001,11 @@ export const getExtensionRequestsPaginated = async (userIds = null, page = 1, li
     const res = await request.query(`
         WITH Paginated AS (
             SELECT fia.application_id, ROW_NUMBER() OVER (ORDER BY fia.created_at DESC) AS RowNum
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN IAF.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
             ${whereClause}
         )
         SELECT application_id FROM Paginated WHERE RowNum BETWEEN ${startRow} AND ${endRow}
@@ -1098,8 +1098,8 @@ export const getPrototypes = async (userId = null) => {
                 req.masterlist_file_path,
                 req.authorized_id_path,
                 req.booking_date
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_status_lookup fis ON fia.status_id = fis.status_id
             LEFT JOIN sg.financial_insurance_group_lookups gc ON fia.group_classification_id = gc.id
             LEFT JOIN sg.financial_insurance_group_lookups bt ON fia.business_type_id = bt.id
             LEFT JOIN sg.financial_insurance_group_lookups gt ON fia.group_type_id = gt.id
@@ -1107,16 +1107,16 @@ export const getPrototypes = async (userId = null) => {
             LEFT JOIN sg.financial_insurance_product p ON fia.plan_id = p.product_id
             LEFT JOIN sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
             LEFT JOIN sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups al ON fia.amount_loans_id = al.id
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ct ON fia.coverage_type_id = ct.id
+            LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ps
                 ON fia.proposal_status_id = ps.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+            LEFT JOIN IAF.sg.financial_insurance_installation_requirements req
                 ON fia.application_id = req.application_id
             WHERE fia.type_of_proposal_id = 30 AND ${userCondition}
             ORDER BY fia.created_at DESC
@@ -1127,7 +1127,7 @@ export const getPrototypes = async (userId = null) => {
         const appIds = apps.map(a => a.application_id);
         const filesRes = await pool.request().query(`
             SELECT application_id, file_path 
-            FROM DHUB_UAT.sg.financial_insurance_application_files 
+            FROM IAF.sg.financial_insurance_application_files 
             WHERE application_id IN (${appIds.join(',')})
         `);
         const filesMap = {};
@@ -1141,7 +1141,7 @@ export const getPrototypes = async (userId = null) => {
         // Bulk load actuarial notes
         const notesRes = await pool.request().query(`
             SELECT application_id, notes, show_in_pdf 
-            FROM DHUB_UAT.sg.financial_insurance_application_notes 
+            FROM IAF.sg.financial_insurance_application_notes 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
         `);
         const notesMap = {};
@@ -1154,7 +1154,7 @@ export const getPrototypes = async (userId = null) => {
         // Bulk load actuarial files
         const actFilesRes = await pool.request().query(`
             SELECT application_id, file_path 
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files 
+            FROM IAF.sg.financial_insurance_application_department_files 
             WHERE application_id IN (${appIds.join(',')}) AND department = 'actuarial'
         `);
         const actFilesMap = {};
@@ -1168,9 +1168,9 @@ export const getPrototypes = async (userId = null) => {
         // Bulk load all department files (supporting details)
         const deptFilesRes = await pool.request().query(`
             SELECT f.application_id, f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
+            FROM IAF.sg.financial_insurance_application_department_files f
+            LEFT JOIN IAF.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id IN (${appIds.join(',')})
         `);
         const deptFilesMap = {};
@@ -1250,44 +1250,44 @@ export const getApplicationById = async (id) => {
                 req.masterlist_file_path,
                 req.authorized_id_path,
                 req.booking_date
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups bt
                 ON fia.business_type_id = bt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gt
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gt
                 ON fia.group_type_id = gt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups pm
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups pm
                 ON fia.payment_mode_id = pm.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+            LEFT JOIN IAF.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+            LEFT JOIN IAF.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp
                 ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups al
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups al
                 ON fia.amount_loans_id = al.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ct
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ct
                 ON fia.coverage_type_id = ct.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups chant
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups chant
                 ON fia.channel_type_id = chant.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries ind
+            LEFT JOIN IAF.sg.financial_insurance_industries ind
                 ON fia.business_nature_id = ind.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_industries subind
+            LEFT JOIN IAF.sg.financial_insurance_industries subind
                 ON fia.sub_business_nature_id = subind.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml
                 ON fia.sub_payment_term_id = ml.month_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN IAF.sg.financial_insurance_users u
                 ON fia.user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ps
                 ON fia.proposal_status_id = ps.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ext
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ext
                 ON fia.extension_request_status_id = ext.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
+            LEFT JOIN IAF.sg.financial_insurance_installation_requirements req
                 ON fia.application_id = req.application_id
             WHERE fia.application_id = @id
         `);
@@ -1295,27 +1295,27 @@ export const getApplicationById = async (id) => {
     const app = res.recordset?.[0] ?? null;
     if (app) {
         const filesRes = await pool.request().input('appId', sql.Int, id).query(`
-            SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_files WHERE application_id = @appId
+            SELECT file_path FROM IAF.sg.financial_insurance_application_files WHERE application_id = @appId
         `);
         const files = filesRes.recordset || [];
         app.excel_file_path = files.length > 0 ? JSON.stringify(files.map(f => f.file_path)) : null;
 
         // Load actuarial notes
         const actuarialNotesRes = await pool.request().input('appId', sql.Int, id).query(`
-            SELECT notes, show_in_pdf FROM DHUB_UAT.sg.financial_insurance_application_notes WHERE application_id = @appId AND department = 'actuarial'
+            SELECT notes, show_in_pdf FROM IAF.sg.financial_insurance_application_notes WHERE application_id = @appId AND department = 'actuarial'
         `);
         app.actuarial_notes = actuarialNotesRes.recordset?.[0]?.notes ?? null;
         app.actuarial_notes_show_in_pdf = actuarialNotesRes.recordset?.[0]?.show_in_pdf !== false;
 
         // Load actuarial to CFE notes
         const toCfeNotesRes = await pool.request().input('appId', sql.Int, id).query(`
-            SELECT notes FROM DHUB_UAT.sg.financial_insurance_application_notes WHERE application_id = @appId AND department = 'actuarial_to_cfe'
+            SELECT notes FROM IAF.sg.financial_insurance_application_notes WHERE application_id = @appId AND department = 'actuarial_to_cfe'
         `);
         app.actuarial_to_cfe_notes = toCfeNotesRes.recordset?.[0]?.notes ?? null;
 
         // Load actuarial files
         const actuarialFilesRes = await pool.request().input('appId', sql.Int, id).query(`
-            SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_department_files WHERE application_id = @appId AND department = 'actuarial'
+            SELECT file_path FROM IAF.sg.financial_insurance_application_department_files WHERE application_id = @appId AND department = 'actuarial'
         `);
         const actFiles = actuarialFilesRes.recordset || [];
         app.actuarial_files = actFiles.length > 0 ? JSON.stringify(actFiles.map(f => f.file_path)) : null;
@@ -1323,9 +1323,9 @@ export const getApplicationById = async (id) => {
         // Load all department files (supporting details)
         const departmentFilesRes = await pool.request().input('appId', sql.Int, id).query(`
             SELECT f.file_path, f.file_name, f.department, f.created_at, f.uploaded_by_user_id, u.firstname, u.lastname, dept.name AS uploader_department
-            FROM DHUB_UAT.sg.financial_insurance_application_department_files f
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
+            FROM IAF.sg.financial_insurance_application_department_files f
+            LEFT JOIN IAF.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups dept ON u.department_id = dept.id AND dept.category = 'DEPARTMENT'
             WHERE f.application_id = @appId
         `);
         app.department_files = departmentFilesRes.recordset || [];
@@ -1349,7 +1349,7 @@ export const saveDepartmentFiles = async (applicationId, department, files, user
                     .input('file_name', sql.NVarChar(255), file.originalName)
                     .input('userId', sql.Int, userId)
                     .query(`
-                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_department_files 
+                        INSERT INTO IAF.sg.financial_insurance_application_department_files 
                         (application_id, department, file_path, file_name, uploaded_by_user_id, created_at)
                         VALUES (@appId, @department, @file_path, @file_name, @userId, GETDATE())
                     `);
@@ -1368,8 +1368,8 @@ export const getDepartmentFiles = async (applicationId, department = null) => {
     const request = pool.request().input('appId', sql.Int, applicationId);
     let query = `
         SELECT f.file_path, f.file_name, f.department, f.created_at, u.firstname, u.lastname
-        FROM DHUB_UAT.sg.financial_insurance_application_department_files f
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
+        FROM IAF.sg.financial_insurance_application_department_files f
+        LEFT JOIN IAF.sg.financial_insurance_users u ON f.uploaded_by_user_id = u.user_id
         WHERE f.application_id = @appId
     `;
     if (department) {
@@ -1387,7 +1387,7 @@ export const getApplicationByGroupName = async (groupName) => {
         .input('group_name', sql.NVarChar, groupName)
         .query(`
             SELECT TOP 1 application_id, user_id, created_at, status_id
-            FROM DHUB_UAT.sg.financial_insurance_application
+            FROM IAF.sg.financial_insurance_application
             WHERE REPLACE(UPPER(group_name), ' ', '') = REPLACE(UPPER(@group_name), ' ', '')
         `);
     return res.recordset[0] || null;
@@ -1401,8 +1401,8 @@ export const searchApplicationsByGroupName = async (groupName) => {
         .query(`
             SELECT fia.application_id, fia.group_name, fia.created_at, fia.status_id, fia.user_id, fia.expiry_date,
                    u.firstname, u.lastname, u.is_active, u.agent_code
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
             WHERE fia.group_name LIKE '%' + @group_name + '%'
             ORDER BY fia.created_at DESC
         `);
@@ -1436,7 +1436,7 @@ export const updateApplication = async (id, data, userId) => {
                             .input('rider_id', sql.Int, rider.rider_id)
                             .input('rider_amount', sql.Decimal(18, 2), valueOrNull(finalValue.amount))
                             .input('rider_unit', sql.Int, valueOrNull(finalValue.unit))
-                            .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
+                            .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking_rider (coverage_ranking_id, rider_id, rider_amount, rider_unit) VALUES (@coverage_ranking_id, @rider_id, @rider_amount, @rider_unit);`);
                     }
                 }
             }
@@ -1447,7 +1447,7 @@ export const updateApplication = async (id, data, userId) => {
             const deleteSubGroupsRequest = new sql.Request(transaction);
             await deleteSubGroupsRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_subgroup WHERE application_id = @application_id');
+                .query('DELETE FROM IAF.sg.financial_insurance_application_subgroup WHERE application_id = @application_id');
             
             if (data.sub_group_type_id) {
                 const subGroupIds = Array.isArray(data.sub_group_type_id) ? data.sub_group_type_id : [data.sub_group_type_id];
@@ -1457,7 +1457,7 @@ export const updateApplication = async (id, data, userId) => {
                         await insertSubGroupRequest
                             .input('application_id', sql.Int, id)
                             .input('sub_group_type_id', sql.Int, subGroupId)
-                            .query('INSERT INTO DHUB_UAT.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
+                            .query('INSERT INTO IAF.sg.financial_insurance_application_subgroup (application_id, sub_group_type_id) VALUES (@application_id, @sub_group_type_id);');
                     }
                 }
             }
@@ -1471,14 +1471,14 @@ export const updateApplication = async (id, data, userId) => {
             const deleteRankingsRequest = new sql.Request(transaction);
             await deleteRankingsRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_coverage_ranking WHERE application_id = @application_id');
+                .query('DELETE FROM IAF.sg.financial_insurance_coverage_ranking WHERE application_id = @application_id');
 
             let coverageTypeId = data.coverage_type_id;
             
             if (coverageTypeId === undefined) {
                 const currentApp = await new sql.Request(transaction)
                     .input('id', sql.Int, id)
-                    .query('SELECT coverage_type_id FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @id');
+                    .query('SELECT coverage_type_id FROM IAF.sg.financial_insurance_application WHERE application_id = @id');
                 coverageTypeId = currentApp.recordset[0]?.coverage_type_id;
             }
 
@@ -1494,7 +1494,7 @@ export const updateApplication = async (id, data, userId) => {
                         .input('designation', sql.NVarChar, rank.designation)
                         .input('amount', sql.Decimal(18, 2), rank.amount)
                         .input('total_coverage_amount', sql.Decimal(18, 2), rank.amount)
-                        .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                        .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking (application_id, designation, amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                     const rankingId = rankResult.recordset[0].id;
                     // Use new riders if provided, otherwise this will use undefined which is handled by insertRankingRiders
                     await insertRankingRiders(rankingId, rank.designation, data.riders); 
@@ -1511,7 +1511,7 @@ export const updateApplication = async (id, data, userId) => {
                         .input('amount', sql.Decimal(18, 2), rank.amount)
                         .input('salary_multiplier', sql.NVarChar, rank.salary_multiplier)
                         .input('total_coverage_amount', sql.Decimal(18, 2), totalAmount)
-                        .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
+                        .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking (application_id, designation, amount, salary_multiplier, total_coverage_amount) VALUES (@application_id, @designation, @amount, @salary_multiplier, @total_coverage_amount); SELECT SCOPE_IDENTITY() AS id;`);
                     const rankingId = rankResult.recordset[0].id;
                     await insertRankingRiders(rankingId, rank.designation, data.riders);
                 }
@@ -1523,7 +1523,7 @@ export const updateApplication = async (id, data, userId) => {
                     .input('amount', sql.Decimal(18, 2), uniformAmount)
                     .input('uniform_coverage_amount', sql.Decimal(18, 2), uniformAmount)
                     .input('total_coverage_amount', sql.Decimal(18, 2), uniformAmount)
-                    .query(`INSERT INTO DHUB_UAT.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
+                    .query(`INSERT INTO IAF.sg.financial_insurance_coverage_ranking (application_id, designation, amount, uniform_coverage_amount, total_coverage_amount) VALUES (@application_id, @designation, @amount, @uniform_coverage_amount, @total_coverage_amount);`);
             }
         } else if (areRidersUpdated) {
             // This block handles the case where ONLY riders are updated, but the ranking structure is not.
@@ -1531,19 +1531,19 @@ export const updateApplication = async (id, data, userId) => {
             let currentCoverageTypeId;
             const typeRes = await new sql.Request(transaction)
                 .input('appId', sql.Int, id)
-                .query('SELECT coverage_type_id FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId');
+                .query('SELECT coverage_type_id FROM IAF.sg.financial_insurance_application WHERE application_id = @appId');
             currentCoverageTypeId = typeRes.recordset[0]?.coverage_type_id;
 
             if (currentCoverageTypeId === 32 || currentCoverageTypeId === 34) {
                 const existingRankingsRes = await new sql.Request(transaction)
                     .input('appId', sql.Int, id)
-                    .query('SELECT ranking_id, designation FROM DHUB_UAT.sg.financial_insurance_coverage_ranking WHERE application_id = @appId');
+                    .query('SELECT ranking_id, designation FROM IAF.sg.financial_insurance_coverage_ranking WHERE application_id = @appId');
                 
                 const existingRankings = existingRankingsRes.recordset || [];
 
                 if (existingRankings.length > 0) {
                     // Delete existing ranking riders and re-insert new ones based on the updated rider list
-                    await new sql.Request(transaction).input('appId', sql.Int, id).query(`DELETE crr FROM DHUB_UAT.sg.financial_insurance_coverage_ranking_rider crr JOIN DHUB_UAT.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id WHERE cr.application_id = @appId`);
+                    await new sql.Request(transaction).input('appId', sql.Int, id).query(`DELETE crr FROM IAF.sg.financial_insurance_coverage_ranking_rider crr JOIN IAF.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id WHERE cr.application_id = @appId`);
 
                     for (const rank of existingRankings) {
                         await insertRankingRiders(rank.ranking_id, rank.designation, data.riders);
@@ -1557,7 +1557,7 @@ export const updateApplication = async (id, data, userId) => {
             const deleteRidersRequest = new sql.Request(transaction);
             await deleteRidersRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_rider WHERE application_id = @application_id');
+                .query('DELETE FROM IAF.sg.financial_insurance_application_rider WHERE application_id = @application_id');
 
             if (Array.isArray(data.riders) && data.riders.length > 0) {
                 for (const rider of data.riders) {
@@ -1568,7 +1568,7 @@ export const updateApplication = async (id, data, userId) => {
                         .input('rider_amount', sql.Decimal(18, 2), valueOrNull(rider.amount))
                         .input('rider_unit', sql.Int, valueOrNull(rider.unit))
                         .query(`
-                            INSERT INTO DHUB_UAT.sg.financial_insurance_application_rider
+                            INSERT INTO IAF.sg.financial_insurance_application_rider
                             (application_id, rider_id, rider_amount, rider_unit)
                             VALUES (@application_id, @rider_id, @rider_amount, @rider_unit);
                         `);
@@ -1581,7 +1581,7 @@ export const updateApplication = async (id, data, userId) => {
             const deleteAffiliatesRequest = new sql.Request(transaction);
             await deleteAffiliatesRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_affiliate WHERE application_id = @application_id');
+                .query('DELETE FROM IAF.sg.financial_insurance_application_affiliate WHERE application_id = @application_id');
             
             if (data.affiliates && Array.isArray(data.affiliates) && data.affiliates.length > 0) {
                 for (const affiliate of data.affiliates) {
@@ -1593,7 +1593,7 @@ export const updateApplication = async (id, data, userId) => {
                             .input('tin_number', sql.NVarChar(50), valueOrNull(affiliate.tin_number))
                             .input('address', sql.NVarChar(500), valueOrNull(affiliate.address))
                             .query(`
-                                INSERT INTO DHUB_UAT.sg.financial_insurance_application_affiliate (application_id, company_name, tin_number, address)
+                                INSERT INTO IAF.sg.financial_insurance_application_affiliate (application_id, company_name, tin_number, address)
                                 VALUES (@application_id, @company_name, @tin_number, @address);
                             `);
                     }
@@ -1687,7 +1687,7 @@ export const updateApplication = async (id, data, userId) => {
             const deleteFilesRequest = new sql.Request(transaction);
             await deleteFilesRequest
                 .input('application_id', sql.Int, id)
-                .query('DELETE FROM DHUB_UAT.sg.financial_insurance_application_files WHERE application_id = @application_id');
+                .query('DELETE FROM IAF.sg.financial_insurance_application_files WHERE application_id = @application_id');
 
             if (data.excel_file_path) {
                 let paths = [];
@@ -1705,7 +1705,7 @@ export const updateApplication = async (id, data, userId) => {
                             .input('application_id', sql.Int, id)
                             .input('file_path', sql.NVarChar(500), p)
                             .input('file_name', sql.NVarChar(255), path.basename(p))
-                            .query('INSERT INTO DHUB_UAT.sg.financial_insurance_application_files (application_id, file_path, file_name) VALUES (@application_id, @file_path, @file_name)');
+                            .query('INSERT INTO IAF.sg.financial_insurance_application_files (application_id, file_path, file_name) VALUES (@application_id, @file_path, @file_name)');
                     }
                 }
             }
@@ -1724,7 +1724,7 @@ export const updateApplication = async (id, data, userId) => {
             for (const input of inputs) {
                 request.input(input.name, input.type, input.value);
             }
-            const query = `UPDATE DHUB_UAT.sg.financial_insurance_application SET ${setClauses.join(', ')} WHERE application_id = @id`;
+            const query = `UPDATE IAF.sg.financial_insurance_application SET ${setClauses.join(', ')} WHERE application_id = @id`;
             await request.query(query);
         }
 
@@ -1751,7 +1751,7 @@ export const deleteApplication = async (id) => {
     await pool.request()
         .input('id', sql.Int, id)
         .query(`
-            DELETE FROM DHUB_UAT.sg.financial_insurance_application
+            DELETE FROM IAF.sg.financial_insurance_application
             WHERE application_id = @id
         `);
     return { deleted: true };
@@ -1760,7 +1760,7 @@ export const deleteApplication = async (id) => {
 export const getStatusLookups = async () => {
     const pool = await poolPromise;
     const result = await pool.request()
-        .query(`SELECT status_id, status_name, group_type, parent_id FROM DHUB_UAT.sg.financial_insurance_status_lookup WHERE is_active = 1`);
+        .query(`SELECT status_id, status_name, group_type, parent_id FROM IAF.sg.financial_insurance_status_lookup WHERE is_active = 1`);
     
     return result.recordset;
 };
@@ -1772,7 +1772,7 @@ export const getLookupListByCategory = async (category) => {
         .input('category', sql.NVarChar, category)
         .query(`
             SELECT id, name, parent_id
-            FROM DHUB_UAT.sg.financial_insurance_group_lookups
+            FROM IAF.sg.financial_insurance_group_lookups
             WHERE category=@category AND is_active=1
         `);
     return res.recordset ?? [];
@@ -1784,7 +1784,7 @@ export const getAllPlans = async () => {
     const res = await pool.request()
         .query(`
             SELECT product_id AS plan_id, product_name AS plan_name, acronym, is_active
-            FROM DHUB_UAT.sg.financial_insurance_product
+            FROM IAF.sg.financial_insurance_product
             WHERE is_active = 1
         `);
     return res.recordset ?? [];
@@ -1795,7 +1795,7 @@ export const getPrototypePlans = async () => {
     const pool = await poolPromise;
     const res = await pool.request()
         .query(`
-            SELECT id, name, acronym FROM DHUB_UAT.sg.financial_insurance_prototype_plans WHERE is_active = 1
+            SELECT id, name, acronym FROM IAF.sg.financial_insurance_prototype_plans WHERE is_active = 1
         `);
     return res.recordset ?? [];
 };
@@ -1807,7 +1807,7 @@ export const getBasicPlansByPlanId = async (planId) => {
         .input('planId', sql.Int, planId)
         .query(`
             SELECT basic_plan_id, basic_plan_name, acronym, is_active
-            FROM DHUB_UAT.sg.financial_insurance_basic_plan
+            FROM IAF.sg.financial_insurance_basic_plan
             WHERE product_id = @planId AND is_active = 1
         `);
     return res.recordset ?? [];
@@ -1820,7 +1820,7 @@ export const getRidersByProductId = async (productId) => {
         .input('productId', sql.Int, productId)
         .query(`
             SELECT rider_id, rider_name, acronym, is_active
-            FROM DHUB_UAT.sg.financial_insurance_riders
+            FROM IAF.sg.financial_insurance_riders
             WHERE product_id = @productId AND is_active = 1
         `);
     return res.recordset ?? [];
@@ -1845,7 +1845,7 @@ export const getLookupNamesByIds = async (ids) => {
     });
 
     const result = await request.query(`
-        SELECT id, name FROM DHUB_UAT.sg.financial_insurance_group_lookups 
+        SELECT id, name FROM IAF.sg.financial_insurance_group_lookups 
         WHERE id IN (${parameters.join(',')})
     `);
 
@@ -1861,7 +1861,7 @@ export const getLookupsByIds = async (ids) => {
     if (!ids || ids.length === 0) return new Map();
     const pool = await poolPromise;
     const subGroupRes = await pool.request()
-        .query(`SELECT id, name FROM DHUB_UAT.sg.financial_insurance_group_lookups WHERE id IN (${ids.join(',')})`);
+        .query(`SELECT id, name FROM IAF.sg.financial_insurance_group_lookups WHERE id IN (${ids.join(',')})`);
     const lookupsMap = new Map();
     subGroupRes.recordset.forEach(sg => lookupsMap.set(sg.id, sg.name));
     return lookupsMap;
@@ -1881,8 +1881,8 @@ export const getApplicationRiders = async (applicationId) => {
                 r.unit_value,
                 ar.rider_amount as amount,
                 ar.rider_unit as unit
-            FROM DHUB_UAT.sg.financial_insurance_application_rider ar
-            JOIN DHUB_UAT.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
+            FROM IAF.sg.financial_insurance_application_rider ar
+            JOIN IAF.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
             WHERE ar.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1897,8 +1897,8 @@ export const getApplicationHistory = async (applicationId) => {
             SELECT 
                 l.log_id, l.application_id, l.user_id, l.action_type, l.changes, l.ip_address, l.created_at,
                 u.firstname, u.lastname, u.email
-            FROM DHUB_UAT.sg.financial_insurance_application_history_logs l
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON l.user_id = u.user_id
+            FROM IAF.sg.financial_insurance_application_history_logs l
+            LEFT JOIN IAF.sg.financial_insurance_users u ON l.user_id = u.user_id
             WHERE l.application_id = @application_id
             ORDER BY l.created_at DESC
         `);
@@ -1911,8 +1911,8 @@ export const getApplicationSubGroups = async (applicationId) => {
     const result = await pool.request()
         .input('application_id', sql.Int, applicationId)
         .query(`
-            SELECT l.id, l.name FROM DHUB_UAT.sg.financial_insurance_application_subgroup s
-            JOIN DHUB_UAT.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
+            SELECT l.id, l.name FROM IAF.sg.financial_insurance_application_subgroup s
+            JOIN IAF.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
             WHERE s.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1929,9 +1929,9 @@ export const getApplicationPaymentTerms = async (applicationId) => {
                 pt.name as payment_term_name,
                 p.sub_payment_term_id,
                 ml.month_name as loan_maturity_month_name
-            FROM DHUB_UAT.sg.financial_insurance_application p
-            JOIN DHUB_UAT.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
+            FROM IAF.sg.financial_insurance_application p
+            JOIN IAF.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
             WHERE p.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1944,7 +1944,7 @@ export const getCoverageRankingsByAppId = async (applicationId) => {
         .input('application_id', sql.Int, applicationId)
         .query(`
             SELECT designation, amount, salary_multiplier, uniform_coverage_amount, total_coverage_amount
-            FROM DHUB_UAT.sg.financial_insurance_coverage_ranking
+            FROM IAF.sg.financial_insurance_coverage_ranking
             WHERE application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1964,9 +1964,9 @@ export const getCoverageRankingRiders = async (applicationId) => {
                 r.acronym,
                 crr.rider_amount,
                 crr.rider_unit
-            FROM DHUB_UAT.sg.financial_insurance_coverage_ranking_rider crr
-            JOIN DHUB_UAT.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
-            JOIN DHUB_UAT.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
+            FROM IAF.sg.financial_insurance_coverage_ranking_rider crr
+            JOIN IAF.sg.financial_insurance_coverage_ranking cr ON crr.coverage_ranking_id = cr.ranking_id
+            JOIN IAF.sg.financial_insurance_riders r ON crr.rider_id = r.rider_id
             WHERE cr.application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -1985,8 +1985,8 @@ export const getBulkApplicationSubGroups = async (applicationIds) => {
     }).join(',');
 
     const result = await request.query(`
-        SELECT s.application_id, l.id, l.name FROM DHUB_UAT.sg.financial_insurance_application_subgroup s
-        JOIN DHUB_UAT.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
+        SELECT s.application_id, l.id, l.name FROM IAF.sg.financial_insurance_application_subgroup s
+        JOIN IAF.sg.financial_insurance_group_lookups l ON s.sub_group_type_id = l.id
         WHERE s.application_id IN (${idParams})`);
     return result.recordset ?? [];
 };
@@ -2010,9 +2010,9 @@ export const getBulkApplicationPaymentTerms = async (applicationIds) => {
             pt.name as payment_term_name,
             p.sub_payment_term_id,
             ml.month_name as loan_maturity_month_name
-        FROM DHUB_UAT.sg.financial_insurance_application p
-        JOIN DHUB_UAT.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
+        FROM IAF.sg.financial_insurance_application p
+        JOIN IAF.sg.financial_insurance_group_lookups pt ON p.payment_term_id = pt.id
+        LEFT JOIN IAF.sg.financial_insurance_month_lookups ml ON p.sub_payment_term_id = ml.month_id
         WHERE p.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -2032,8 +2032,8 @@ export const getBulkApplicationRiders = async (applicationIds) => {
 
     const result = await request.query(`
         SELECT ar.application_id, r.rider_id, r.rider_name, r.acronym, r.input_type, r.unit_value, ar.rider_amount as amount, ar.rider_unit as unit
-        FROM DHUB_UAT.sg.financial_insurance_application_rider ar
-        JOIN DHUB_UAT.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
+        FROM IAF.sg.financial_insurance_application_rider ar
+        JOIN IAF.sg.financial_insurance_riders r ON ar.rider_id = r.rider_id
         WHERE ar.application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -2046,7 +2046,7 @@ export const getApplicationAffiliates = async (applicationId) => {
         .input('application_id', sql.Int, applicationId)
         .query(`
             SELECT id, company_name, tin_number, address 
-            FROM DHUB_UAT.sg.financial_insurance_application_affiliate 
+            FROM IAF.sg.financial_insurance_application_affiliate 
             WHERE application_id = @application_id
         `);
     return result.recordset ?? [];
@@ -2066,7 +2066,7 @@ export const getBulkApplicationAffiliates = async (applicationIds) => {
 
     const result = await request.query(`
         SELECT id, application_id, company_name, tin_number, address
-        FROM DHUB_UAT.sg.financial_insurance_application_affiliate
+        FROM IAF.sg.financial_insurance_application_affiliate
         WHERE application_id IN (${idParams})
     `);
     return result.recordset ?? [];
@@ -2081,7 +2081,7 @@ export const requestAmendment = async (data, userId) => {
 
         const { applicationId, requestNotes, requestDeptId, targetDeptId, ipAddress } = data;
 
-        // Insert into DHUB_UAT.sg.financial_insurance_amendment_requests table
+        // Insert into IAF.sg.financial_insurance_amendment_requests table
         const insertReq = new sql.Request(transaction)
             .input('application_id', sql.Int, applicationId)
             .input('requested_by', sql.Int, userId)
@@ -2091,7 +2091,7 @@ export const requestAmendment = async (data, userId) => {
             .input('status', sql.NVarChar(50), 'PENDING');
 
         const insertRes = await insertReq.query(`
-            INSERT INTO DHUB_UAT.sg.financial_insurance_amendment_requests (
+            INSERT INTO IAF.sg.financial_insurance_amendment_requests (
                 application_id, requested_by, request_dept_id, target_dept_id, request_notes, status
             ) VALUES (
                 @application_id, @requested_by, @request_dept_id, @target_dept_id, @request_notes, @status
@@ -2105,7 +2105,7 @@ export const requestAmendment = async (data, userId) => {
         await new sql.Request(transaction)
             .input('application_id', sql.Int, applicationId)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_application
+                UPDATE IAF.sg.financial_insurance_application
                 SET extension_requested = 0 -- clear extension request if any
                 WHERE application_id = @application_id
             `);
@@ -2113,7 +2113,7 @@ export const requestAmendment = async (data, userId) => {
         // Fetch application snapshot for audit history logging
         const snapshotRes = await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
-            .query(`SELECT * FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId`);
+            .query(`SELECT * FROM IAF.sg.financial_insurance_application WHERE application_id = @appId`);
 
         const appSnapshot = snapshotRes.recordset[0] || {};
         appSnapshot.amendment_id = amendmentId;
@@ -2128,7 +2128,7 @@ export const requestAmendment = async (data, userId) => {
             .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(appSnapshot))
             .input('ip_address', sql.NVarChar, ipAddress || null)
             .query(`
-                INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+                INSERT INTO IAF.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
                 VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
             `);
 
@@ -2174,23 +2174,23 @@ export const getPendingAmendmentRequests = async (targetDeptId = null) => {
             p.product_name AS plan_name,
             p.acronym AS plan_acronym,
             u.firstname + ' ' + u.lastname AS requester_name
-        FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-        JOIN DHUB_UAT.sg.financial_insurance_application fia
+        FROM IAF.sg.financial_insurance_amendment_requests ar
+        JOIN IAF.sg.financial_insurance_application fia
             ON ar.application_id = fia.application_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_status fis
+        LEFT JOIN IAF.sg.financial_insurance_status fis
             ON fia.status_id = fis.status_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+        LEFT JOIN IAF.sg.financial_insurance_group_lookups ps
             ON fia.proposal_status_id = ps.id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+        LEFT JOIN IAF.sg.financial_insurance_group_lookups topl
             ON fia.type_of_proposal_id = topl.id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+        LEFT JOIN IAF.sg.financial_insurance_product p
             ON fia.plan_id = p.product_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+        LEFT JOIN IAF.sg.financial_insurance_users u
             ON ar.requested_by = u.user_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups reqDept
+        LEFT JOIN IAF.sg.financial_insurance_system_lookups reqDept
             ON ar.request_dept_id = reqDept.id
             AND reqDept.category = 'DEPARTMENT'
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups targetDept
+        LEFT JOIN IAF.sg.financial_insurance_system_lookups targetDept
             ON ar.target_dept_id = targetDept.id
             AND targetDept.category = 'DEPARTMENT'
         ${whereClause}
@@ -2244,16 +2244,16 @@ export const getPendingAmendmentRequestsPaginated = async (targetDeptId = null, 
     // 1. Get total count
     const countRes = await request.query(`
         SELECT COUNT(DISTINCT ar.id) AS total
-        FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-        JOIN DHUB_UAT.sg.financial_insurance_application fia
+        FROM IAF.sg.financial_insurance_amendment_requests ar
+        JOIN IAF.sg.financial_insurance_application fia
             ON ar.application_id = fia.application_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_product p 
+        LEFT JOIN IAF.sg.financial_insurance_product p 
             ON fia.plan_id = p.product_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+        LEFT JOIN IAF.sg.financial_insurance_basic_plan bp
             ON fia.basic_plan_id = bp.basic_plan_id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+        LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp
             ON fia.prototype_id = pp.id
-        LEFT JOIN DHUB_UAT.sg.financial_insurance_users u 
+        LEFT JOIN IAF.sg.financial_insurance_users u 
             ON ar.requested_by = u.user_id
         ${whereClause}
     `);
@@ -2288,27 +2288,27 @@ export const getPendingAmendmentRequestsPaginated = async (targetDeptId = null, 
                 p.acronym AS plan_acronym,
                 u.firstname + ' ' + u.lastname AS requester_name,
                 ROW_NUMBER() OVER (ORDER BY ar.created_at ASC) AS RowNum
-            FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-            JOIN DHUB_UAT.sg.financial_insurance_application fia
+            FROM IAF.sg.financial_insurance_amendment_requests ar
+            JOIN IAF.sg.financial_insurance_application fia
                 ON ar.application_id = fia.application_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_status fis
+            LEFT JOIN IAF.sg.financial_insurance_status fis
                 ON fia.status_id = fis.status_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups ps
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups ps
                 ON fia.proposal_status_id = ps.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups topl
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups topl
                 ON fia.type_of_proposal_id = topl.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p
+            LEFT JOIN IAF.sg.financial_insurance_product p
                 ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp
+            LEFT JOIN IAF.sg.financial_insurance_basic_plan bp
                 ON fia.basic_plan_id = bp.basic_plan_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp
                 ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN IAF.sg.financial_insurance_users u
                 ON ar.requested_by = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups reqDept
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups reqDept
                 ON ar.request_dept_id = reqDept.id
                 AND reqDept.category = 'DEPARTMENT'
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups targetDept
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups targetDept
                 ON ar.target_dept_id = targetDept.id
                 AND targetDept.category = 'DEPARTMENT'
             ${whereClause}
@@ -2335,7 +2335,7 @@ export const approveAmendment = async (data, userId) => {
             .input('response_notes', sql.NVarChar(sql.MAX), valueOrNull(responseNotes))
             .input('responded_by', sql.Int, userId)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_amendment_requests
+                UPDATE IAF.sg.financial_insurance_amendment_requests
                 SET status = 'APPROVED',
                     response_notes = @response_notes,
                     responded_by = @responded_by,
@@ -2347,7 +2347,7 @@ export const approveAmendment = async (data, userId) => {
         await new sql.Request(transaction)
             .input('application_id', sql.Int, applicationId)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_application
+                UPDATE IAF.sg.financial_insurance_application
                 SET status_id = 16,
                     updated_at = GETDATE()
                 WHERE application_id = @application_id
@@ -2356,7 +2356,7 @@ export const approveAmendment = async (data, userId) => {
         // Fetch updated snapshot
         const snapshotRes = await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
-            .query(`SELECT * FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId`);
+            .query(`SELECT * FROM IAF.sg.financial_insurance_application WHERE application_id = @appId`);
 
         const appSnapshot = snapshotRes.recordset[0] || {};
         appSnapshot.amendment_response_notes = responseNotes;
@@ -2371,7 +2371,7 @@ export const approveAmendment = async (data, userId) => {
             .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(appSnapshot))
             .input('ip_address', sql.NVarChar, ipAddress || null)
             .query(`
-                INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+                INSERT INTO IAF.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
                 VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
             `);
 
@@ -2398,7 +2398,7 @@ export const declineAmendment = async (data, userId) => {
             .input('response_notes', sql.NVarChar(sql.MAX), valueOrNull(responseNotes))
             .input('responded_by', sql.Int, userId)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_amendment_requests
+                UPDATE IAF.sg.financial_insurance_amendment_requests
                 SET status = 'DECLINED',
                     response_notes = @response_notes,
                     responded_by = @responded_by,
@@ -2410,7 +2410,7 @@ export const declineAmendment = async (data, userId) => {
         await new sql.Request(transaction)
             .input('application_id', sql.Int, applicationId)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_application
+                UPDATE IAF.sg.financial_insurance_application
                 SET status_id = 15,
                     updated_at = GETDATE()
                 WHERE application_id = @application_id
@@ -2419,7 +2419,7 @@ export const declineAmendment = async (data, userId) => {
         // Fetch updated snapshot
         const snapshotRes = await new sql.Request(transaction)
             .input('appId', sql.Int, applicationId)
-            .query(`SELECT * FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @appId`);
+            .query(`SELECT * FROM IAF.sg.financial_insurance_application WHERE application_id = @appId`);
 
         const appSnapshot = snapshotRes.recordset[0] || {};
         appSnapshot.amendment_response_notes = responseNotes;
@@ -2434,7 +2434,7 @@ export const declineAmendment = async (data, userId) => {
             .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(appSnapshot))
             .input('ip_address', sql.NVarChar, ipAddress || null)
             .query(`
-                INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+                INSERT INTO IAF.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
                 VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
             `);
 
@@ -2446,13 +2446,13 @@ export const declineAmendment = async (data, userId) => {
     }
 };
 
-// Helper: Ensure DHUB_UAT.sg.financial_insurance_amendment_requests table exists
+// Helper: Ensure IAF.sg.financial_insurance_amendment_requests table exists
 export const ensureAmendmentRequestsTable = async () => {
     const pool = await poolPromise;
     await pool.request().query(`
-        IF OBJECT_ID('DHUB_UAT.sg.financial_insurance_amendment_requests', 'U') IS NULL
+        IF OBJECT_ID('IAF.sg.financial_insurance_amendment_requests', 'U') IS NULL
         BEGIN
-            CREATE TABLE DHUB_UAT.sg.financial_insurance_amendment_requests (
+            CREATE TABLE IAF.sg.financial_insurance_amendment_requests (
                 id INT IDENTITY(1,1) PRIMARY KEY,
                 application_id INT NOT NULL,
                 requested_by INT NOT NULL,
@@ -2491,15 +2491,15 @@ export const getAmendmentHistoryByApplicationId = async (applicationId) => {
                 ar.response_notes,
                 ar.created_at AS requested_at,
                 ar.updated_at AS responded_at
-            FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users req_u
+            FROM IAF.sg.financial_insurance_amendment_requests ar
+            LEFT JOIN IAF.sg.financial_insurance_users req_u
                 ON ar.requested_by = req_u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users resp_u
+            LEFT JOIN IAF.sg.financial_insurance_users resp_u
                 ON ar.responded_by = resp_u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups req_dept
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups req_dept
                 ON ar.request_dept_id = req_dept.id
                 AND req_dept.category = 'DEPARTMENT'
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups target_dept
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups target_dept
                 ON ar.target_dept_id = target_dept.id
                 AND target_dept.category = 'DEPARTMENT'
             WHERE ar.application_id = @application_id
@@ -2526,10 +2526,10 @@ export const getLatestAmendmentRequestByAppId = async (applicationId) => {
                 resp_u.firstname + ' ' + resp_u.lastname AS responded_by_name,
                 ar.created_at AS requested_at,
                 ar.updated_at AS responded_at
-            FROM DHUB_UAT.sg.financial_insurance_amendment_requests ar
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users req_u ON ar.requested_by = req_u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users resp_u ON ar.responded_by = resp_u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups req_dept ON ar.request_dept_id = req_dept.id AND req_dept.category = 'DEPARTMENT'
+            FROM IAF.sg.financial_insurance_amendment_requests ar
+            LEFT JOIN IAF.sg.financial_insurance_users req_u ON ar.requested_by = req_u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_users resp_u ON ar.responded_by = resp_u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_system_lookups req_dept ON ar.request_dept_id = req_dept.id AND req_dept.category = 'DEPARTMENT'
             WHERE ar.application_id = @application_id
             ORDER BY ar.created_at DESC
         `);

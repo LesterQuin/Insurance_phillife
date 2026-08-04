@@ -80,7 +80,7 @@ export const auditLog = async (req, {
             .input('user_agent', sql.NVarChar(255), req.headers['user-agent']?.substring(0, 255))
             .input('status', sql.NVarChar(20), status)
             .query(`
-                INSERT INTO [DHUB_UAT].[sg].[financial_insurance_audit_logs]
+                INSERT INTO [IAF].[sg].[financial_insurance_audit_logs]
                 (user_id, action, entity, entity_id, metadata, ip_address, user_agent, status)
                 VALUES
                 (@user_id, @action, @entity, @entity_id, @metadata, @ip_address, @user_agent, @status)

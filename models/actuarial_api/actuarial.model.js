@@ -11,7 +11,7 @@ const logApplicationAction = async (transaction, { applicationId, userId, action
         .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(changes))
         .input('ip_address', sql.NVarChar, ipAddress || null)
         .query(`
-            INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+            INSERT INTO IAF.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
             VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
         `);
 };
@@ -27,8 +27,8 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
             .input('appId', sql.Int, applicationId)
             .query(`
                 SELECT fia.plan_id, fia.number_of_lives, fia.minimum_age, fia.maximum_age, bp.basic_plan_name 
-                FROM DHUB_UAT.sg.financial_insurance_application fia
-                LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
+                FROM IAF.sg.financial_insurance_application fia
+                LEFT JOIN IAF.sg.financial_insurance_basic_plan bp ON fia.basic_plan_id = bp.basic_plan_id
                 WHERE fia.application_id = @appId
             `);
         
@@ -41,13 +41,13 @@ export const saveApplicationRates = async (applicationId, ratesData, userId, ipA
         const isScale2 = numLives > 30;
 
         const tableName = planId === 1
-            ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli'
+            ? 'IAF.sg.financial_insurance_actuarial_rates_gcli'
             : planId === 2 
-                ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' 
+                ? 'IAF.sg.financial_insurance_actuarial_rates_gyrt' 
                 : planId === 3 
-                    ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa' 
+                    ? 'IAF.sg.financial_insurance_actuarial_rates_gpa' 
                     : planId === 4
-                        ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gci'
+                        ? 'IAF.sg.financial_insurance_actuarial_rates_gci'
                         : null;
 
         if (!tableName) {
@@ -180,7 +180,7 @@ export const getApplicationRates = async (applicationId) => {
     
     const appRes = await pool.request()
         .input('application_id', sql.Int, applicationId)
-        .query('SELECT plan_id FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @application_id');
+        .query('SELECT plan_id FROM IAF.sg.financial_insurance_application WHERE application_id = @application_id');
     
     const planId = appRes.recordset[0]?.plan_id;
     if (!planId) return [];
@@ -188,23 +188,23 @@ export const getApplicationRates = async (applicationId) => {
     let query = '';
     if (planId === 2 || planId === 3 || planId === 4) {
         const targetTable = planId === 2 
-            ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gyrt' 
+            ? 'IAF.sg.financial_insurance_actuarial_rates_gyrt' 
             : planId === 3 
-                ? 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gpa'
-                : 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gci';
+                ? 'IAF.sg.financial_insurance_actuarial_rates_gpa'
+                : 'IAF.sg.financial_insurance_actuarial_rates_gci';
         // Query for product specific table
         query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
-                 LEFT JOIN DHUB_UAT.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
-                 LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
+                 LEFT JOIN IAF.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 LEFT JOIN IAF.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
     } else if (planId === 1) {
         // Standard rates table
-        const targetTable = 'DHUB_UAT.sg.financial_insurance_actuarial_rates_gcli';
+        const targetTable = 'IAF.sg.financial_insurance_actuarial_rates_gcli';
         query = `SELECT r.*, rider.rider_name, rider.acronym, bp.basic_plan_name, bp.acronym as basic_plan_acronym
                  FROM ${targetTable} r
-                 LEFT JOIN DHUB_UAT.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
-                 LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
+                 LEFT JOIN IAF.sg.financial_insurance_riders rider ON r.rider_id = rider.rider_id
+                 LEFT JOIN IAF.sg.financial_insurance_basic_plan bp ON r.basic_plan_id = bp.basic_plan_id
                  WHERE r.application_id = @application_id`;
     } else {
         return [];
@@ -225,12 +225,12 @@ export const getApplicationsPendingRates = async () => {
             SELECT fia.application_id, fia.group_name, fia.created_at, fia.borrower_age_66_70, fia.borrower_age_71_75, fia.borrower_age_76_80,
                 gl.name as proposal_type, p.product_name as plan_name, pp.name as prototype_name, u.firstname + ' ' + u.lastname as creator_name,
                 fia.total_annual_premium, fia.evidence_notes, ml.month_name as loan_maturity_name
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
+            LEFT JOIN IAF.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
             WHERE fia.status_id IN (5, 8)
             ORDER BY fia.created_at ASC
         `);
@@ -245,12 +245,12 @@ export const getApplicationsPendingTotalPremium = async () => {
             SELECT fia.application_id, fia.group_name, fia.created_at, fia.borrower_age_66_70, fia.borrower_age_71_75, fia.borrower_age_76_80,
                 gl.name as proposal_type, p.product_name as plan_name, pp.name as prototype_name, u.firstname + ' ' + u.lastname as creator_name,
                 fia.total_annual_premium, fia.evidence_notes, ml.month_name as loan_maturity_name
-            FROM DHUB_UAT.sg.financial_insurance_application fia
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON fia.plan_id = p.product_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON fia.user_id = u.user_id
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
+            FROM IAF.sg.financial_insurance_application fia
+            LEFT JOIN IAF.sg.financial_insurance_group_lookups gl ON fia.type_of_proposal_id = gl.id
+            LEFT JOIN IAF.sg.financial_insurance_product p ON fia.plan_id = p.product_id
+            LEFT JOIN IAF.sg.financial_insurance_prototype_plans pp ON fia.prototype_id = pp.id
+            LEFT JOIN IAF.sg.financial_insurance_users u ON fia.user_id = u.user_id
+            LEFT JOIN IAF.sg.financial_insurance_month_lookups ml ON fia.sub_payment_term_id = ml.month_id
             WHERE fia.status_id IN (5, 8, 13) AND fia.total_annual_premium IS NULL
             ORDER BY fia.created_at ASC
         `);
@@ -264,7 +264,7 @@ export const getRatesHistoryByApplicationId = async (applicationId) => {
     // 1. Get the group name of the current application
     const appRes = await pool.request()
         .input('application_id', sql.Int, applicationId)
-        .query('SELECT group_name FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @application_id');
+        .query('SELECT group_name FROM IAF.sg.financial_insurance_application WHERE application_id = @application_id');
         
     const groupName = appRes.recordset[0]?.group_name;
     if (!groupName) return [];
@@ -285,9 +285,9 @@ export const getRatesHistoryByApplicationId = async (applicationId) => {
                 u.lastname, 
                 u.email,
                 fia.group_name
-            FROM DHUB_UAT.sg.financial_insurance_application_history_logs l
-            LEFT JOIN DHUB_UAT.sg.financial_insurance_users u ON l.user_id = u.user_id
-            JOIN DHUB_UAT.sg.financial_insurance_application fia ON l.application_id = fia.application_id
+            FROM IAF.sg.financial_insurance_application_history_logs l
+            LEFT JOIN IAF.sg.financial_insurance_users u ON l.user_id = u.user_id
+            JOIN IAF.sg.financial_insurance_application fia ON l.application_id = fia.application_id
             WHERE l.action_type = 'UPDATE_RATES'
               AND REPLACE(UPPER(fia.group_name), ' ', '') = REPLACE(UPPER(@group_name), ' ', '')
             ORDER BY l.created_at DESC
@@ -333,7 +333,7 @@ export const saveActuarialNotes = async (applicationId, notes, userId, showInPdf
         .input('appId', sql.Int, applicationId)
         .input('department', sql.NVarChar(100), 'actuarial')
         .query(`
-            SELECT id FROM DHUB_UAT.sg.financial_insurance_application_notes
+            SELECT id FROM IAF.sg.financial_insurance_application_notes
             WHERE application_id = @appId AND department = @department
         `);
 
@@ -346,7 +346,7 @@ export const saveActuarialNotes = async (applicationId, notes, userId, showInPdf
             .input('notes', sql.NVarChar(sql.MAX), notes)
             .input('show_in_pdf', sql.Bit, showVal)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_application_notes
+                UPDATE IAF.sg.financial_insurance_application_notes
                 SET notes = @notes, user_id = @userId, show_in_pdf = @show_in_pdf, updated_at = GETDATE()
                 WHERE application_id = @appId AND department = @department
             `);
@@ -359,7 +359,7 @@ export const saveActuarialNotes = async (applicationId, notes, userId, showInPdf
             .input('notes', sql.NVarChar(sql.MAX), notes)
             .input('show_in_pdf', sql.Bit, showVal)
             .query(`
-                INSERT INTO DHUB_UAT.sg.financial_insurance_application_notes (application_id, department, user_id, notes, show_in_pdf)
+                INSERT INTO IAF.sg.financial_insurance_application_notes (application_id, department, user_id, notes, show_in_pdf)
                 VALUES (@appId, @department, @userId, @notes, @show_in_pdf)
             `);
     }
@@ -372,7 +372,7 @@ export const getActuarialNotes = async (applicationId) => {
         .input('appId', sql.Int, applicationId)
         .input('department', sql.NVarChar(100), 'actuarial')
         .query(`
-            SELECT TOP 1 notes FROM DHUB_UAT.sg.financial_insurance_application_notes
+            SELECT TOP 1 notes FROM IAF.sg.financial_insurance_application_notes
             WHERE application_id = @appId AND department = @department
             ORDER BY updated_at DESC
         `);
@@ -399,7 +399,7 @@ export const saveActuarialFiles = async (applicationId, filePaths, userId) => {
                     .input('file_name', sql.NVarChar(255), fileName)
                     .input('userId', sql.Int, userId)
                     .query(`
-                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_department_files (application_id, department, file_path, file_name, uploaded_by_user_id, created_at)
+                        INSERT INTO IAF.sg.financial_insurance_application_department_files (application_id, department, file_path, file_name, uploaded_by_user_id, created_at)
                         VALUES (@appId, @department, @file_path, @file_name, @userId, GETDATE())
                     `);
             }
@@ -419,7 +419,7 @@ export const getActuarialFiles = async (applicationId) => {
         .input('appId', sql.Int, applicationId)
         .input('department', sql.NVarChar(100), 'actuarial')
         .query(`
-            SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_department_files
+            SELECT file_path FROM IAF.sg.financial_insurance_application_department_files
             WHERE application_id = @appId AND department = @department
         `);
     return (res.recordset || []).map(f => f.file_path);
@@ -435,7 +435,7 @@ export const saveActuarialToCfeNotes = async (applicationId, notes, userId) => {
         .input('appId', sql.Int, applicationId)
         .input('department', sql.NVarChar(100), department)
         .query(`
-            SELECT id FROM DHUB_UAT.sg.financial_insurance_application_notes
+            SELECT id FROM IAF.sg.financial_insurance_application_notes
             WHERE application_id = @appId AND department = @department
         `);
 
@@ -447,7 +447,7 @@ export const saveActuarialToCfeNotes = async (applicationId, notes, userId) => {
             .input('userId', sql.Int, userId)
             .input('notes', sql.NVarChar(sql.MAX), notes)
             .query(`
-                UPDATE DHUB_UAT.sg.financial_insurance_application_notes
+                UPDATE IAF.sg.financial_insurance_application_notes
                 SET notes = @notes, user_id = @userId, show_in_pdf = 0, updated_at = GETDATE()
                 WHERE application_id = @appId AND department = @department
             `);
@@ -459,7 +459,7 @@ export const saveActuarialToCfeNotes = async (applicationId, notes, userId) => {
             .input('userId', sql.Int, userId)
             .input('notes', sql.NVarChar(sql.MAX), notes)
             .query(`
-                INSERT INTO DHUB_UAT.sg.financial_insurance_application_notes (application_id, department, user_id, notes, show_in_pdf)
+                INSERT INTO IAF.sg.financial_insurance_application_notes (application_id, department, user_id, notes, show_in_pdf)
                 VALUES (@appId, @department, @userId, @notes, 0)
             `);
     }
@@ -472,7 +472,7 @@ export const getActuarialToCfeNotes = async (applicationId) => {
         .input('appId', sql.Int, applicationId)
         .input('department', sql.NVarChar(100), 'actuarial_to_cfe')
         .query(`
-            SELECT TOP 1 notes FROM DHUB_UAT.sg.financial_insurance_application_notes
+            SELECT TOP 1 notes FROM IAF.sg.financial_insurance_application_notes
             WHERE application_id = @appId AND department = @department
             ORDER BY updated_at DESC
         `);

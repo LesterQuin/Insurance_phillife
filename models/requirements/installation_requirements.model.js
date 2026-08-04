@@ -10,7 +10,7 @@ const logApplicationAction = async (transaction, { applicationId, userId, action
         .input('changes', sql.NVarChar(sql.MAX), JSON.stringify(changes))
         .input('ip_address', sql.NVarChar, ipAddress || null)
         .query(`
-            INSERT INTO DHUB_UAT.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
+            INSERT INTO IAF.sg.financial_insurance_application_history_logs (application_id, user_id, action_type, changes, ip_address)
             VALUES (@application_id, @user_id, @action_type, @changes, @ip_address)
         `);
 };
@@ -35,15 +35,15 @@ export const upsertInstallationRequirements = async (applicationId, data, userId
 
         // SQL Server Merge (Upsert) logic
         await request.query(`
-            IF EXISTS (SELECT 1 FROM DHUB_UAT.sg.financial_insurance_installation_requirements WHERE application_id = @application_id)
+            IF EXISTS (SELECT 1 FROM IAF.sg.financial_insurance_installation_requirements WHERE application_id = @application_id)
             BEGIN
-                UPDATE DHUB_UAT.sg.financial_insurance_installation_requirements
+                UPDATE IAF.sg.financial_insurance_installation_requirements
                 SET ${updateClauses}, updated_at = GETDATE()
                 WHERE application_id = @application_id;
             END
             ELSE
             BEGIN
-                INSERT INTO DHUB_UAT.sg.financial_insurance_installation_requirements (application_id, ${columns.join(', ')})
+                INSERT INTO IAF.sg.financial_insurance_installation_requirements (application_id, ${columns.join(', ')})
                 VALUES (@application_id, ${columns.map(c => `@${c}`).join(', ')});
             END
         `);
