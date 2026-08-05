@@ -15,8 +15,8 @@ export const getByCategory = async (category) => {
                 t1.is_active,
                 t1.created_at,
                 t1.updated_at
-            FROM [IAF].[sg].[financial_insurance_group_lookups] t1
-            LEFT JOIN [IAF].[sg].[financial_insurance_group_lookups] t2 ON t1.parent_id = t2.id
+            FROM [DHUB_UAT].[sg].[financial_insurance_group_lookups] t1
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_group_lookups] t2 ON t1.parent_id = t2.id
             WHERE t1.category = @category 
             AND t1.is_active = 1
             ORDER BY t1.created_at DESC
@@ -39,8 +39,8 @@ export const getById = async (id) => {
                 t1.is_active,
                 t1.created_at,
                 t1.updated_at
-            FROM [IAF].[sg].[financial_insurance_group_lookups] t1
-            LEFT JOIN [IAF].[sg].[financial_insurance_group_lookups] t2 ON t1.parent_id = t2.id
+            FROM [DHUB_UAT].[sg].[financial_insurance_group_lookups] t1
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_group_lookups] t2 ON t1.parent_id = t2.id
             WHERE t1.id = @id
         `);
     return result.recordset[0];
@@ -60,8 +60,8 @@ export const getAll = async () => {
                 t1.is_active,
                 t1.created_at,
                 t1.updated_at
-            FROM [IAF].[sg].[financial_insurance_group_lookups] t1
-            LEFT JOIN [IAF].[sg].[financial_insurance_group_lookups] t2 ON t1.parent_id = t2.id
+            FROM [DHUB_UAT].[sg].[financial_insurance_group_lookups] t1
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_group_lookups] t2 ON t1.parent_id = t2.id
             WHERE t1.is_active = 1
             ORDER BY t1.category ASC, t1.created_at DESC
         `);

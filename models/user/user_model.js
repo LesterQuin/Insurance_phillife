@@ -24,7 +24,7 @@ export const createUser = async ({ firstname, middlename, lastname, suffix, emai
         .input('is_active', sql.Bit, 1) 
         .input('position', sql.NVarChar, position || null)
         .query(`
-            INSERT INTO IAF.sg.financial_insurance_users
+            INSERT INTO DHUB_UAT.sg.financial_insurance_users
             (firstname, middlename, lastname, suffix, email, agent_code, role_id, location_id, department_id, phoneNumber, reporting_to_id, password_hash, mustChangePassword, is_active, position)
             OUTPUT INSERTED.user_id AS userId
             VALUES (@firstname, @middlename, @lastname, @suffix, @email, @agent_code, @role_id, @location_id, @department_id, @phoneNumber, @reporting_to_id, @password_hash, @mustChangePassword, @is_active, @position)
@@ -46,11 +46,11 @@ export const getUserByEmail = async (email) => {
                 u.department_id, d.name as departmentName, d.code as departmentCode,
                 u.reporting_to_id, m.firstname + ' ' + m.lastname as reportingToName,
                 u.position
-            FROM IAF.sg.financial_insurance_users u
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups d ON d.id = u.department_id AND d.category = 'DEPARTMENT'
-            LEFT JOIN IAF.sg.financial_insurance_users m ON u.reporting_to_id = m.user_id
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups d ON d.id = u.department_id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users m ON u.reporting_to_id = m.user_id
             WHERE u.email = @email
         `);
     return result.recordset[0];
@@ -66,11 +66,11 @@ export const getAllUsers = async () => {
                 d.name AS department_name,
                 l.name AS location_name,
                 m.firstname + ' ' + m.lastname AS reporting_to_name
-            FROM IAF.sg.financial_insurance_users u
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups l ON u.location_id = l.id AND l.category = 'LOCATION'
-            LEFT JOIN IAF.sg.financial_insurance_users m ON u.reporting_to_id = m.user_id
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups l ON u.location_id = l.id AND l.category = 'LOCATION'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users m ON u.reporting_to_id = m.user_id
             ORDER BY u.created_at DESC
         `);
     return result.recordset;
@@ -90,11 +90,11 @@ export const getUserById = async (userId) => {
                 u.department_id, d.name as departmentName, d.code as departmentCode,
                 u.reporting_to_id, m.firstname + ' ' + m.lastname as reportingToName,
                 u.position
-            FROM IAF.sg.financial_insurance_users u
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
-            LEFT JOIN IAF.sg.financial_insurance_system_lookups d ON d.id = u.department_id AND d.category = 'DEPARTMENT'
-            LEFT JOIN IAF.sg.financial_insurance_users m ON u.reporting_to_id = m.user_id
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON r.id = u.role_id AND r.category = 'ROLE'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups l ON l.id = u.location_id AND l.category = 'LOCATION'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups d ON d.id = u.department_id AND d.category = 'DEPARTMENT'
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_users m ON u.reporting_to_id = m.user_id
             WHERE u.user_id = @userId
         `);
     return result.recordset[0];
@@ -107,7 +107,7 @@ export const getUserByAgentCode = async (agent_code) => {
         .input('agent_code', sql.VarChar, agent_code)
         .query(`
             SELECT user_id, agent_code, email, firstname, lastname
-            FROM IAF.sg.financial_insurance_users
+            FROM DHUB_UAT.sg.financial_insurance_users
             WHERE agent_code = @agent_code
         `);
     return result.recordset[0];
@@ -120,7 +120,7 @@ export const updatePassword = async (email, newPassword) => {
         .input('email', sql.VarChar, email)
         .input('password_hash', sql.VarChar, hashed)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET password_hash = @password_hash, mustChangePassword = 0
             WHERE email = @email
         `);
@@ -133,7 +133,7 @@ export const adminResetPassword = async (email, hashedPassword) => {
         .input('password_hash', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit, 1)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET password_hash = @password_hash, mustChangePassword = @mustChangePassword
             WHERE email = @email
         `);
@@ -178,7 +178,7 @@ export const updateProfile = async (userId, { firstname, middlename, lastname, s
         .input('password_hash', sql.VarChar, hashedPassword)
         .input('mustChangePassword', sql.Bit, mustChangePasswordValue)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET firstname = @firstname,
                 middlename = @middlename,
                 lastname = @lastname,
@@ -226,7 +226,7 @@ export const adminUpdateUser = async (userId, { role_id, department_id, location
     }
 
     const query = `
-        UPDATE IAF.sg.financial_insurance_users
+        UPDATE DHUB_UAT.sg.financial_insurance_users
         SET ${setClauses.join(', ')}
         WHERE user_id = @userId
     `;
@@ -245,7 +245,7 @@ export const saveOTP = async (userId, otp) => {
         .input('otp', sql.Char(6), otp)
         .input('expiresAt', sql.DateTime, expiresAt)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET otpCode = @otp, otpExpiresAt = @expiresAt, mustVerifyOtp = 1
             WHERE user_id = @userId
         `);
@@ -258,7 +258,7 @@ export const verifyOTP = async (userId, otp) => {
         .input('otp', sql.Char(6), otp)
         .query(`
             SELECT otpExpiresAt
-            FROM IAF.sg.financial_insurance_users
+            FROM DHUB_UAT.sg.financial_insurance_users
             WHERE user_id = @userId AND otpCode = @otp AND mustVerifyOtp = 1
         `);
 
@@ -272,7 +272,7 @@ export const clearOTP = async (userId) => {
     await pool.request()
         .input('userId', sql.Int, userId)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET mustVerifyOtp = 0, otpCode = NULL, otpExpiresAt = NULL
             WHERE user_id = @userId
         `);
@@ -286,7 +286,7 @@ export const saveTokens = async (userId, accessToken, refreshToken, accessTokenE
         .input('refreshToken', sql.VarChar, refreshToken)
         .input('accessTokenExpiry', sql.DateTime, accessTokenExpiry)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET accessToken = @accessToken,
                 refreshToken = @refreshToken,
                 tokenExpiresAt = @accessTokenExpiry
@@ -299,7 +299,7 @@ export const clearTokens = async (userId) => {
     await pool.request()
         .input('userId', sql.Int, userId)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET accessToken = NULL, refreshToken = NULL, tokenExpiresAt = NULL
             WHERE user_id = @userId
         `);
@@ -311,7 +311,7 @@ export const getValidLookupIds = async (category) => {
     const result = await pool.request()
         .input('category', sql.VarChar, category)
         .query(`
-            SELECT id FROM IAF.sg.financial_insurance_system_lookups
+            SELECT id FROM DHUB_UAT.sg.financial_insurance_system_lookups
             WHERE category = @category AND is_active = 1
         `);
     return result.recordset.map(row => row.id);
@@ -323,7 +323,7 @@ export const getLookupListByCategory = async (category) => {
         .input('category', sql.VarChar, category)
         .query(`
             SELECT id, name 
-            FROM IAF.sg.financial_insurance_system_lookups
+            FROM DHUB_UAT.sg.financial_insurance_system_lookups
             WHERE category = @category AND is_active = 1
         `);
 
@@ -334,9 +334,9 @@ export const getPotentialSuperiors = async () => {
     const pool = await poolPromise;
     const result = await pool.request().query(`
             SELECT u.user_id, u.firstname, u.lastname, r.name as roleName, d.name AS departmentName
-            FROM IAF.sg.financial_insurance_users u
-            JOIN IAF.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
-			LEFT JOIN IAF.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+			LEFT JOIN DHUB_UAT.sg.financial_insurance_system_lookups d ON u.department_id = d.id AND d.category = 'DEPARTMENT'
             WHERE r.name IN ('Group Sales & Marketing Head', 'Team Leader', 'Super Admin', ' Vice President')
             AND u.is_active = 1
         `);
@@ -349,9 +349,9 @@ export const getSubordinateIds = async (managerId) => {
         .input('managerId', sql.Int, managerId)
         .query(`
             WITH Subordinates AS (
-                SELECT user_id FROM IAF.sg.financial_insurance_users WHERE reporting_to_id = @managerId
+                SELECT user_id FROM DHUB_UAT.sg.financial_insurance_users WHERE reporting_to_id = @managerId
                 UNION ALL
-                SELECT u.user_id FROM IAF.sg.financial_insurance_users u
+                SELECT u.user_id FROM DHUB_UAT.sg.financial_insurance_users u
                 INNER JOIN Subordinates s ON u.reporting_to_id = s.user_id
             )
             SELECT user_id FROM Subordinates;
@@ -365,7 +365,7 @@ export const setUserStatus = async (userId, isActive) => {
         .input('userId', sql.Int, userId)
         .input('isActive', sql.Bit, isActive)
         .query(`
-            UPDATE IAF.sg.financial_insurance_users
+            UPDATE DHUB_UAT.sg.financial_insurance_users
             SET is_active = @isActive
             WHERE user_id = @userId
         `);
@@ -382,10 +382,25 @@ export const getSuperiorsForDepartment = async (departmentId) => {
         .input('deptId', sql.Int, departmentId)
         .query(`
             SELECT u.user_id, u.firstname, u.lastname, u.email
-            FROM IAF.sg.financial_insurance_users u
-            JOIN IAF.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
             WHERE u.department_id = @deptId
               AND r.name IN ('Group Sales & Marketing Head', 'Team Leader', 'Super Admin', ' Vice President')
+              AND u.is_active = 1
+        `);
+    return result.recordset;
+};
+
+export const getDepartmentHeadsAndAdmins = async (departmentId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('deptId', sql.Int, departmentId)
+        .query(`
+            SELECT u.user_id, u.firstname, u.lastname, u.email
+            FROM DHUB_UAT.sg.financial_insurance_users u
+            JOIN DHUB_UAT.sg.financial_insurance_system_lookups r ON u.role_id = r.id AND r.category = 'ROLE'
+            WHERE u.department_id = @deptId
+              AND r.name IN ('Group Sales & Marketing Head', 'Super Admin', ' Vice President')
               AND u.is_active = 1
         `);
     return result.recordset;

@@ -21,9 +21,9 @@ export const getAllRiders = async () => {
                 r.is_active,
                 r.created_at,
                 r.updated_at
-            FROM [IAF].[sg].[financial_insurance_riders] r
-            LEFT JOIN [IAF].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
-            LEFT JOIN [IAF].[sg].[financial_insurance_basic_plan] bp ON r.product_id = bp.product_id
+            FROM [DHUB_UAT].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_basic_plan] bp ON r.product_id = bp.product_id
             WHERE r.is_active = 1
             ORDER BY p.product_name, bp.basic_plan_name, r.rider_name
         `);
@@ -52,10 +52,10 @@ export const getRidersByProductName = async (productName) => {
                 r.is_active,
                 r.created_at,
                 r.updated_at
-            FROM [IAF].[sg].[financial_insurance_riders] r
-            LEFT JOIN [IAF].[sg].[financial_insurance_product] p 
+            FROM [DHUB_UAT].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_product] p 
                 ON r.product_id = p.product_id
-            LEFT JOIN [IAF].[sg].[financial_insurance_basic_plan] bp 
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_basic_plan] bp 
                 ON r.product_id = bp.product_id
             WHERE (
                 p.acronym LIKE '%' + @productName + '%'
@@ -89,9 +89,9 @@ export const getRidersByProductAcronym = async (acronym) => {
                 r.is_active,
                 r.created_at,
                 r.updated_at
-            FROM [IAF].[sg].[financial_insurance_riders] r
-            LEFT JOIN [IAF].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
-            LEFT JOIN [IAF].[sg].[financial_insurance_basic_plan] bp ON r.product_id = bp.product_id
+            FROM [DHUB_UAT].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_basic_plan] bp ON r.product_id = bp.product_id
             WHERE LTRIM(RTRIM(p.acronym)) = LTRIM(RTRIM(@acronym)) AND r.is_active = 1
             ORDER BY bp.basic_plan_name, r.rider_name
         `);
@@ -107,8 +107,8 @@ export const getRiderById = async (id) => {
             SELECT 
                 r.*,
                 p.product_name
-            FROM [IAF].[sg].[financial_insurance_riders] r
-            LEFT JOIN [IAF].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
+            FROM [DHUB_UAT].[sg].[financial_insurance_riders] r
+            LEFT JOIN [DHUB_UAT].[sg].[financial_insurance_product] p ON r.product_id = p.product_id
             WHERE r.rider_id = @id
         `);
     return result.recordset[0];
@@ -120,7 +120,7 @@ export const getRiderByName = async (name) => {
     const result = await pool.request()
         .input("name", sql.VarChar, name)
         .query(`
-            SELECT * FROM [IAF].[sg].[financial_insurance_riders]
+            SELECT * FROM [DHUB_UAT].[sg].[financial_insurance_riders]
             WHERE rider_name = @name AND is_active = 1
         `);
     return result.recordset[0];
