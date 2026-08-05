@@ -164,9 +164,23 @@ export const cleanProposalFields = (data) => {
         mutableData.prototype_id = null;
     }
 
+    const isTrue = (val) => val === true || val === 'true' || val === 1 || val === '1';
+
     ['borrower_age_66_70', 'borrower_age_71_75', 'borrower_age_76_80'].forEach(field => {
-        if (mutableData[field] !== undefined) mutableData[field] = mutableData[field] ? 1 : 0;
+        if (mutableData[field] !== undefined) mutableData[field] = isTrue(mutableData[field]) ? 1 : 0;
     });
+
+    if (mutableData.borrower_under_min !== undefined) {
+        if (!isTrue(mutableData.borrower_under_min)) {
+            mutableData.borrower_amount_under_min = null;
+        }
+    }
+
+    if (mutableData.borrower_under_max !== undefined) {
+        if (!isTrue(mutableData.borrower_under_max)) {
+            mutableData.borrower_amount_over_max = null;
+        }
+    }
 
     if (mutableData.plan_id && Number(mutableData.plan_id) !== 1) {
         mutableData.amount_loans_id = null;
@@ -548,6 +562,11 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
 
     return {
         ...cleanedApp,
+        borrower_under_min: app.borrower_amount_under_min !== null && app.borrower_amount_under_min !== undefined,
+        borrower_under_max: app.borrower_amount_over_max !== null && app.borrower_amount_over_max !== undefined,
+        borrower_age_66_70: app.borrower_age_66_70 === true || app.borrower_age_66_70 === 1,
+        borrower_age_71_75: app.borrower_age_71_75 === true || app.borrower_age_71_75 === 1,
+        borrower_age_76_80: app.borrower_age_76_80 === true || app.borrower_age_76_80 === 1,
         user_full_name: creatorName,
         contact_person: {
             full_name: [contact_person_salutation, contact_person_firstname, contact_person_mi, contact_person_lastname].filter(Boolean).join(' '),

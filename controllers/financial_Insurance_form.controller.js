@@ -15,6 +15,7 @@ import { bookedNotificationTemplate } from '../templates/bookedNotificationTempl
 import { closedNotificationTemplate } from '../templates/closedNotificationTemplate.js';
 import { extensionApprovedTemplate } from '../templates/extensionApprovedTemplate.js';
 import { extensionDeclinedTemplate } from '../templates/extensionDeclinedTemplate.js';
+import { extensionRequestedTemplate } from '../templates/extensionRequestedTemplate.js';
 // Constants for extension request statuses
 const EXTENSION_STATUS_APPROVED = 62;
 const EXTENSION_STATUS_DECLINED = 63;
@@ -551,9 +552,9 @@ export const requestExtension = async (req, res) => {
                     }
                 }
 
-                // 2. Department superiors (Team Leaders, Head, etc.)
+                // 2. Department superiors (Admins, Head, etc.)
                 if (creator.department_id) {
-                    const deptSuperiors = await User.getSuperiorsForDepartment(creator.department_id);
+                    const deptSuperiors = await User.getDepartmentHeadsAndAdmins(creator.department_id);
                     for (const sup of deptSuperiors) {
                         if (sup.email) {
                             recipients.add(sup.email);
@@ -566,39 +567,15 @@ export const requestExtension = async (req, res) => {
                     const creatorName = [creator.firstname, creator.lastname].filter(Boolean).join(' ');
                     const emailSubject = `Extension Request Submitted: ${updated.group_name}`;
                     const appUrl = `${process.env.APP_BASE_URL || 'http://localhost:5000'}/applications/${updated.application_id}`;
+                    const proposalNumber = `PRO-${updated.application_id.toString().padStart(6, '0')}`;
                     
-                    const emailHtml = `
-                        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; padding: 20px; border-radius: 5px;">
-                            <h2 style="color: #0d47a1; border-bottom: 2px solid #0d47a1; padding-bottom: 10px; margin-top: 0;">Extension Request Notification</h2>
-                            <p>An extension request has been submitted for an insurance application requiring your review:</p>
-                            <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-                                <tr>
-                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0; width: 180px;">Application ID:</td>
-                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">PRO-${updated.application_id.toString().padStart(6, '0')}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0;">Group Name:</td>
-                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${updated.group_name}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0;">Requested By:</td>
-                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${creatorName} (${creator.email})</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 8px; font-weight: bold; border-bottom: 1px solid #f0f0f0;">Submission Date:</td>
-                                    <td style="padding: 8px; border-bottom: 1px solid #f0f0f0;">${new Date().toLocaleDateString()}</td>
-                                </tr>
-                            </table>
-                            <p>Please log in to the PhilLife Insurance System dashboard to review, approve, or decline this request.</p>
-                            <div style="margin-top: 30px; text-align: center;">
-                                <a href="${appUrl}" style="background-color: #0d47a1; color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; display: inline-block;">View Proposal</a>
-                            </div>
-                            <hr style="border: 0; border-top: 1px solid #e0e0e0; margin-top: 30px; margin-bottom: 20px;" />
-                            <p style="font-size: 9pt; color: #777; text-align: center; margin-bottom: 0;">
-                                This is an automated notification from PhilLife Insurance System. Please do not reply directly to this email.
-                            </p>
-                        </div>
-                    `;
+                    const emailHtml = extensionRequestedTemplate(
+                        creatorName,
+                        creator.email,
+                        updated.group_name,
+                        proposalNumber,
+                        appUrl
+                    );
 
                     for (const email of recipients) {
                         try {

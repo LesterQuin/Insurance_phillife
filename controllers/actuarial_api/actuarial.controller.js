@@ -43,7 +43,10 @@ const compareRiderArrays = (oldRiders, newRiders, pathLabel) => {
 
 const compareRates = (oldData, newData, planId) => {
     const diff = [];
-    const brackets = ['18-65', '66-70', '71-75', '76-80'];
+    const brackets = new Set([
+        ...Object.keys(oldData),
+        ...Object.keys(newData)
+    ]);
 
     const formatVal = (v) => {
         if (v === null || v === undefined || v === '') return '0.000';
@@ -137,12 +140,24 @@ export const saveRates = async (req, res) => {
         }
 
         const planId = Number(existingApplication.plan_id);
-        const oldRatesFormatted = {
-            "18-65": formatDbRatesForTemplate(existingRates, '18_65', planId, existingApplication),
-            "66-70": formatDbRatesForTemplate(existingRates, '66_70', planId, existingApplication),
-            "71-75": formatDbRatesForTemplate(existingRates, '71_75', planId, existingApplication),
-            "76-80": formatDbRatesForTemplate(existingRates, '76_80', planId, existingApplication)
-        };
+        const minAge = existingApplication.minimum_age || 18;
+        const maxAge = existingApplication.maximum_age || 65;
+        const isCustomAge = minAge !== 18 || maxAge !== 65;
+        const numLives = Number(existingApplication.number_of_lives);
+        const isScale2 = numLives > 30;
+
+        const oldRatesFormatted = {};
+        if (planId !== 1 && isScale2 && isCustomAge) {
+            oldRatesFormatted[`${minAge}-${maxAge}`] = formatDbRatesForTemplate(existingRates, `${minAge}_${maxAge}`, planId, existingApplication);
+            if (maxAge < 65) {
+                oldRatesFormatted[`${maxAge + 1}-65`] = formatDbRatesForTemplate(existingRates, `${maxAge + 1}_65`, planId, existingApplication);
+            }
+        } else {
+            oldRatesFormatted["18-65"] = formatDbRatesForTemplate(existingRates, '18_65', planId, existingApplication);
+        }
+        oldRatesFormatted["66-70"] = formatDbRatesForTemplate(existingRates, '66_70', planId, existingApplication);
+        oldRatesFormatted["71-75"] = formatDbRatesForTemplate(existingRates, '71_75', planId, existingApplication);
+        oldRatesFormatted["76-80"] = formatDbRatesForTemplate(existingRates, '76_80', planId, existingApplication);
 
         const diff = compareRates(oldRatesFormatted, ratesData, planId);
 
@@ -540,7 +555,7 @@ export const downloadRatesTemplate = async (req, res) => {
             }
             row[basicHeader] = findExistingRate(bracket, ageOrBand, term, null);
             
-            const isSeniorBracket = bracket !== '18-65';
+            const isSeniorBracket = ['66-70', '71-75', '76-80'].includes(bracket);
             selectedRiders.forEach(r => {
                 const acronym = r.acronym || `Rider_${r.rider_id}`;
                 const colName = `Rider_${acronym.trim()}`;
