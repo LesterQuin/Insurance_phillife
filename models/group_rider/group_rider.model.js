@@ -126,5 +126,30 @@ export const getRiderByName = async (name) => {
     return result.recordset[0];
 };
 
+// GET RIDER BY ACRONYM
+export const getRiderByAcronym = async (acronym) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input("acronym", sql.VarChar, acronym)
+        .query(`
+            SELECT TOP 1
+                rider_id,
+                product_id,
+                rider_name,
+                acronym,
+                is_active,
+                input_type,
+                min_amount,
+                max_amount,
+                unit_value,
+                created_at,
+                updated_at
+            FROM [DHUB_UAT].[sg].[financial_insurance_riders]
+            WHERE acronym = @acronym AND is_active = 1
+        `);
+    return result.recordset[0];
+};
+
+
 // NOTE: 'createRider', 'updateRider', and 'deleteRider' functions should be implemented 
 // here as well to fully support the controller, using 'financial_insurance_rider' table.

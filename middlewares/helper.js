@@ -889,8 +889,8 @@ export const generatePDFBuffer = async (htmlContent, options = {}) => {
             format: 'A4', 
             printBackground: true,
             displayHeaderFooter,
-            headerTemplate: '<div></div>',
-            footerTemplate: `
+            headerTemplate: options.headerTemplate || '<div></div>',
+            footerTemplate: options.footerTemplate || `
                 <div style="
                     width: 100%;
                     font-size: 11px;

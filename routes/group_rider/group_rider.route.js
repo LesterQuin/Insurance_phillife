@@ -8,5 +8,6 @@ router.get("/product/:productName", Controller.getRidersByProductName);
 router.get("/product/GCLI", Controller.getRidersForGCLI);
 router.get("/product/GYRT", Controller.getRidersForGYRT);
 router.get("/product/GPA", Controller.getRidersForGPA);
+router.get("/template/:acronym", Controller.viewRiderTemplateByAcronym);
 
 export default router;
