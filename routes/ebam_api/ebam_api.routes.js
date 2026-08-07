@@ -7,4 +7,8 @@ const router = express.Router();
 router.get('/:id/coc/view-pdf', authenticate, Controller.viewCOCPDF);
 router.get('/:id/coc/download', authenticate, Controller.downloadCOCPDF);
 
+// EBAM Master Policy Contract Generation APIs
+router.get('/:id/policy-contract/view-pdf', Controller.viewPolicyContractPDF);
+router.get('/:id/policy-contract/download', Controller.downloadPolicyContractPDF);
+
 export default router;
