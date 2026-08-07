@@ -124,7 +124,7 @@ export const downloadCOCPDF = async (req, res) => {
  * - Pages 2+: Rendered with displayHeaderFooter: true (REPEATING CORPORATE FOOTER)
  */
 const createMasterPolicyContractPDF = async (application, details, riderTemplatesHtml) => {
-    const { generateMasterPolicyContractTemplate } = await import('../../templates/policy_contract_generator.js');
+    const { generateMasterPolicyContractTemplate } = await import('../../templates/policy_contract/policy_contract_generator.js');
     const fullHtml = generateMasterPolicyContractTemplate(application, details, riderTemplatesHtml);
 
     const pageBreakMarker = '<div class="page-break"></div>';
