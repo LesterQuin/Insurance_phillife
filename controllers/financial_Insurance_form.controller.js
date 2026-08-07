@@ -39,6 +39,54 @@ const getPendingRequirements = (app) => {
     }).map(m => m.label);
 };
 
+// Helper to dispatch booked proposal email notifications to internal team and client
+const sendBookedNotificationEmail = async (app) => {
+    if (!app || !app.application_id) return;
+    try {
+        const { creator, head, recipientEmails, internalSalutation } = await Helper.getProposalNotificationRecipients(app.user_id);
+        const bookedDate = new Date().toLocaleDateString();
+        const policyNumber = app.policy_no || `PRO-${app.application_id.toString().padStart(6, '0')}`;
+        const clientName = `${app.contact_person_firstname || ''} ${app.contact_person_lastname || ''}`.trim() || 'Valued Client';
+        const clientSalutation = app.contact_person_lastname ? `Mr./Ms. ${app.contact_person_lastname}` : 'Valued Client';
+
+        // Notify Internal Team (CFE Creator, CFE Head, Admins)
+        if (recipientEmails.length > 0) {
+            await transporter.sendMail({
+                from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                to: recipientEmails.join(', '),
+                subject: `Account BOOKED: ${app.group_name}`,
+                html: bookedNotificationTemplate(
+                    internalSalutation,
+                    app.group_name,
+                    clientName,
+                    policyNumber,
+                    bookedDate,
+                    creator ? `${creator.firstname} ${creator.lastname}` : 'System'
+                )
+            });
+        }
+
+        // Notify Applicant (Registered Email on the form)
+        if (app.email) {
+            await transporter.sendMail({
+                from: `"Insurance System" <${process.env.SMTP_USER}>`,
+                to: app.email,
+                subject: `Congratulations! Your proposal for ${app.group_name} is now Booked`,
+                html: bookedNotificationTemplate(
+                    clientSalutation,
+                    app.group_name,
+                    clientName,
+                    policyNumber,
+                    bookedDate,
+                    creator ? `${creator.firstname} ${creator.lastname}` : 'System'
+                )
+            });
+        }
+    } catch (emailErr) {
+        console.error('Booked Notification Error:', emailErr);
+    }
+};
+
 // Create Application
 export const createApplication = async (req, res) => {
     try {
@@ -108,6 +156,11 @@ export const createApplication = async (req, res) => {
         
         // Format it to match the standard response structure
         const response = await Helper.buildApplicationResponse(app);
+
+        // If prototype proposal, trigger booked email notification upon creation
+        if (Number(dataToSave.type_of_proposal_id) === PROTOTYPE_TYPE_ID) {
+            sendBookedNotificationEmail(app);
+        }
 
         io.emit('createApplication', response);
 
@@ -219,7 +272,7 @@ export const updateApplicationStatus = async (req, res) => {
             // Release Check: Customized Proposals must be Released (15) by Actuarial before booking
             const PROTOTYPE_TYPE_ID = 30;
             if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
-                if (Number(app.status_id) !== 15) {
+                if (!canBypass && Number(app.status_id) !== 15) {
                     return error(res, 'Cannot mark as BOOKED. Only proposals that have been Released by the Actuarial department can be booked.', 400);
                 }
             }
@@ -233,54 +286,17 @@ export const updateApplicationStatus = async (req, res) => {
         }
 
         const updated = await Model.updateApplication(appId, { status_id, expiry_date: req.body.expiry_date }, userId);
-        const response = await Helper.buildApplicationResponse(updated);
 
         // Notify via email if status is manually set to Booked (7)
         if (Number(status_id) === 7) {
-            try {
-                const { creator, head, recipientEmails, internalSalutation } = await Helper.getProposalNotificationRecipients(app.user_id);
-                const bookedDate = new Date().toLocaleDateString();
-                const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
-                const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
-                const clientSalutation = `Mr./Ms. ${app.contact_person_lastname}`;
-
-                // Notify Internal Team (User 17, CFE Creator, CFE Head)
-                if (recipientEmails.length > 0) {
-                    await transporter.sendMail({
-                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: recipientEmails.join(', '),
-                        subject: `Account BOOKED: ${app.group_name}`,
-                        html: bookedNotificationTemplate(
-                            internalSalutation,
-                            app.group_name,
-                            clientName,
-                            proposalNumber,
-                            bookedDate,
-                            creator ? `${creator.firstname} ${creator.lastname}` : 'System'
-                        )
-                    });
-                }
-
-                // Notify Applicant (Registered Email on the form)
-                if (app.email) {
-                    await transporter.sendMail({
-                        from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                        to: app.email,
-                        subject: `Proposal Booked Successfully: ${app.group_name}`,
-                        html: bookedNotificationTemplate(
-                            clientSalutation,
-                            app.group_name,
-                            clientName,
-                            proposalNumber,
-                            bookedDate,
-                            creator ? `${creator.firstname} ${creator.lastname}` : 'System'
-                        )
-                    });
-                }
-            } catch (emailErr) {
-                console.error('Manual Booking Notification Error:', emailErr);
+            const bookedPolicyNo = await Model.assignBookedPolicyNumber(appId);
+            if (bookedPolicyNo) {
+                updated.policy_no = bookedPolicyNo;
             }
+            sendBookedNotificationEmail(updated);
         }
+
+        const response = await Helper.buildApplicationResponse(updated);
 
         // Notify via email if status is manually set to Closed (6)
         if (Number(status_id) === 6) {
@@ -865,12 +881,13 @@ export const checkGroupName = async (req, res) => {
         }
 
         const existingGroup = await Model.getApplicationByGroupName(groupName);
+        const isActiveRecord = existingGroup && Number(existingGroup.status_id) !== 6;
 
         return success(res, { 
-            exists: !!existingGroup,
+            exists: isActiveRecord,
             group_name: groupName 
-        }, existingGroup 
-            ? `An application for "${groupName}" (or a company with a similar name) already have record in the system.` 
+        }, isActiveRecord 
+            ? `An active application for "${groupName}" (or a company with a similar name) already has a record in the system.` 
             : `Group name "${groupName}" is available.`
         );
     } catch (err) {
@@ -1785,6 +1802,11 @@ export const updateApplication = async (req, res) => {
         const updated = await Model.updateApplication(req.params.id, processedData, userId);
         const response = await Helper.buildApplicationResponse(updated);
 
+        // If prototype proposal transitioning from draft to booked, trigger notification
+        if (Number(existingApplication.status_id) === STATUS_DRAFT && Number(updated.status_id) === STATUS_BOOKED) {
+            sendBookedNotificationEmail(updated);
+        }
+
         io.emit('updateApplication', response);
 
         await auditLog(req, {
@@ -2103,7 +2125,7 @@ export const setStatusBooked = async (req, res) => {
         const PROTOTYPE_TYPE_ID = 30;
         // Release Check: Customized Proposals must be Released (15) by Actuarial before booking
         if (Number(app.type_of_proposal_id) !== PROTOTYPE_TYPE_ID) {
-            if (Number(app.status_id) !== 15) {
+            if (!canBypass && Number(app.status_id) !== 15) {
                 return error(res, 'Cannot mark as BOOKED. Only proposals that have been Released by the Actuarial department can be booked.', 400);
             }
         }
@@ -2116,59 +2138,21 @@ export const setStatusBooked = async (req, res) => {
             return error(res, `Action Denied: This proposal expired on ${expiryDate.toLocaleDateString()}. You cannot book an expired proposal.`, 400);
         }
 
-        // 4. Update Status (Status ID 7)
+        // 4. Update Status (Status ID 7) & Assign Official Booked Policy Number Sequence
         const oneYearLater = new Date();
-        // oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
         oneYearLater.setDate(oneYearLater.getDate() + 8); // Testing: Valid for 8 days
         const updated = await Model.updateApplication(appId, { status_id: STATUS_BOOKED, expiry_date: oneYearLater }, userId);
         
-        // 4. Return updated data (the validity object will now show as stopped)
+        // Assign official product sequence number (e.g., G-ADD-DRX-26-401, G-TLI-26-101)
+        const bookedPolicyNo = await Model.assignBookedPolicyNumber(appId);
+        if (bookedPolicyNo) {
+            updated.policy_no = bookedPolicyNo;
+        }
+
         const response = await Helper.buildApplicationResponse(updated);
 
         // 5. Send Notification Email
-        try {
-            const { creator, head, recipientEmails, internalSalutation } = await Helper.getProposalNotificationRecipients(app.user_id);
-            const bookedDate = new Date().toLocaleDateString();
-            const proposalNumber = `PRO-${app.application_id.toString().padStart(6, '0')}`;
-            const clientName = `${app.contact_person_firstname} ${app.contact_person_lastname}`;
-            const clientSalutation = `Mr./Ms. ${app.contact_person_lastname}`;
-
-            // Notify Internal Team (User 17, CFE Creator, CFE Head)
-            if (recipientEmails.length > 0) {
-                await transporter.sendMail({
-                    from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                    to: recipientEmails.join(', '),
-                    subject: `Account Successfully BOOKED: ${app.group_name}`,
-                    html: bookedNotificationTemplate(
-                        internalSalutation,
-                        app.group_name,
-                        clientName,
-                        proposalNumber,
-                        bookedDate,
-                        creator ? `${creator.firstname} ${creator.lastname}` : 'System'
-                    )
-                });
-            }
-
-            // Notify Applicant (Registered Email on the form)
-            if (app.email) {
-                await transporter.sendMail({
-                    from: `"Insurance System" <${process.env.SMTP_USER}>`,
-                    to: app.email,
-                    subject: `Congratulations! Your proposal for ${app.group_name} is now Booked`,
-                    html: bookedNotificationTemplate(
-                        clientSalutation,
-                        app.group_name,
-                        clientName,
-                        proposalNumber,
-                        bookedDate,
-                        creator ? `${creator.firstname} ${creator.lastname}` : 'System'
-                    )
-                });
-            }
-        } catch (emailErr) {
-            console.error('Booked Notification Error:', emailErr);
-        }
+        sendBookedNotificationEmail(updated);
 
         io.emit('setStatusBooked', response);
 

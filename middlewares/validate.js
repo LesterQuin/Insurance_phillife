@@ -3002,8 +3002,11 @@ export const validateRequestAmendment = [
             if (!app) return res.status(404).json({ success: false, message: 'Application not found' });
 
             const STATUS_RELEASED = 15;
-            if (Number(app.status_id) !== STATUS_RELEASED) {
-                return res.status(400).json({ success: false, message: 'Amendments can only be requested for applications with "Released" status.' });
+            const STATUS_BOOKED = 7;
+            const appStatus = Number(app.status_id);
+
+            if (appStatus !== STATUS_RELEASED && appStatus !== STATUS_BOOKED) {
+                return res.status(400).json({ success: false, message: 'Amendments can only be requested for applications with "Released" or "Booked" status.' });
             }
 
             const currentUser = req.user || {};

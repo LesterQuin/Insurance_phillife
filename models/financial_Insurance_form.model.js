@@ -1389,6 +1389,7 @@ export const getApplicationByGroupName = async (groupName) => {
             SELECT TOP 1 application_id, user_id, created_at, status_id
             FROM DHUB_UAT.sg.financial_insurance_application
             WHERE REPLACE(UPPER(group_name), ' ', '') = REPLACE(UPPER(@group_name), ' ', '')
+            ORDER BY application_id DESC
         `);
     return res.recordset[0] || null;
 };
@@ -2534,4 +2535,136 @@ export const getLatestAmendmentRequestByAppId = async (applicationId) => {
             ORDER BY ar.created_at DESC
         `);
     return result.recordset && result.recordset.length > 0 ? result.recordset[0] : null;
+};
+
+// Map product name to policy number prefix and starting base sequence
+export const getPolicyNumberPrefix = (basicPlanName = '') => {
+    const nameUpper = basicPlanName.toUpperCase();
+    if (nameUpper.includes('OVERSEAS') || nameUpper.includes('OFW') || nameUpper.includes('G-OFW')) return { prefix: 'G-OFW', startSeq: 1 };
+    if (nameUpper.includes('TERM LIFE WITH MEDICAL') || nameUpper.includes('G-TMR')) return { prefix: 'G-TMR', startSeq: 701 };
+    if (nameUpper.includes('MOSQUITO-BORNE LIFE') || nameUpper.includes('G-MBL')) return { prefix: 'G-MBL', startSeq: 801 };
+    if (nameUpper.includes('MOSQUITO-BORNE ACCIDENT') || nameUpper.includes('G-ADD-MBDRX')) return { prefix: 'G-ADD-MBDRX', startSeq: 1001 };
+    if (nameUpper.includes('TERM LIFE - FAM') || nameUpper.includes('FAMS') || nameUpper.includes('GTLI-FAMS')) return { prefix: 'GTLI-FAMS', startSeq: 1101 };
+    if (nameUpper.includes('COMPREHENSIVE') || nameUpper.includes('G-CBP')) return { prefix: 'G-CBP', startSeq: 201 };
+    if ((nameUpper.includes('ACCIDENTAL DEATH') && (nameUpper.includes('PLUS') || nameUpper.includes('DRX'))) || nameUpper.includes('G-ADD-DRX')) return { prefix: 'G-ADD-DRX', startSeq: 401 };
+    if (nameUpper.includes('ACCIDENTAL DEATH') || nameUpper.includes('GPA') || nameUpper.includes('G-ADD')) return { prefix: 'G-ADD', startSeq: 301 };
+    if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) return { prefix: 'G-CLI', startSeq: 501 };
+    if (nameUpper.includes('CRITICAL ILLNESS') || nameUpper.includes('GCI') || nameUpper.includes('G-CIP')) return { prefix: 'G-CIP', startSeq: 601 };
+    if (nameUpper.includes('MEDICAL BENEFIT') || nameUpper.includes('MBR') || nameUpper.includes('G-MBR')) return { prefix: 'G-MBR', startSeq: 901 };
+    if (nameUpper.includes('TERM LIFE') || nameUpper.includes('GTLIP') || nameUpper.includes('GYRT') || nameUpper.includes('G-TLI')) return { prefix: 'G-TLI', startSeq: 101 };
+    return { prefix: 'G-TLI', startSeq: 101 };
+};
+
+// Ensure database table for tracking plan policy sequence counters exists
+export const ensurePolicySequenceTable = async () => {
+    const pool = await poolPromise;
+    await pool.request().query(`
+        IF OBJECT_ID('DHUB_UAT.sg.financial_insurance_policy_plan_sequences', 'U') IS NULL
+        BEGIN
+            CREATE TABLE DHUB_UAT.sg.financial_insurance_policy_plan_sequences (
+                id INT PRIMARY KEY,
+                plan_name NVARCHAR(255) NOT NULL,
+                plan_prefix VARCHAR(20) NOT NULL UNIQUE,
+                current_sequence INT NOT NULL,
+                start_sequence INT NOT NULL,
+                sequence_year INT NOT NULL DEFAULT YEAR(GETDATE()),
+                last_updated DATETIME DEFAULT GETDATE()
+            );
+
+            INSERT INTO DHUB_UAT.sg.financial_insurance_policy_plan_sequences (id, plan_name, plan_prefix, current_sequence, start_sequence, sequence_year) VALUES
+            (1, 'GROUP OVERSEAS FILIPINO WORKERS', 'G-OFW', 1, 1, YEAR(GETDATE())),
+            (2, 'GROUP TERM LIFE INSURANCE PLAN', 'G-TLI', 101, 101, YEAR(GETDATE())),
+            (3, 'GROUP COMPREHENSIVE BENEFITS PLAN', 'G-CBP', 201, 201, YEAR(GETDATE())),
+            (4, 'GROUP ACCIDENTAL DEATH AND DISABILITY PLAN', 'G-ADD', 301, 301, YEAR(GETDATE())),
+            (5, 'GROUP ACCIDENTAL DEATH AND DISABILITY PLAN PLUS', 'G-ADD-DRX', 401, 401, YEAR(GETDATE())),
+            (6, 'GROUP CREDIT LIFE INSURANCE PLAN', 'G-CLI', 501, 501, YEAR(GETDATE())),
+            (7, 'GROUP CRITICAL ILLNESS INSURANCE PLAN', 'G-CIP', 601, 601, YEAR(GETDATE())),
+            (8, 'GROUP TERM LIFE WITH MEDICAL RIDER', 'G-TMR', 701, 701, YEAR(GETDATE())),
+            (9, 'GROUP MOSQUITO-BORNE LIFE PLAN', 'G-MBL', 801, 801, YEAR(GETDATE())),
+            (10, 'GROUP MEDICAL BENEFIT RIDER', 'G-MBR', 901, 901, YEAR(GETDATE())),
+            (11, 'GROUP MOSQUITO-BORNE ACCIDENT PLAN', 'G-ADD-MBDRX', 1001, 1001, YEAR(GETDATE())),
+            (12, 'GROUP TERM LIFE - FAM', 'GTLI-FAMS', 1101, 1101, YEAR(GETDATE()));
+        END
+    `);
+};
+
+// Atomically assign & save official policy number when application status is updated to BOOKED
+export const assignBookedPolicyNumber = async (applicationId) => {
+    const pool = await poolPromise;
+    await ensurePolicySequenceTable();
+
+    const checkRes = await pool.request()
+        .input('id', sql.Int, applicationId)
+        .query(`SELECT policy_no, basic_plan_id, plan_id, created_at FROM DHUB_UAT.sg.financial_insurance_application WHERE application_id = @id`);
+
+    const appRow = checkRes.recordset[0];
+    if (!appRow) return null;
+    if (appRow.policy_no && appRow.policy_no.trim() !== '') {
+        return appRow.policy_no;
+    }
+
+    const planRes = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .input('basic_plan_id', sql.Int, appRow.basic_plan_id)
+        .input('plan_id', sql.Int, appRow.plan_id)
+        .query(`
+            SELECT 
+                bp.basic_plan_name,
+                p.product_name AS plan_name
+            FROM DHUB_UAT.sg.financial_insurance_application a
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_basic_plan bp ON bp.basic_plan_id = a.basic_plan_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_product p ON p.product_id = a.plan_id
+            WHERE a.application_id = @application_id
+        `);
+
+    const planRow = planRes.recordset[0] || {};
+    const planNameStr = planRow.basic_plan_name || planRow.plan_name || 'Group Term Life Insurance Plan';
+
+    const { prefix, startSeq } = getPolicyNumberPrefix(planNameStr);
+    const effDate = appRow.created_at ? new Date(appRow.created_at) : new Date();
+    const currentYear = effDate.getFullYear();
+    const effYearStr = currentYear.toString().substring(2);
+
+    // Atomically increment sequence or reset sequence to startSeq when year rolls over
+    const seqRes = await pool.request()
+        .input('prefix', sql.VarChar(20), prefix)
+        .input('startSeq', sql.Int, startSeq)
+        .input('planName', sql.NVarChar(255), planNameStr)
+        .input('currentYear', sql.Int, currentYear)
+        .query(`
+            MERGE INTO DHUB_UAT.sg.financial_insurance_policy_plan_sequences WITH (HOLDLOCK) AS target
+            USING (SELECT @prefix AS plan_prefix) AS source
+            ON target.plan_prefix = source.plan_prefix
+            WHEN MATCHED THEN
+                UPDATE SET 
+                    current_sequence = CASE 
+                        WHEN target.sequence_year < @currentYear THEN @startSeq + 1 
+                        ELSE target.current_sequence + 1 
+                    END,
+                    sequence_year = @currentYear,
+                    last_updated = GETDATE()
+            WHEN NOT MATCHED THEN
+                INSERT (id, plan_name, plan_prefix, current_sequence, start_sequence, sequence_year, last_updated)
+                VALUES (13, @planName, @prefix, @startSeq + 1, @startSeq, @currentYear, GETDATE());
+
+            SELECT 
+                CASE 
+                    WHEN sequence_year = @currentYear AND current_sequence > @startSeq 
+                    THEN current_sequence - 1 
+                    ELSE @startSeq 
+                END AS assigned_seq 
+            FROM DHUB_UAT.sg.financial_insurance_policy_plan_sequences 
+            WHERE plan_prefix = @prefix;
+        `);
+
+    const assignedSeq = seqRes.recordset[0]?.assigned_seq ?? startSeq;
+    const formattedSeq = String(assignedSeq).padStart(3, '0');
+    const generatedPolicyNo = `${prefix}-${effYearStr}-${formattedSeq}`;
+
+    await pool.request()
+        .input('id', sql.Int, applicationId)
+        .input('policy_no', sql.VarChar(100), generatedPolicyNo)
+        .query(`UPDATE DHUB_UAT.sg.financial_insurance_application SET policy_no = @policy_no WHERE application_id = @id`);
+
+    return generatedPolicyNo;
 };

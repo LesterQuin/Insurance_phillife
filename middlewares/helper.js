@@ -684,7 +684,7 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
         },
         basic_plan: { 
             id: basic_plan_id, 
-            name: basic_plan_name && basic_plan_acronym ? `${basic_plan_name} (${basic_plan_acronym})` : basic_plan_name,
+            name: basic_plan_name ? basic_plan_name.replace(/\s*\([^)]*\)\s*$/, '').trim() : null,
             acronym: basic_plan_acronym || null
         },
         amount_loans: amount_loans_id ? { id: amount_loans_id, name: amount_loans_name } : null,
@@ -1008,10 +1008,13 @@ export const getProposalNotificationRecipients = async (creatorUserId) => {
         }
     }
 
-    // 2. Fetch CFE Creator & Head (Head gets the email, Creator is only fetched for head lookup & template info)
+    // 2. Fetch CFE Creator & Head
     if (creatorUserId) {
         try {
             creator = await User.getUserById(creatorUserId);
+            if (creator && creator.email) {
+                emailSet.add(creator.email.trim());
+            }
 
             // Fetch CFE Creator's Head (via reporting_to_id)
             if (creator && creator.reporting_to_id) {
@@ -1022,6 +1025,14 @@ export const getProposalNotificationRecipients = async (creatorUserId) => {
             }
         } catch (e) {
             console.error('Error fetching creator or head for notification:', e);
+        }
+    }
+
+    // Include Creator's Last Name in salutation if available
+    if (creator && creator.lastname) {
+        const creatorSalutation = `Sir/Ms. ${creator.lastname}`;
+        if (!salutationParts.includes(creatorSalutation)) {
+            salutationParts.push(creatorSalutation);
         }
     }
 

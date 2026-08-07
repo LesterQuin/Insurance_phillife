@@ -1,4 +1,4 @@
-export const bookedNotificationTemplate = (recipientName, accountName, clientName, proposalNumber, bookedDate, cfeName) => {
+export const bookedNotificationTemplate = (recipientName, accountName, clientName, policyNumber, bookedDate, cfeName) => {
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -37,8 +37,8 @@ export const bookedNotificationTemplate = (recipientName, accountName, clientNam
                             <td style="padding:5px 0;">${clientName}</td>
                         </tr>
                         <tr>
-                            <td style="padding:5px 0; font-weight:bold;">Proposal Number:</td>
-                            <td style="padding:5px 0;">${proposalNumber}</td>
+                            <td style="padding:5px 0; font-weight:bold;">Policy Number:</td>
+                            <td style="padding:5px 0;">${policyNumber}</td>
                         </tr>
                         <tr>
                             <td style="padding:5px 0; font-weight:bold;">Account Status:</td>
