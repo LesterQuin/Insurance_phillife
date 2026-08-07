@@ -56,19 +56,22 @@ const graphClient = Client.initWithMiddleware({
 
 export const transporter = {
     sendMail: async (mailOptions) => {
+        const rawTo = mailOptions.to;
+        const toAddresses = Array.isArray(rawTo)
+            ? rawTo
+            : (typeof rawTo === 'string' ? rawTo.split(',').map(e => e.trim()).filter(Boolean) : []);
+
         const message = {
             subject: mailOptions.subject,
             body: {
                 contentType: "HTML",
                 content: mailOptions.html,
             },
-            toRecipients: [
-                {
-                    emailAddress: {
-                        address: mailOptions.to,
-                    },
-                },
-            ],
+            toRecipients: toAddresses.map(addr => ({
+                emailAddress: {
+                    address: addr
+                }
+            })),
         };
 
         if (mailOptions.from) {

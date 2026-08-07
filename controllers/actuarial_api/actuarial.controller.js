@@ -313,25 +313,13 @@ export const releaseApplication = async (req, res) => {
         const STATUS_RELEASED = 15;
         const STATUS_AMEND = 16;
 
-        // if (
-        //     Number(existingApplication.status_id) !== STATUS_APPROVED &&
-        //     Number(existingApplication.status_id) !== STATUS_AMEND
-        // ) {
-        // return error(res, 'Only applications with "Approved" or "Amend" status can be finalized and released.', 400);
-        // }
-
-        if (Number(existingApplication.status_id) === STATUS_AMEND) {
+        if (
+            Number(existingApplication.status_id) !== STATUS_APPROVED &&
+            Number(existingApplication.status_id) !== STATUS_AMEND
+        ) {
             return error(
                 res,
-                'Applications with "Amend" status cannot be finalized and released.',
-                400
-            );
-        }
-
-        if (Number(existingApplication.status_id) !== STATUS_APPROVED) {
-            return error(
-                res,
-                'Only applications with "Approved" status can be finalized and released.',
+                'Only applications with "Approved" or "Amend" status can be finalized and released.',
                 400
             );
         }
