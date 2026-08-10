@@ -2664,7 +2664,12 @@ export const assignBookedPolicyNumber = async (applicationId) => {
     await pool.request()
         .input('id', sql.Int, applicationId)
         .input('policy_no', sql.VarChar(100), generatedPolicyNo)
-        .query(`UPDATE DHUB_UAT.sg.financial_insurance_application SET policy_no = @policy_no WHERE application_id = @id`);
+        .query(`
+            UPDATE DHUB_UAT.sg.financial_insurance_application 
+            SET policy_no = @policy_no,
+                effective_date = GETDATE() 
+            WHERE application_id = @id
+        `);
 
     return generatedPolicyNo;
 };
