@@ -66,19 +66,22 @@ export const generateCOCTemplate = (application, user, details) => {
         }
     }
 
-    const shortYear = new Date().getFullYear().toString().slice(-2);
-    const appId = application.application_id || '380';
-    const policyNo = `G-${planPrefix.toUpperCase()}-${shortYear}-${appId}`;
-    
-    const groupTypeName = application.group_type?.name?.toLowerCase() || 'employer-employees';
-    
     const appCreatedDate = application.created_at ? new Date(application.created_at) : new Date();
     const validCreatedDate = isNaN(appCreatedDate.getTime()) ? new Date() : appCreatedDate;
-    
+
+    const policyYear = validCreatedDate.getFullYear().toString().slice(-2);
+    const isBooked = !!(application?.policy_no && application.policy_no.trim() !== '') || application?.status_id === 7 || application?.status?.id === 7;
+    const policyNo = (application?.policy_no && application.policy_no.trim() !== '')
+        ? application.policy_no
+        : `G-${planPrefix.toUpperCase()}-${policyYear}-`;
+
+    const groupTypeName = application.group_type?.name?.toLowerCase() || 'employer-employees';
+
     const startDate = formatDate(validCreatedDate);
-    
+
     const endDateVal = new Date(validCreatedDate);
     endDateVal.setFullYear(endDateVal.getFullYear() + 1);
+    endDateVal.setDate(endDateVal.getDate() - 1);
     const endDate = formatDate(endDateVal);
 
     // Generate riders list html
@@ -292,12 +295,6 @@ export const generateCOCTemplate = (application, user, details) => {
         <div class="header">
             <div class="logo-container">
                 ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" />` : `<strong>PHILIPPINE LIFE FINANCIAL ASSURANCE CORP.</strong>`}
-            </div>
-            <div class="company-info">
-                <strong>Philippine Life Financial Assurance Corporation</strong><br>
-                11/F STI Holdings Center, 6764 Ayala Avenue<br>
-                1226 Makati City, Philippines<br>
-                Tel. No: (632) 7798-5433 | www.phillife.com.ph
             </div>
         </div>
 

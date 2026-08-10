@@ -154,15 +154,22 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
     const companyTin = application?.company_tin || '007-884-680-000';
     
     // Dates & Policy Number
-    const effectiveDate = application?.effective_date ? new Date(application.effective_date) : new Date();
-    const effectiveDateStr = effectiveDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const isBooked = !!(application?.policy_no && application.policy_no.trim() !== '') || application?.status_id === 7 || application?.proposal_status_id === 7;
+    const effectiveDateObj = application?.effective_date 
+        ? new Date(application.effective_date) 
+        : (isBooked ? (application?.updated_at ? new Date(application.updated_at) : new Date()) : null);
+    const effectiveDateStr = effectiveDateObj 
+        ? effectiveDateObj.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) 
+        : '';
+    const effectiveDate = effectiveDateObj || new Date();
     const effectiveYear = effectiveDate.getFullYear().toString().substring(2);
 
     const basicPlanName = application?.basic_plan_name || application?.plan_name || 'Group Term Life Insurance Plan (GTLIP)';
     const { prefix, startSeq } = getPolicyNumberPrefix(basicPlanName, application?.plan_id);
     const appId = application?.application_id || 1;
-    const seqNumber = String(appId).padStart(3, '0');
-    const policyNo = application?.policy_no || `${prefix}-${effectiveYear}-${seqNumber}`;
+    const policyNo = (application?.policy_no && application.policy_no.trim() !== '') 
+        ? application.policy_no 
+        : `${prefix}-${effectiveYear}-`;
 
     // Underwriting Limits
     const nelAmount = application?.nel_amount || 3000000;
@@ -170,7 +177,7 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
 
     // Currency & Contribution
     const currencyName = application?.currency_name || 'Philippine Peso';
-    const contributionText = application?.contribution_text || 'Non-Contributory – The Policyholder will pay all premiums.';
+    const contributionText = application?.contribution_text || '';
     const numberOfLives = application?.number_of_lives || 776;
 
     // Addressee & Signatories
@@ -322,7 +329,7 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                     </div>
                 </div>
 
-                <div style="text-align: center; font-size: 15pt; font-weight: 900; color: #000; margin-top: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                <div style="text-align: center; font-size: 18pt; font-weight: 900; color: #000; margin-top: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
                     PHILIPPINE LIFE FINANCIAL ASSURANCE CORPORATION
                 </div>
                 <div style="text-align: center; font-size: 9.5pt; font-style: italic; margin-bottom: 20px;">
@@ -452,24 +459,27 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
 
         <!-- ================= PAGE 3: SPECIAL UNDERWRITING PROVISIONS ================= -->
         <div class="section-header">SPECIAL UNDERWRITING PROVISIONS</div>
-        <ol style="padding-left: 20px; line-height: 1.6;">
-            <li>GTLI – Additional Life is contingent to basic life.</li>
-            <li>GTLIP coverage of an employee shall remain 100% with no riders upon attaining age 66 and shall cease upon the attainment of age 70.</li>
-            <li><strong>Effective Date Proviso in case of injury or disease:</strong> If an enrolled employee, by reason of injury or disease, is not actively at work in full-time employment on the date his/her insurance would otherwise become effective under this Policy, such insurance shall not take effect until the date the enrolled person has returned to full-time active work and has continuously remained actively at work for a period of thirty (30) consecutive days.</li>
-            <li><strong>Transfer Business Provision:</strong> Insurance Coverage of all individuals existing on the Effective Date, who have continuously completed at least one year coverage with their previous insurance carrier, shall be considered as Transferred Business.</li>
-        </ol>
+        <div class="provisions-container" style="line-height: 1.6; font-size: 10pt;">
+            ${typeof application?.special_underwriting_provisions === 'string' && application.special_underwriting_provisions.trim() !== ''
+                ? application.special_underwriting_provisions
+                : (Array.isArray(application?.special_underwriting_provisions) && application.special_underwriting_provisions.length > 0
+                    ? `<ol style="padding-left: 20px; line-height: 1.6;">${application.special_underwriting_provisions.map(item => `<li>${item}</li>`).join('')}</ol>`
+                    : ''
+                )
+            }
+        </div>
 
         <div class="page-break"></div>
 
-        <!-- ================= PAGES 4-5: SCHEDULE OF INSURANCE ================= -->
-        <div class="main-title" style="font-size: 14pt; margin-bottom: 15px;">SCHEDULE OF INSURANCE</div>
+        <!-- ================= SCHEDULE OF INSURANCE ================= -->
+        <div class="main-title" style="font-size: 14pt; margin-bottom: 10px;">SCHEDULE OF INSURANCE</div>
 
-        <table class="data-table" style="margin-bottom: 15px;">
+        <table class="data-table" style="margin-bottom: 10px; font-size: 8.5pt;">
             <tr>
-                <th style="width: 20%;">MODE OF PAYMENT</th>
-                <td style="width: 30%;"><strong>${application?.payment_mode_name || 'Annual'}</strong></td>
-                <th style="width: 15%;">DUE DATES</th>
-                <td style="width: 35%;">
+                <th style="width: 20%; padding: 4px 6px;">MODE OF PAYMENT</th>
+                <td style="width: 30%; padding: 4px 6px;"><strong>${application?.payment_mode_name || 'Annual'}</strong></td>
+                <th style="width: 15%; padding: 4px 6px;">DUE DATES</th>
+                <td style="width: 35%; padding: 4px 6px;">
                     <strong>First:</strong> Within 10 days from the date of billing by the Insurer.<br>
                     <strong>Renewal:</strong> Every 1st day of ${effectiveDate.toLocaleDateString('en-US', { month: 'long' })} of each subsequent year, with billing from the Insurer.<br>
                     <strong>Additions:</strong> Within 10 days from the date of billing by the Insurer.
@@ -477,14 +487,14 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
             </tr>
         </table>
 
-        <table class="data-table">
+        <table class="data-table" style="font-size: 8.5pt;">
             <thead>
                 <tr>
-                    <th style="width: 35%;">CLASSIFICATION & BENEFITS</th>
-                    <th style="width: 25%;">AMOUNT OF INSURANCE</th>
-                    <th style="width: 12%;">RATE/₱1,000</th>
-                    <th style="width: 15%;">PER HEAD (₱)</th>
-                    <th style="width: 13%;">TERMINATION AGE</th>
+                    <th style="width: 35%; padding: 4px 6px;">CLASSIFICATION & BENEFITS</th>
+                    <th style="width: 25%; padding: 4px 6px;">AMOUNT OF INSURANCE</th>
+                    <th style="width: 12%; padding: 4px 6px;">RATE/₱1,000</th>
+                    <th style="width: 15%; padding: 4px 6px;">PER HEAD (₱)</th>
+                    <th style="width: 13%; padding: 4px 6px;">TERMINATION AGE</th>
                 </tr>
             </thead>
             <tbody>
@@ -492,39 +502,39 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
             </tbody>
         </table>
 
-        <table class="data-table" style="margin-top: 15px;">
+        <table class="data-table" style="margin-top: 10px; font-size: 8.5pt;">
             <tr style="background-color: #f1f5f9; font-weight: bold;">
-                <td colspan="4">SPECIAL RATES PER ₱1,000 BASED ON RENEWAL AGES:</td>
+                <td colspan="4" style="padding: 4px 6px;">SPECIAL RATES PER ₱1,000 BASED ON RENEWAL AGES:</td>
             </tr>
             <tr>
-                <th style="width: 25%;">Age</th>
-                <th style="width: 25%;">GTLIP Amount (%)</th>
-                <th style="width: 25%;">Rate per ₱1,000</th>
-                <th style="width: 25%;">Termination Age</th>
+                <th style="width: 25%; padding: 4px 6px;">Age</th>
+                <th style="width: 25%; padding: 4px 6px;">GTLIP Amount (%)</th>
+                <th style="width: 25%; padding: 4px 6px;">Rate per ₱1,000</th>
+                <th style="width: 25%; padding: 4px 6px;">Termination Age</th>
             </tr>
             <tr>
-                <td>66 years old</td>
-                <td>100%</td>
-                <td>21.83</td>
-                <td>70 years old</td>
+                <td style="padding: 3px 6px;">66 years old</td>
+                <td style="padding: 3px 6px;">100%</td>
+                <td style="padding: 3px 6px;">21.83</td>
+                <td style="padding: 3px 6px;">70 years old</td>
             </tr>
             <tr>
-                <td>67 years old</td>
-                <td>100%</td>
-                <td>21.83</td>
-                <td>70 years old</td>
+                <td style="padding: 3px 6px;">67 years old</td>
+                <td style="padding: 3px 6px;">100%</td>
+                <td style="padding: 3px 6px;">21.83</td>
+                <td style="padding: 3px 6px;">70 years old</td>
             </tr>
             <tr>
-                <td>68 years old</td>
-                <td>100%</td>
-                <td>21.83</td>
-                <td>70 years old</td>
+                <td style="padding: 3px 6px;">68 years old</td>
+                <td style="padding: 3px 6px;">100%</td>
+                <td style="padding: 3px 6px;">21.83</td>
+                <td style="padding: 3px 6px;">70 years old</td>
             </tr>
             <tr>
-                <td>69 years old</td>
-                <td>100%</td>
-                <td>21.83</td>
-                <td>70 years old</td>
+                <td style="padding: 3px 6px;">69 years old</td>
+                <td style="padding: 3px 6px;">100%</td>
+                <td style="padding: 3px 6px;">21.83</td>
+                <td style="padding: 3px 6px;">70 years old</td>
             </tr>
         </table>
 
@@ -665,26 +675,25 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
         <!-- ================= PAGE 8: CONFORME & SIGNATURE PAGE ================= -->
         <div style="font-size: 9.5pt; color: #4a5568; margin-bottom: 30px; font-weight: bold;">Continuation of ${policyNo}:</div>
 
-        <div style="margin-top: 60px; text-align: center;">
-            <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">PHILIPPINE LIFE FINANCIAL ASSURANCE CORPORATION</div>
-            <div style="font-size: 9.5pt; font-style: italic; margin-top: 5px; margin-bottom: 35px;">By:</div>
+        <div style="margin-top: 50px; text-align: center;">
+            <div style="font-weight: bold; font-size: 25pt; text-transform: uppercase; letter-spacing: 0.5px;">PHILIPPINE LIFE FINANCIAL ASSURANCE CORPORATION</div>
+            <div style="font-size: 11pt; font-style: italic; margin-top: 8px; margin-bottom: 40px;">By:</div>
 
-            <div style="width: 350px; margin: 0 auto; border-bottom: 1px solid #000; height: 30px;"></div>
-            <div style="font-weight: bold; font-size: 11pt; margin-top: 5px;">MICHELLE L. AMBAGAN</div>
-            <div style="font-size: 9.5pt;">Executive Vice-President & Chief Operating Officer</div>
-            <div style="font-size: 9.5pt; margin-top: 10px;">Signed on _________________ at Makati City, Metro Manila.</div>
+            <div style="width: 380px; margin: 0 auto; border-bottom: 1.5px solid #000; height: 30px;"></div>
+            <div style="font-weight: bold; font-size: 13pt; margin-top: 8px; text-transform: uppercase;">MICHELLE L. AMBAGAN</div>
+            <div style="font-size: 11pt; font-weight: 500;">Executive Vice-President & Chief Operating Officer</div>
+            <div style="font-size: 11pt; margin-top: 12px;">Signed on _________________ at Makati City, Metro Manila.</div>
         </div>
 
-        <div style="margin-top: 90px; text-align: center;">
-            <div style="font-weight: bold; font-size: 12pt; text-transform: uppercase; letter-spacing: 1px;">CONFORME:</div>
-            <br>
-            <div style="font-weight: bold; font-size: 11pt; text-transform: uppercase;">${groupName}</div>
-            <div style="font-size: 9.5pt; font-style: italic; margin-top: 5px; margin-bottom: 35px;">By:</div>
+        <div style="margin-top: 70px; text-align: center;">
+            <div style="font-weight: bold; font-size: 14pt; text-transform: uppercase; letter-spacing: 1.5px;">CONFORME:</div>
+            <div style="font-weight: bold; font-size: 13pt; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 15px;">${groupName}</div>
+            <div style="font-size: 11pt; font-style: italic; margin-top: 8px; margin-bottom: 40px;">By:</div>
 
-            <div style="width: 350px; margin: 0 auto; border-bottom: 1px solid #000; height: 30px;"></div>
-            <div style="font-weight: bold; font-size: 11pt; margin-top: 5px;">${addresseeName}</div>
-            <div style="font-size: 9.5pt;">${addresseeDesignation}</div>
-            <div style="font-size: 9.5pt; margin-top: 10px;">Signed on _________________ at ${application?.signing_location || businessAddress || 'Muntinlupa City, Metro Manila'}.</div>
+            <div style="width: 380px; margin: 0 auto; border-bottom: 1.5px solid #000; height: 30px;"></div>
+            <div style="font-weight: bold; font-size: 13pt; margin-top: 8px; text-transform: uppercase;">${addresseeName}</div>
+            <div style="font-size: 11pt; font-weight: 500;">${addresseeDesignation}</div>
+            <div style="font-size: 11pt; margin-top: 12px;">Signed on _________________ at ${application?.signing_location || businessAddress || 'Muntinlupa City, Metro Manila'}.</div>
         </div>
 
         <div class="page-break"></div>
@@ -1095,15 +1104,34 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                     <td>✓</td>
                     <td>✓</td>
                 </tr>
-                <tr>
-                    <td>18-22</td>
-                    <td>Riders</td>
-                    <td>✓</td>
-                    <td>✓</td>
-                    <td>✓</td>
-                    <td>✓</td>
-                    <td>✓</td>
-                </tr>
+                ${(() => {
+                    const riderCount = Array.isArray(application?.riders) && application.riders.length > 0 ? application.riders.length : 0;
+                    if (riderCount === 0) {
+                        return `
+                            <tr>
+                                <td>N/A</td>
+                                <td>Riders</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>-</td>
+                            </tr>
+                        `;
+                    }
+
+                    return `
+                        <tr>
+                            <td>{{RIDER_PAGE_RANGE}}</td>
+                            <td>Riders</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                            <td>✓</td>
+                        </tr>
+                    `;
+                })()}
             </tbody>
         </table>
 

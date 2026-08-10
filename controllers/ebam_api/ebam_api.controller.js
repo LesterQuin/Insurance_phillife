@@ -1,12 +1,12 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as EbamModel from '../../models/ebam_api/ebam_api.model.js';
 import * as Helper from '../../middlewares/helper.js';
-import { error } from '../../utils/response.js';
+import { success, error } from '../../utils/response.js';
 import { generateCOCTemplate } from '../../templates/coc/cocTemplate.js';
 
 // Helper to build application structure for template
 const buildCOCTemplateData = (data) => {
-    const { appData, riders, rankings, rankingRiders } = data;
+    const { appData, riders, rankings, rankingRiders, provisions, contribution_text } = data;
 
     if ((appData.coverage_type_id === 32 || appData.coverage_type_id === 34) && rankingRiders.length > 0) {
         riders.forEach(mainRider => {
@@ -28,6 +28,8 @@ const buildCOCTemplateData = (data) => {
     return { 
         ...appData, 
         riders,
+        special_underwriting_provisions: provisions || null,
+        contribution_text: contribution_text || null,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
         uniform_coverage_amount: appData.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
@@ -156,7 +158,7 @@ const createMasterPolicyContractPDF = async (application, details, riderTemplate
     });
 
     // 2. Render Pages 2 to End with repeating corporate footer
-    const pdfBufferBody = await Helper.generatePDFBuffer(htmlBody, {
+    let pdfBufferBody = await Helper.generatePDFBuffer(htmlBody, {
         preferCSSPageSize: true,
         displayHeaderFooter: true,
         headerTemplate: '<div></div>',
@@ -170,9 +172,31 @@ const createMasterPolicyContractPDF = async (application, details, riderTemplate
         margin: { top: '12mm', bottom: '20mm', left: '0mm', right: '0mm' }
     });
 
-    // 3. Merge Page 1 + Pages 2-23 into single PDF package
+    let docBody = await PDFDocument.load(pdfBufferBody);
+    const measuredTotalPages = 1 + docBody.getPageCount();
+    const measuredRiderEnd = measuredTotalPages - 1;
+    const exactRiderRange = measuredRiderEnd >= 18 ? `18-${measuredRiderEnd}` : '18';
+
+    if (htmlBody.includes('{{RIDER_PAGE_RANGE}}')) {
+        const updatedHtmlBody = htmlBody.replace('{{RIDER_PAGE_RANGE}}', exactRiderRange);
+        pdfBufferBody = await Helper.generatePDFBuffer(updatedHtmlBody, {
+            preferCSSPageSize: true,
+            displayHeaderFooter: true,
+            headerTemplate: '<div></div>',
+            footerTemplate: `
+                <div style="width: 100%; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; font-size: 7.5pt; color: #718096; line-height: 1.35; padding-top: 4px; border-top: 1px solid #cbd5e1; margin: 0 20mm;">
+                    Philippine Life Financial Assurance Corporation<br>
+                    11/F STI Holdings Center, 6764 Ayala Avenue, 1226 Makati City, Philippines<br>
+                    Tel. No: (632) 7798-5433 | www.phillife.com.ph
+                </div>
+            `,
+            margin: { top: '12mm', bottom: '20mm', left: '0mm', right: '0mm' }
+        });
+        docBody = await PDFDocument.load(pdfBufferBody);
+    }
+
+    // 3. Merge Page 1 + Pages 2 to End into single PDF package and apply page numbers
     const docPage1 = await PDFDocument.load(pdfBufferPage1);
-    const docBody = await PDFDocument.load(pdfBufferBody);
 
     const mergedDoc = await PDFDocument.create();
     const [coverPage] = await mergedDoc.copyPages(docPage1, [0]);
@@ -180,6 +204,25 @@ const createMasterPolicyContractPDF = async (application, details, riderTemplate
 
     const bodyPages = await mergedDoc.copyPages(docBody, docBody.getPageIndices());
     bodyPages.forEach(p => mergedDoc.addPage(p));
+
+    const font = await mergedDoc.embedFont(StandardFonts.Helvetica);
+    const totalPages = mergedDoc.getPageCount();
+
+    for (let i = 1; i < totalPages; i++) {
+        const page = mergedDoc.getPage(i);
+        const { width } = page.getSize();
+        const pageNumText = `Page ${i + 1} of ${totalPages}`;
+        const textSize = 7.5;
+        const textWidth = font.widthOfTextAtSize(pageNumText, textSize);
+
+        page.drawText(pageNumText, {
+            x: width - 56 - textWidth,
+            y: 20,
+            size: textSize,
+            font: font,
+            color: rgb(0.29, 0.33, 0.41)
+        });
+    }
 
     const mergedPdfBytes = await mergedDoc.save();
     return Buffer.from(mergedPdfBytes);
@@ -293,6 +336,104 @@ export const downloadPolicyContractPDF = async (req, res) => {
         res.end(pdfBuffer);
     } catch (err) {
         console.error("Master Policy Contract Download Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Get Special Underwriting Provisions for an application
+export const getUnderwritingProvisions = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const row = await EbamModel.getUnderwritingProvisions(id);
+        
+        return success(res, {
+            application_id: id,
+            provision_text: row ? row.provision_text : null
+        }, "Special underwriting provisions fetched successfully.", 200);
+    } catch (err) {
+        console.error("Get Underwriting Provisions Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Save/Update Special Underwriting Provisions for an application
+export const saveUnderwritingProvisions = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const inputVal = req.body.provisions ?? req.body.underwriting_provisions ?? req.body.evidence_notes ?? req.body.notes ?? req.body.provision_text;
+        if (inputVal === undefined) {
+            return error(res, "Validation failed.", 400, [
+                { field: "provisions", message: "provisions, provision_text, or evidence_notes field is required." }
+            ]);
+        }
+
+        const savedRow = await EbamModel.saveUnderwritingProvisions(id, inputVal);
+
+        return success(res, {
+            application_id: id,
+            provision_text: savedRow ? savedRow.provision_text : null
+        }, "Special underwriting provisions updated successfully.", 200);
+    } catch (err) {
+        console.error("Save Underwriting Provisions Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Get Contribution text for an application
+export const getContribution = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const row = await EbamModel.getUnderwritingProvisions(id);
+        
+        return success(res, {
+            application_id: id,
+            contribution_text: row ? row.contribution_text : null
+        }, "Contribution text fetched successfully.", 200);
+    } catch (err) {
+        console.error("Get Contribution Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Save/Update Contribution text for an application
+export const saveContribution = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const inputVal = req.body.contribution_text ?? req.body.contribution;
+        if (inputVal === undefined) {
+            return error(res, "Validation failed.", 400, [
+                { field: "contribution_text", message: "contribution_text or contribution field is required." }
+            ]);
+        }
+
+        const savedRow = await EbamModel.saveContributionText(id, inputVal);
+
+        return success(res, {
+            application_id: id,
+            contribution_text: savedRow ? savedRow.contribution_text : null
+        }, "Contribution text updated successfully.", 200);
+    } catch (err) {
+        console.error("Save Contribution Error:", err);
         return error(res, err.message, 500);
     }
 };
