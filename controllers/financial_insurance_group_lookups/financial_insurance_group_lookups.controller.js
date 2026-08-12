@@ -47,6 +47,8 @@ export const getByPaymentTerm = (req, res) => fetchByCategory(res, 'PAYMENT_TERM
 export const getByPaymentYear = (req, res) => fetchByCategory(res, 'PAYMENT_YEAR');
 export const getByChannelType = (req, res) => fetchByCategory(res, 'CHANNEL_TYPE');
 export const getByStatusProposal = (req, res) => fetchByCategory(res, 'STATUS_PROPOSAL');
+export const getByCompanyNumberType = (req, res) => fetchByCategory(res, 'COMPANY_NUMBER_TYPE');
+export const getByContactNumberType = (req, res) => fetchByCategory(res, 'CONTACT_NUMBER_TYPE');
 
 // Generic Get by Category (Optional usage via params)
 export const getByCategory = async (req, res) => {

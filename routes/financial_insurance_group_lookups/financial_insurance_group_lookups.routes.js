@@ -17,6 +17,8 @@ router.get("/category/PAYMENT_TERM", Controller.getByPaymentTerm);
 router.get("/category/PAYMENT_YEAR", Controller.getByPaymentYear);
 router.get("/category/CHANNEL_TYPE", Controller.getByChannelType);
 router.get("/category/STATUS_PROPOSAL", Controller.getByStatusProposal);
+router.get("/category/COMPANY_NUMBER_TYPE", Controller.getByCompanyNumberType);
+router.get("/category/CONTACT_NUMBER_TYPE", Controller.getByContactNumberType);
 
 // Get by ID
 router.get("/name/:id", Controller.getById);
