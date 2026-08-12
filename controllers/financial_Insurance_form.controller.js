@@ -881,7 +881,7 @@ export const checkGroupName = async (req, res) => {
         }
 
         const existingGroup = await Model.getApplicationByGroupName(groupName);
-        const isActiveRecord = existingGroup && Number(existingGroup.status_id) !== 6;
+        const isActiveRecord = !!(existingGroup && Number(existingGroup.status_id) !== 6);
 
         return success(res, { 
             exists: isActiveRecord,
@@ -1300,7 +1300,7 @@ export const getPrototypePlanView = async (req, res) => {
             default: return error(res, 'Prototype plan view not found.', 404);
         }
 
-        const filePath = path.join(__dirname, '../templates', filename);
+        const filePath = path.join(__dirname, '../templates/prototype', filename);
         if (!fs.existsSync(filePath)) {
             console.error(`[getPrototypePlanView] File not found at: ${filePath}`);
             return error(res, 'Template file not found on server.', 404);

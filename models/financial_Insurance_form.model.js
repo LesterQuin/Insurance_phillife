@@ -89,7 +89,6 @@ export const createApplication = async (data, userId) => {
             .input('evidence_notes', sql.NVarChar(sql.MAX), valueOrNull(data.evidence_notes))
             .input('expiry_date', sql.DateTime, valueOrNull(data.expiry_date))
             .input('excel_file_path', sql.NVarChar(sql.MAX), valueOrNull(data.excel_file_path))
-            .input('company_tin', sql.NVarChar(50), valueOrNull(data.company_tin))
             .query(`
                 INSERT INTO DHUB_UAT.sg.financial_insurance_application (
                     user_id, group_name, business_nature, business_nature_id, sub_business_nature_id, number_of_lives, business_address, contact_number, fax_number, email,
@@ -97,19 +96,36 @@ export const createApplication = async (data, userId) => {
                     other_group_classification, business_type_id, other_business_type, group_type_id, other_group_type,
                     minimum_age, maximum_age, payment_mode_id, plan_id, basic_plan_id, type_of_proposal_id, prototype_id, status_id,
                     amount_loans_id, max_loan_amount, min_loan_amount, loan_portfolio_amount, loans_amount, coverage_type_id, payment_term_id, sub_payment_term_id, excel_file_path,
-                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, borrower_amount_under_min, borrower_amount_over_max, channel_type_id, channel_name, channel_number, channel_email, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date, company_tin
+                    borrower_age_66_70, borrower_amount_66_70, borrower_age_71_75, borrower_amount_71_75, borrower_age_76_80, borrower_amount_76_80, borrower_amount_18_65, borrower_amount_under_min, borrower_amount_over_max, channel_type_id, channel_name, channel_number, channel_email, commission_rate, service_fee, total_annual_premium, proposal_status_id, notes, evidence_notes, expiry_date
                 ) VALUES (
                     @user_id, @group_name, @business_nature, @business_nature_id, @sub_business_nature_id, @number_of_lives, @business_address, @contact_number, @fax_number, @email,
                     @contact_person_salutation, @contact_person_firstname, @contact_person_mi, @contact_person_lastname, @designation, @proposal_addressee, @addressee_designation, @group_classification_id,
                     @other_group_classification, @business_type_id, @other_business_type, @group_type_id, @other_group_type,
                     @minimum_age, @maximum_age, @payment_mode_id, @plan_id, @basic_plan_id, @type_of_proposal_id, @prototype_id, @status_id,
                     @amount_loans_id, @max_loan_amount, @min_loan_amount, @loan_portfolio_amount, @loans_amount, @coverage_type_id, @payment_term_id, @sub_payment_term_id, @excel_file_path,
-                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @borrower_amount_under_min, @borrower_amount_over_max, @channel_type_id, @channel_name, @channel_number, @channel_email, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date, @company_tin
+                    @borrower_age_66_70, @borrower_amount_66_70, @borrower_age_71_75, @borrower_amount_71_75, @borrower_age_76_80, @borrower_amount_76_80, @borrower_amount_18_65, @borrower_amount_under_min, @borrower_amount_over_max, @channel_type_id, @channel_name, @channel_number, @channel_email, @commission_rate, @service_fee, @total_annual_premium, @proposal_status_id, @notes, @evidence_notes, @expiry_date
                 );
                 SELECT SCOPE_IDENTITY() AS application_id;
             `);
 
         const applicationId = appResult.recordset[0].application_id;
+
+        // Insert metadata in separate table
+        await transaction.request()
+            .input('application_id', sql.Int, applicationId)
+            .input('company_tin', sql.NVarChar(100), valueOrNull(data.company_tin))
+            .input('company_sec', sql.NVarChar(100), valueOrNull(data.company_sec))
+            .input('company_mobile', sql.NVarChar(50), valueOrNull(data.company_mobile))
+            .input('company_telephone', sql.NVarChar(50), valueOrNull(data.company_telephone))
+            .input('contact_person_mobile', sql.NVarChar(50), valueOrNull(data.contact_person_mobile))
+            .input('contact_person_telephone', sql.NVarChar(50), valueOrNull(data.contact_person_telephone))
+            .query(`
+                INSERT INTO DHUB_UAT.sg.financial_insurance_application_metadata (
+                    application_id, company_tin, company_sec, company_mobile, company_telephone, contact_person_mobile, contact_person_telephone
+                ) VALUES (
+                    @application_id, @company_tin, @company_sec, @company_mobile, @company_telephone, @contact_person_mobile, @contact_person_telephone
+                )
+            `);
 
         // Log the creation action
         await logApplicationAction(transaction, {
@@ -1249,7 +1265,13 @@ export const getApplicationById = async (id) => {
                 req.business_permit_path,
                 req.masterlist_file_path,
                 req.authorized_id_path,
-                req.booking_date
+                req.booking_date,
+                meta.company_tin AS meta_company_tin,
+                meta.company_sec,
+                meta.company_mobile,
+                meta.company_telephone,
+                meta.contact_person_mobile,
+                meta.contact_person_telephone
             FROM DHUB_UAT.sg.financial_insurance_application fia
             LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
@@ -1289,11 +1311,17 @@ export const getApplicationById = async (id) => {
                 ON fia.extension_request_status_id = ext.id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_installation_requirements req
                 ON fia.application_id = req.application_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_application_metadata meta
+                ON fia.application_id = meta.application_id
             WHERE fia.application_id = @id
         `);
 
     const app = res.recordset?.[0] ?? null;
     if (app) {
+        // Resolve duplicate company_tin array collision by prioritizing the metadata column
+        app.company_tin = app.meta_company_tin || (Array.isArray(app.company_tin) ? app.company_tin[0] : app.company_tin) || null;
+        delete app.meta_company_tin;
+
         const filesRes = await pool.request().input('appId', sql.Int, id).query(`
             SELECT file_path FROM DHUB_UAT.sg.financial_insurance_application_files WHERE application_id = @appId
         `);
@@ -1681,7 +1709,7 @@ export const updateApplication = async (id, data, userId) => {
 
         // Add excel_file_path to update clause
         addClause('excel_file_path', data.excel_file_path, sql.NVarChar(sql.MAX));
-        addClause('company_tin', data.company_tin);
+        // company_tin updated in metadata table
 
         if (data.excel_file_path !== undefined) {
             // Delete existing files in files table first
@@ -1727,6 +1755,52 @@ export const updateApplication = async (id, data, userId) => {
             }
             const query = `UPDATE DHUB_UAT.sg.financial_insurance_application SET ${setClauses.join(', ')} WHERE application_id = @id`;
             await request.query(query);
+        }
+
+        // Update metadata in separate table
+        const metaClauses = [];
+        const metaRequest = new sql.Request(transaction);
+        metaRequest.input('application_id', sql.Int, id);
+
+        const addMetaClause = (field, value, type = sql.NVarChar) => {
+            if (value !== undefined) {
+                metaClauses.push(`${field} = @${field}`);
+                metaRequest.input(field, type, valueOrNull(value));
+            }
+        };
+
+        addMetaClause('company_tin', data.company_tin, sql.NVarChar(100));
+        addMetaClause('company_sec', data.company_sec, sql.NVarChar(100));
+        addMetaClause('company_mobile', data.company_mobile, sql.NVarChar(50));
+        addMetaClause('company_telephone', data.company_telephone, sql.NVarChar(50));
+        addMetaClause('contact_person_mobile', data.contact_person_mobile, sql.NVarChar(50));
+        addMetaClause('contact_person_telephone', data.contact_person_telephone, sql.NVarChar(50));
+
+        if (metaClauses.length > 0) {
+            const checkRes = await transaction.request()
+                .input('application_id', sql.Int, id)
+                .query('SELECT 1 FROM DHUB_UAT.sg.financial_insurance_application_metadata WHERE application_id = @application_id');
+            
+            if (checkRes.recordset.length > 0) {
+                const metaQuery = `UPDATE DHUB_UAT.sg.financial_insurance_application_metadata SET ${metaClauses.join(', ')} WHERE application_id = @application_id`;
+                await metaRequest.query(metaQuery);
+            } else {
+                await transaction.request()
+                    .input('application_id', sql.Int, id)
+                    .input('company_tin', sql.NVarChar(100), valueOrNull(data.company_tin))
+                    .input('company_sec', sql.NVarChar(100), valueOrNull(data.company_sec))
+                    .input('company_mobile', sql.NVarChar(50), valueOrNull(data.company_mobile))
+                    .input('company_telephone', sql.NVarChar(50), valueOrNull(data.company_telephone))
+                    .input('contact_person_mobile', sql.NVarChar(50), valueOrNull(data.contact_person_mobile))
+                    .input('contact_person_telephone', sql.NVarChar(50), valueOrNull(data.contact_person_telephone))
+                    .query(`
+                        INSERT INTO DHUB_UAT.sg.financial_insurance_application_metadata (
+                            application_id, company_tin, company_sec, company_mobile, company_telephone, contact_person_mobile, contact_person_telephone
+                        ) VALUES (
+                            @application_id, @company_tin, @company_sec, @company_mobile, @company_telephone, @contact_person_mobile, @contact_person_telephone
+                        )
+                    `);
+            }
         }
 
         // Log the update action
