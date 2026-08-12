@@ -255,9 +255,11 @@ export const viewPolicyContractPDF = async (req, res) => {
         if (!data) return error(res, "Application not found.", 404);
 
         const application = buildCOCTemplateData(data);
+        const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
-            riders: data.riders || []
+            riders: data.riders || [],
+            isReview: showWatermark
         };
 
         // Dynamically compile selected riders
@@ -303,9 +305,11 @@ export const downloadPolicyContractPDF = async (req, res) => {
         if (!data) return error(res, "Application not found.", 404);
 
         const application = buildCOCTemplateData(data);
+        const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
-            riders: data.riders || []
+            riders: data.riders || [],
+            isReview: showWatermark
         };
 
         let riderTemplatesHtml = '';

@@ -8,8 +8,8 @@ router.get('/:id/coc/view-pdf', Controller.viewCOCPDF);
 router.get('/:id/coc/download', authenticate, Controller.downloadCOCPDF);
 
 // EBAM Master Policy Contract Generation APIs
-router.get('/:id/policy-contract/view-pdf', Controller.viewPolicyContractPDF);
-router.get('/:id/policy-contract/download', Controller.downloadPolicyContractPDF);
+router.get('/:id/policy-contract/view-pdf', Controller.viewPolicyContractPDF); // view-pdf?watermark=true
+router.get('/:id/policy-contract/download', Controller.downloadPolicyContractPDF); // download?watermark=true
 
 // Special Underwriting Provisions Management APIs
 router.get('/:id/policy-contract/underwriting-provisions', authenticate, Controller.getUnderwritingProvisions);

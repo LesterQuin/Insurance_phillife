@@ -475,6 +475,7 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
     const ratesRows = await ActuarialModel.getApplicationRates(app.application_id);
     const affiliates = await Model.getApplicationAffiliates(app.application_id);
     const planId = Number(app.plan_id);
+
     const STATUS_BOOKED = 7;
     const STATUS_CLOSED = 6;
     const STATUS_DRAFT = 11;
@@ -553,6 +554,8 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
         signed_proposal_path, group_app_path, dti_path, sec_reg_path,
         articles_of_inc_path, by_laws_path, business_permit_path,
         masterlist_file_path, authorized_id_path, booking_date,
+        company_tin, company_sec, company_mobile, company_telephone,
+        contact_person_mobile, contact_person_telephone,
         ...cleanedApp
     } = app;
     const extension_request_status_id = app.extension_request_status_id;
@@ -744,7 +747,25 @@ export const buildApplicationResponse = async (app, loggedInUserId = null) => {
                 requested_at: latest.requested_at,
                 responded_at: latest.responded_at
             };
-        })()
+        })(),
+        company_details: {
+            company_tin: app.company_tin || null,
+            company_tin_type_id: app.company_tin ? 64 : null,
+            company_sec: app.company_sec || null,
+            company_sec_type_id: app.company_sec ? 65 : null
+        },
+        company_contact: {
+            company_mobile: app.company_mobile || null,
+            company_mobile_type_id: app.company_mobile ? 66 : null,
+            company_telephone: app.company_telephone || null,
+            company_telephone_type_id: app.company_telephone ? 67 : null
+        },
+        contact_person_contact: {
+            contact_person_mobile: app.contact_person_mobile || null,
+            contact_person_mobile_type_id: app.contact_person_mobile ? 66 : null,
+            contact_person_telephone: app.contact_person_telephone || null,
+            contact_person_telephone_type_id: app.contact_person_telephone ? 67 : null
+        }
     };
 };
 

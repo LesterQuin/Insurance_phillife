@@ -5,6 +5,128 @@ import * as User from '../models/user/user_model.js';
 import * as Financial from '../models/financial_Insurance_form.model.js'
 import * as Dropdown from '../models/insurance_dropdown/insurance_dropdown.model.js';
 
+// Preprocessor middleware to flatten nested company metadata objects
+export const preprocessMetadataFields = (req, res, next) => {
+    // 1. Convert old style flat fields if they exist
+    if (req.body.tin_number !== undefined) {
+        req.body.company_tin = req.body.tin_number;
+    }
+    if (req.body.company_number_type_id !== undefined && req.body.company_number !== undefined) {
+        const typeId = Number(req.body.company_number_type_id);
+        if (typeId === 64) req.body.company_tin = req.body.company_number;
+        else if (typeId === 65) req.body.company_sec = req.body.company_number;
+    }
+    if (req.body.company_contact_number_type_id !== undefined && req.body.company_contact_number !== undefined) {
+        const typeId = Number(req.body.company_contact_number_type_id);
+        if (typeId === 66) req.body.company_mobile = req.body.company_contact_number;
+        else if (typeId === 67) req.body.company_telephone = req.body.company_contact_number;
+    }
+    if (req.body.contact_person_contact_number_type_id !== undefined && req.body.contact_person_contact_number !== undefined) {
+        const typeId = Number(req.body.contact_person_contact_number_type_id);
+        if (typeId === 66) req.body.contact_person_mobile = req.body.contact_person_contact_number;
+        else if (typeId === 67) req.body.contact_person_telephone = req.body.contact_person_contact_number;
+    }
+
+    // 2. Process company_type_info
+    if (req.body.company_type_info) {
+        const info = req.body.company_type_info;
+        if (Array.isArray(info)) {
+            for (const item of info) {
+                if (item && typeof item === 'object') {
+                    const typeId = Number(item.company_number_type_id);
+                    if (typeId === 64) {
+                        req.body.company_tin = item.company_number;
+                    } else if (typeId === 65) {
+                        req.body.company_sec = item.company_number;
+                    }
+                }
+            }
+        } else if (info && typeof info === 'object') {
+            if (info.company_tin !== undefined) req.body.company_tin = info.company_tin;
+            if (info.tin !== undefined) req.body.company_tin = info.tin;
+            if (info.company_sec !== undefined) req.body.company_sec = info.company_sec;
+            if (info.sec !== undefined) req.body.company_sec = info.sec;
+
+            const typeId = Number(info.company_number_type_id);
+            if (typeId === 64) {
+                req.body.company_tin = info.company_number;
+            } else if (typeId === 65) {
+                req.body.company_sec = info.company_number;
+            }
+        }
+    }
+
+    // 3. Process company_contact_info
+    if (req.body.company_contact_info && typeof req.body.company_contact_info === 'object') {
+        const info = req.body.company_contact_info;
+        if (Array.isArray(info)) {
+            for (const item of info) {
+                if (item && typeof item === 'object') {
+                    const typeId = Number(item.company_contact_number_type_id || item.type_id);
+                    const val = item.company_contact_number || item.value;
+                    if (typeId === 66) {
+                        req.body.company_mobile = val;
+                    } else if (typeId === 67) {
+                        req.body.company_telephone = val;
+                    }
+                }
+            }
+        } else {
+            if (info.company_mobile !== undefined) req.body.company_mobile = info.company_mobile;
+            if (info.mobile !== undefined) req.body.company_mobile = info.mobile;
+            if (info.company_telephone !== undefined) req.body.company_telephone = info.company_telephone;
+            if (info.telephone !== undefined) req.body.company_telephone = info.telephone;
+
+            if (info.company_contact_number_type_id !== undefined) {
+                const typeId = Number(info.company_contact_number_type_id);
+                if (typeId === 66) req.body.company_mobile = info.company_contact_number;
+                else if (typeId === 67) req.body.company_telephone = info.company_contact_number;
+            } else if (info.type_id !== undefined) {
+                const typeId = Number(info.type_id);
+                if (typeId === 66) req.body.company_mobile = info.value;
+                else if (typeId === 67) req.body.company_telephone = info.value;
+            }
+        }
+    }
+
+    // 4. Process contact_number_info
+    if (req.body.contact_number_info && typeof req.body.contact_number_info === 'object') {
+        const info = req.body.contact_number_info;
+        if (Array.isArray(info)) {
+            for (const item of info) {
+                if (item && typeof item === 'object') {
+                    const typeId = Number(item.company_contact_number_type_id || item.contact_person_contact_number_type_id || item.type_id);
+                    const val = item.company_contact_number || item.contact_person_contact_number || item.value;
+                    if (typeId === 66) {
+                        req.body.contact_person_mobile = val;
+                    } else if (typeId === 67) {
+                        req.body.contact_person_telephone = val;
+                    }
+                }
+            }
+        } else {
+            if (info.contact_person_mobile !== undefined) req.body.contact_person_mobile = info.contact_person_mobile;
+            if (info.mobile !== undefined) req.body.contact_person_mobile = info.mobile;
+            if (info.contact_person_telephone !== undefined) req.body.contact_person_telephone = info.contact_person_telephone;
+            if (info.telephone !== undefined) req.body.contact_person_telephone = info.telephone;
+
+            const typeIdVal = info.contact_person_contact_number_type_id 
+                || info.company_contact_number_type_id 
+                || info.type_id;
+            const valueVal = info.contact_person_contact_number 
+                || info.company_contact_number 
+                || info.value;
+
+            if (typeIdVal !== undefined) {
+                const typeId = Number(typeIdVal);
+                if (typeId === 66) req.body.contact_person_mobile = valueVal;
+                else if (typeId === 67) req.body.contact_person_telephone = valueVal;
+            }
+        }
+    }
+    next();
+};
+
 // -----------------------------
 // User validation
 // -----------------------------
@@ -413,6 +535,7 @@ export const validateAdminUpdateUser = [
 // Form validation
 // -----------------------------
 export const validateFinancialApplication = [
+    preprocessMetadataFields,
     body('group_name')
         .notEmpty().withMessage('Group Name is required')
         .isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters')
@@ -1448,6 +1571,30 @@ body('basic_plan_id')
             return true;
         }),
 
+    body('company_tin')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 100 }).withMessage('Company TIN must not exceed 100 characters'),
+
+    body('company_sec')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 100 }).withMessage('Company SEC must not exceed 100 characters'),
+
+    body('company_mobile')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Company Mobile must not exceed 50 characters'),
+
+    body('company_telephone')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Company Telephone must not exceed 50 characters'),
+
+    body('contact_person_mobile')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Contact Person Mobile must not exceed 50 characters'),
+
+    body('contact_person_telephone')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Contact Person Telephone must not exceed 50 characters'),
+
     // Validation result
     (req, res, next) => {
         const errors = validationResult(req);
@@ -1460,6 +1607,7 @@ body('basic_plan_id')
 // Form validation (Draft)
 // -----------------------------
 export const validateDraftFinancialApplication = [
+    preprocessMetadataFields,
     body('application_id').optional().isInt({ min: 1 }).withMessage('Valid Application ID is required for updating a draft'),
     body('group_name').optional().isLength({ max: 255 }).withMessage('Group Name must not exceed 255 characters'),
     body('business_nature_id')
@@ -1582,6 +1730,25 @@ export const validateDraftFinancialApplication = [
     body('salary_ranking').optional({ nullable: true }).isArray().withMessage('salary_ranking must be an array'),
 
     body('notes').optional({ nullable: true }).isString().withMessage('Notes must be a string'),
+
+    body('company_tin')
+        .optional({ nullable: true })
+        .isLength({ max: 100 }).withMessage('Company TIN must not exceed 100 characters'),
+    body('company_sec')
+        .optional({ nullable: true })
+        .isLength({ max: 100 }).withMessage('Company SEC must not exceed 100 characters'),
+    body('company_mobile')
+        .optional({ nullable: true })
+        .isLength({ max: 50 }).withMessage('Company Mobile must not exceed 50 characters'),
+    body('company_telephone')
+        .optional({ nullable: true })
+        .isLength({ max: 50 }).withMessage('Company Telephone must not exceed 50 characters'),
+    body('contact_person_mobile')
+        .optional({ nullable: true })
+        .isLength({ max: 50 }).withMessage('Contact Person Mobile must not exceed 50 characters'),
+    body('contact_person_telephone')
+        .optional({ nullable: true })
+        .isLength({ max: 50 }).withMessage('Contact Person Telephone must not exceed 50 characters'),
 
     // Validation result
     (req, res, next) => {
@@ -2038,6 +2205,7 @@ export const validateRates = [
 // Form validation (Update)
 // -----------------------------
 export const validateUpdateFinancialApplication = [
+    preprocessMetadataFields,
     async (req, res, next) => {
         if (req.params.id) {
             try {
@@ -2760,6 +2928,25 @@ body('basic_plan_id').optional().isInt({ min: 0 }).withMessage('basic_plan_id mu
             }
             return true;
         }),
+
+    body('company_tin')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 100 }).withMessage('Company TIN must not exceed 100 characters'),
+    body('company_sec')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 100 }).withMessage('Company SEC must not exceed 100 characters'),
+    body('company_mobile')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Company Mobile must not exceed 50 characters'),
+    body('company_telephone')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Company Telephone must not exceed 50 characters'),
+    body('contact_person_mobile')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Contact Person Mobile must not exceed 50 characters'),
+    body('contact_person_telephone')
+        .optional({ nullable: true, checkFalsy: true })
+        .isLength({ max: 50 }).withMessage('Contact Person Telephone must not exceed 50 characters'),
 
     // Validation result
     (req, res, next) => {

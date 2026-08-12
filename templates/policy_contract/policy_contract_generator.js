@@ -329,7 +329,7 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                     </div>
                 </div>
 
-                <div style="text-align: center; font-size: 18pt; font-weight: 900; color: #000; margin-top: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
+                <div style="text-align: center; font-size: 15pt; font-weight: 900; color: #000; margin-top: 20px; text-transform: uppercase; letter-spacing: 0.5px;">
                     PHILIPPINE LIFE FINANCIAL ASSURANCE CORPORATION
                 </div>
                 <div style="text-align: center; font-size: 9.5pt; font-style: italic; margin-bottom: 20px;">
@@ -340,7 +340,7 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                     HEREBY ISSUES this Group Policy (hereinafter referred to as this Policy) to
                 </p>
 
-                <div style="text-align: center; font-size: 17pt; font-weight: 900; color: #000; margin: 15px 0 3px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+                <div style="text-align: center; font-size: 16pt; font-weight: 900; color: #000; margin: 15px 0 3px 0; text-transform: uppercase; letter-spacing: 0.5px;">
                     ${groupName}
                 </div>
                 <div style="text-align: center; font-size: 9.5pt; font-style: italic; margin-bottom: 20px;">
@@ -430,7 +430,26 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                 <th>ELIGIBLE INDIVIDUALS</th>
                 <td>
                     Any regular, probationary or contractual employee of the Policyholder who is in good health and actively-at-work at least 18 years old and who has not attained 66th birth anniversary on Eligibility Date.<br><br>
-                    Subject to DOLE’s ruling on Employment of Youth aged 15 years old and not more than 18 years old.
+                    Subject to DOLE’s ruling on Employment of Youth aged 15 years old and not more than 18 years old.<br><br>
+                    In good health and actively-at-work means performing usual duties of occupation and performing activities of daily living.<br><br>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 8px;">
+                        <thead>
+                            <tr style="background-color: #f1f5f9;">
+                                <th style="border: 1px solid #000; padding: 4px 6px; text-align: left; font-size: 8.5pt; font-weight: bold;">Classification of Individuals</th>
+                                <th style="border: 1px solid #000; padding: 4px 6px; text-align: left; font-size: 8.5pt; font-weight: bold;">Eligibility Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt;">Eligible Individuals as of the Effective Date of this Policy.</td>
+                                <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt;">The Effective Date</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt;">Employees who become regular after the Effective Date of this Policy.</td>
+                                <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt;">Date of Enrollment to the Policy</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </td>
             </tr>
             <tr>
@@ -445,12 +464,51 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                 </td>
             </tr>
             <tr>
+                <!--
                 <th>UNDERWRITING PROVISIONS</th>
                 <td>
-                    <strong>No-Evidence Limit per Life:</strong> ${formattedNel} (18 to 65 years old)<br>
-                    <strong>Non-Medical Limit per Life:</strong> N/A<br>
-                    <strong>Medical Limit per Life:</strong> N/A<br>
-                    <strong>Maximum Amount of Insurance per Life:</strong> ${formattedNel} (18 to 70 years old)
+                    ${application?.evidence_notes && application.evidence_notes.trim() !== ''
+                        ? application.evidence_notes
+                        : `<strong>No-Evidence Limit per Life:</strong> ${formattedNel} (18 to 65 years old)<br>
+                           <strong>Non-Medical Limit per Life:</strong> N/A<br>
+                           <strong>Medical Limit per Life:</strong> N/A<br>
+                           <strong>Maximum Amount of Insurance per Life:</strong> ${formattedNel} (18 to 70 years old)`
+                    }
+                </td>
+                -->
+                <th style="vertical-align: middle; background-color: #ffffff;">UNDERWRITING<br>PROVISIONS</th>
+                <td style="padding: 0; vertical-align: middle;">
+                    <table style="width: 100%; border-collapse: collapse; border-style: hidden;">
+                        <thead>
+                            <tr style="background-color: #ffffff;">
+                                <th style="border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 9.5pt; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; background-color: #ffffff;">Parameters</th>
+                                <th style="border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 9.5pt; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; width: 32%; background-color: #ffffff;">Maximum Amount<br>of Coverage at entry</th>
+                                <th style="border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 9.5pt; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; width: 30%; background-color: #ffffff;">Attained Age<br>at entry</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; font-style: italic;">No-Evidence Limit per Life</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">${formattedNel}</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">18 to 65 years old</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; font-style: italic;">Non-Medical Limit per Life</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">N/A</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">N/A</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; font-style: italic;">Medical Limit per Life</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">N/A</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">N/A</td>
+                            </tr>
+                            <tr>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; font-style: italic;">Maximum Amount of Insurance per Life</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">${formattedNel}</td>
+                                <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9.5pt; text-align: center; font-style: italic;">18 to 70 years old</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </td>
             </tr>
         </table>
@@ -1025,8 +1083,7 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
             The Provisions stated in the Policy Data Page shall supersede any inconsistent provision herein.
         </p>
 
-        <div class="page-break"></div>        
-        <div style="border: 3px double #000; padding: 12px 15px; margin-top: 25px; text-align: justify; font-size: 8.5pt; line-height: 1.45;">
+        <div style="border: 3px double #000; padding: 12px 15px; margin-top: 25px; text-align: justify; font-size: 8.5pt; line-height: 1.45; page-break-inside: avoid; break-inside: avoid;">
             <div style="text-align: center; font-size: 11pt; font-weight: bold; margin-bottom: 8px; letter-spacing: 0.5px;">IMPORTANT NOTICE</div>
             The Insurance Commission, with offices in Manila, Cebu and Davao, is the government office in charge of the enforcement of all laws related to insurance and has supervision over insurance providers and intermediaries. It is ready at all times to assist the general public in matters pertaining to insurance. For any inquiries or complains, please contact the Public Assistance and Mediation Division (PAMD) of the Insurance Commission at 1071 United Nations Avenue, Ermita, Manila with telephone/cellphone numbers (02) 8523-8461 local 103 or 127, 09171160007 (Globe), and 09999930637 (Smart), and with email address <a href="mailto:publicassistance@insurance.gov.ph" style="color: #0d47a1; text-decoration: underline;">publicassistance@insurance.gov.ph</a>. The official website of the Insurance Commission is <a href="https://www.insurance.gov.ph" style="color: #0d47a1; text-decoration: underline;">www.insurance.gov.ph</a>.
         </div>
@@ -1058,8 +1115,8 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
             Printing Date: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
         </div>
 
-        <div style="font-weight: bold; text-align: center; font-size: 12pt; margin-bottom: 2px;">GROUP MASTER POLICY CHECKLIST</div>
-        <div style="font-size: 8.5pt; text-align: center; font-style: italic; margin-bottom: 10px;">
+        <div style="font-weight: bold; text-align: center; font-size: 14pt; margin-bottom: 2px;">GROUP MASTER POLICY CHECKLIST</div>
+        <div style="font-size: 9pt; text-align: center; font-style: italic; margin-bottom: 10px;">
             Pages to be signed (Those with ✓ marks only.)<br>
             Please affix your signature on this certification below to keep the policy contract clean. Thank you.
         </div>
@@ -1080,15 +1137,24 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                 <tr>
                     <td>1</td>
                     <td>Cover Page</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
                     <td>✓</td>
+                </tr>
+                <tr>
+                    <td>1</td>
+                    <td>“Examined By” portion</td>
+                    <td>X</td>
                     <td>✓</td>
+                    <td>X</td>
                     <td>✓</td>
-                    <td>✓</td>
-                    <td>✓</td>
+                    <td>X</td>
                 </tr>
                 <tr>
                     <td>2-8</td>
-                    <td>Policy Data Page & Schedule</td>
+                    <td>Policy Data Page, Schedule of Insurance, Premium</td>
                     <td>✓</td>
                     <td>✓</td>
                     <td>✓</td>
@@ -1096,46 +1162,78 @@ export function generateMasterPolicyContractTemplate(application = {}, details =
                     <td>✓</td>
                 </tr>
                 <tr>
-                    <td>9-17</td>
-                    <td>Policy Provisions</td>
+                    <td>9</td>
+                    <td>Insurance Provisions</td>
+                    <td>X</td>
                     <td>✓</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
+                </tr>
+                <tr>
+                    <td>10</td>
+                    <td>Conversion Provisions</td>
+                    <td>X</td>
                     <td>✓</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
+                </tr>
+                <tr>
+                    <td>11</td>
+                    <td>Premium Provisions</td>
+                    <td>X</td>
                     <td>✓</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
+                </tr>
+                <tr>
+                    <td>12-13</td>
+                    <td>Claim Provisions</td>
+                    <td>X</td>
                     <td>✓</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
+                </tr>
+                <tr>
+                    <td>14-17</td>
+                    <td>General Provisions</td>
+                    <td>X</td>
                     <td>✓</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>X</td>
                 </tr>
                 ${(() => {
                     const riderCount = Array.isArray(application?.riders) && application.riders.length > 0 ? application.riders.length : 0;
-                    if (riderCount === 0) {
-                        return `
-                            <tr>
-                                <td>N/A</td>
-                                <td>Riders</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>-</td>
-                            </tr>
-                        `;
-                    }
-
+                    const range = riderCount > 0 ? '{{RIDER_PAGE_RANGE}}' : 'N/A';
                     return `
                         <tr>
-                            <td>{{RIDER_PAGE_RANGE}}</td>
+                            <td>${range}</td>
                             <td>Riders</td>
+                            <td>X</td>
                             <td>✓</td>
-                            <td>✓</td>
-                            <td>✓</td>
-                            <td>✓</td>
-                            <td>✓</td>
+                            <td>X</td>
+                            <td>X</td>
+                            <td>X</td>
                         </tr>
                     `;
                 })()}
+                <tr>
+                    <td>-</td>
+                    <td>Cover Letter</td>
+                    <td>X</td>
+                    <td>X</td>
+                    <td>✓</td>
+                    <td>X</td>
+                    <td>X</td>
+                </tr>
             </tbody>
         </table>
 
-        <div class="section-header" style="margin-top: 15px; font-size: 11pt;">CERTIFICATION</div>
+        <div style="font-weight: bold; text-align: center; font-size: 14pt; margin-bottom: 1px;">CERTIFICATION</div>
         <p class="paragraph" style="font-size: 9pt; text-indent: 0; margin-bottom: 15px;">
             We, the undersigned, certify that the Policy Data Page, Schedule of Insurance, Premium and policy contract assembly of the Account described herein is correct, and hereby endorsed for final signature by the EVP and COO.
         </p>
