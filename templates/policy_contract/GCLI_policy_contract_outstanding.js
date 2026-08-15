@@ -224,7 +224,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             margin: 12mm 20mm 25mm 20mm;
         }
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Cambria', Georgia, serif;
             color: #202124;
             line-height: 1.5;
             margin: 0;
@@ -352,7 +352,9 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
                 <div class="header-logo" style="margin-bottom: 15px;">
                     ${logoDataUri ? `<img src="${logoDataUri}" alt="PhilLife Logo" style="max-height: 100px;" />` : `<strong>PHILIPPINE LIFE FINANCIAL ASSURANCE CORP.</strong>`}
                     <div style="font-size: 8.5pt; color: #2d3748; margin-top: 5px; font-weight: 600;">
-                        Philippine Life Financial Assurance Corporation<br>
+                        Philippine Life Financial Assurance Corporation
+                    </div>
+                    <div style="font-size: 8.5pt; color: #2d3748; font-weight: 400;">
                         11/F STI Holdings Center, 6764 Ayala Avenue, 1226 Makati City, Philippines<br>
                         Tel. No.: (632) 7798-5433 | TIN: 007-884-680-000
                     </div>
@@ -369,7 +371,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
                     HEREBY ISSUES this Group Policy (hereinafter referred to as this Policy) to
                 </p>
 
-                <div style="text-align: center; font-size: 16pt; font-weight: 900; color: #000; margin: 15px 0 3px 0; text-transform: uppercase; letter-spacing: 0.5px;">
+                <div style="text-align: center; font-size: 15pt; font-weight: 900; color: #000; margin: 15px 0 3px 0; text-transform: uppercase; letter-spacing: 0.5px;">
                     ${groupName}
                 </div>
                 <div style="text-align: center; font-size: 9.5pt; font-style: italic; margin-bottom: 20px;">
@@ -393,7 +395,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             <div style="margin-top: 30px;">
                 <!-- 1. Executive Signatory (RIGHT) -->
                 <div style="width: 300px; margin-left: auto; text-align: center; margin-bottom: 25px;">
-                    <strong style="font-size: 11pt; text-transform: uppercase; font-family: 'Segoe UI', Tahoma, sans-serif; letter-spacing: 0.5px;">MICHELLE L. AMBAGAN</strong><br>
+                    <strong style="font-size: 11pt; text-transform: uppercase; font-family: 'Cambria', Georgia, serif; letter-spacing: 0.5px;">MICHELLE L. AMBAGAN</strong><br>
                     <span style="font-size: 9.5pt; display: inline-block; margin-top: 2px;">EVP & COO</span>
                 </div>
 
@@ -632,7 +634,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         <style>
             .sla-container {
                 border: 3px double #000;
-                font-family: 'Segoe UI', Arial, sans-serif;
+                font-family: 'Cambria', Georgia, serif;
                 margin-top: 15px;
             }
             .sla-table {
@@ -1351,7 +1353,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         <!-- ================= PAGE 23: SIGN-OFF CHECKLIST ================= -->
         <div style="font-weight: bold; text-align: center; font-size: 14pt; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">GROUP POLICY SIGN-OFF</div>
 
-        <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 6px; font-size: 9pt; font-family: 'Segoe UI', Arial, sans-serif;">
+        <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 6px; font-size: 9pt; font-family: 'Cambria', Georgia, serif;">
             <tr>
                 <td style="padding: 3px 8px; width: 28%; font-style: italic; border: none; vertical-align: middle;">Policyholder</td>
                 <td style="padding: 3px 8px; border: none; vertical-align: middle;">: <strong>${groupName.toUpperCase()}</strong></td>
@@ -1373,7 +1375,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         <div style="font-weight: bold; text-align: center; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.5px;">GROUP MASTER POLICY</div>
         <div style="font-weight: bold; text-align: center; font-size: 13pt; text-transform: uppercase; margin-bottom: 8px; letter-spacing: 0.5px;">CHECKLIST</div>
 
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 10px; font-size: 8pt; font-family: 'Segoe UI', Arial, sans-serif;">
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 10px; font-size: 8pt; font-family: 'Cambria', Georgia, serif;">
             <thead>
                 <tr style="font-size: 7.5pt; font-style: italic; text-align: center;">
                     <th colspan="7" style="border: 1px solid #000; padding: 4px 6px; font-weight: normal; line-height: 1.3;">
@@ -1492,11 +1494,11 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         </table>
 
         <div style="font-weight: bold; text-align: center; font-size: 13pt; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 0.5px;">CERTIFICATION</div>
-        <p style="font-size: 8.5pt; font-style: italic; line-height: 1.4; text-align: justify; margin-bottom: 10px; text-indent: 0; font-family: 'Segoe UI', Arial, sans-serif;">
+        <p style="font-size: 8.5pt; font-style: italic; line-height: 1.4; text-align: justify; margin-bottom: 10px; text-indent: 0; font-family: 'Cambria', Georgia, serif;">
             We, the undersigned, certify that the Policy Data Page, Schedule of Insurance, Premium and policy contract assembly of the Account described herein is correct, and hereby endorsed for final signature by the EVP and COO.
         </p>
 
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 5px; font-size: 8.5pt; font-family: 'Segoe UI', Arial, sans-serif;">
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-top: 5px; font-size: 8.5pt; font-family: 'Cambria', Georgia, serif;">
             <thead>
                 <tr style="background-color: #ffffff; font-size: 8.5pt;">
                     <th style="width: 50%; border: 1px solid #000; padding: 5px; text-align: center; font-weight: bold;">SIGNATORIES</th>
