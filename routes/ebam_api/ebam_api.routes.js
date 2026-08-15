@@ -1,6 +1,7 @@
 import express from 'express';
 import * as Controller from '../../controllers/ebam_api/ebam_api.controller.js';
 import { authenticate } from '../../middlewares/authenticate.js';
+import contractGCLIPRoutes from './contract_GCLIP_OUT.routes.js';
 
 const router = express.Router();
 
@@ -11,14 +12,7 @@ router.get('/:id/coc/download', authenticate, Controller.downloadCOCPDF);
 router.get('/:id/policy-contract/view-pdf', Controller.viewPolicyContractPDF); // view-pdf?watermark=true
 router.get('/:id/policy-contract/download', Controller.downloadPolicyContractPDF); // download?watermark=true
 
-// Special Underwriting Provisions Management APIs
-router.get('/:id/policy-contract/underwriting-provisions', authenticate, Controller.getUnderwritingProvisions);
-router.post('/:id/policy-contract/underwriting-provisions', authenticate, Controller.saveUnderwritingProvisions);
-router.put('/:id/policy-contract/underwriting-provisions', authenticate, Controller.saveUnderwritingProvisions);
-
-// Contribution Management APIs
-router.get('/:id/policy-contract/contribution', authenticate, Controller.getContribution);
-router.post('/:id/policy-contract/contribution', Controller.saveContribution);
-router.put('/:id/policy-contract/contribution', authenticate, Controller.saveContribution);
+// Mount GCLIP Outstanding policy contract endpoints
+router.use(contractGCLIPRoutes);
 
 export default router;

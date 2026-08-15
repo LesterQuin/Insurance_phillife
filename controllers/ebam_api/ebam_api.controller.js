@@ -3,10 +3,16 @@ import * as EbamModel from '../../models/ebam_api/ebam_api.model.js';
 import * as Helper from '../../middlewares/helper.js';
 import { success, error } from '../../utils/response.js';
 import { generateCOCTemplate } from '../../templates/coc/cocTemplate.js';
+import { getApplicationRates } from '../../models/actuarial_api/actuarial.model.js';
 
 // Helper to build application structure for template
 const buildCOCTemplateData = (data) => {
-    const { appData, riders, rankings, rankingRiders, provisions, contribution_text } = data;
+    const { 
+        appData, riders, rankings, rankingRiders, provisions, contribution_text, eligible_individuals, participation_requirements, termination_age,
+        provision_enrollment, provision_rollover, provision_termination, provision_definitions, provision_claims, refund_of_premiums,
+        amount_of_insurance, coverage_period, due_dates,
+        nel, nmed, med, max_limit, underwriting_notes
+    } = data;
 
     if ((appData.coverage_type_id === 32 || appData.coverage_type_id === 34) && rankingRiders.length > 0) {
         riders.forEach(mainRider => {
@@ -30,6 +36,23 @@ const buildCOCTemplateData = (data) => {
         riders,
         special_underwriting_provisions: provisions || null,
         contribution_text: contribution_text || null,
+        eligible_individuals: eligible_individuals || null,
+        participation_requirements: participation_requirements || null,
+        termination_age: termination_age || null,
+        provision_enrollment: provision_enrollment || null,
+        provision_rollover: provision_rollover || null,
+        provision_termination: provision_termination || null,
+        provision_definitions: provision_definitions || null,
+        provision_claims: provision_claims || null,
+        refund_of_premiums: refund_of_premiums || null,
+        amount_of_insurance: amount_of_insurance || null,
+        coverage_period: coverage_period || null,
+        due_dates: due_dates || null,
+        nel: nel || [],
+        nmed: nmed || [],
+        med: med || [],
+        max_limit: max_limit || [],
+        underwriting_notes: (underwriting_notes || '').trim() || null,
         level_ranking: levelRanking,
         salary_ranking: salaryRanking,
         uniform_coverage_amount: appData.coverage_type_id === 33 ? (rankings[0]?.uniform_coverage_amount || null) : null,
@@ -127,7 +150,7 @@ export const downloadCOCPDF = async (req, res) => {
  */
 const createMasterPolicyContractPDF = async (application, details, riderTemplatesHtml) => {
     const { generateMasterPolicyContractTemplate } = await import('../../templates/policy_contract/policy_contract_generator.js');
-    const fullHtml = generateMasterPolicyContractTemplate(application, details, riderTemplatesHtml);
+    const fullHtml = await generateMasterPolicyContractTemplate(application, details, riderTemplatesHtml);
 
     const pageBreakMarker = '<div class="page-break"></div>';
     const splitIndex = fullHtml.indexOf(pageBreakMarker);
@@ -256,10 +279,12 @@ export const viewPolicyContractPDF = async (req, res) => {
 
         const application = buildCOCTemplateData(data);
         const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
+        const rates = await getApplicationRates(id);
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
             riders: data.riders || [],
-            isReview: showWatermark
+            isReview: showWatermark,
+            rates: rates || []
         };
 
         // Dynamically compile selected riders
@@ -306,10 +331,12 @@ export const downloadPolicyContractPDF = async (req, res) => {
 
         const application = buildCOCTemplateData(data);
         const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
+        const rates = await getApplicationRates(id);
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
             riders: data.riders || [],
-            isReview: showWatermark
+            isReview: showWatermark,
+            rates: rates || []
         };
 
         let riderTemplatesHtml = '';
@@ -340,104 +367,6 @@ export const downloadPolicyContractPDF = async (req, res) => {
         res.end(pdfBuffer);
     } catch (err) {
         console.error("Master Policy Contract Download Error:", err);
-        return error(res, err.message, 500);
-    }
-};
-
-// Get Special Underwriting Provisions for an application
-export const getUnderwritingProvisions = async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
-
-        const application = await EbamModel.getCOCPdfData(id);
-        if (!application) return error(res, "Application not found.", 404);
-
-        const row = await EbamModel.getUnderwritingProvisions(id);
-        
-        return success(res, {
-            application_id: id,
-            provision_text: row ? row.provision_text : null
-        }, "Special underwriting provisions fetched successfully.", 200);
-    } catch (err) {
-        console.error("Get Underwriting Provisions Error:", err);
-        return error(res, err.message, 500);
-    }
-};
-
-// Save/Update Special Underwriting Provisions for an application
-export const saveUnderwritingProvisions = async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
-
-        const application = await EbamModel.getCOCPdfData(id);
-        if (!application) return error(res, "Application not found.", 404);
-
-        const inputVal = req.body.provisions ?? req.body.underwriting_provisions ?? req.body.evidence_notes ?? req.body.notes ?? req.body.provision_text;
-        if (inputVal === undefined) {
-            return error(res, "Validation failed.", 400, [
-                { field: "provisions", message: "provisions, provision_text, or evidence_notes field is required." }
-            ]);
-        }
-
-        const savedRow = await EbamModel.saveUnderwritingProvisions(id, inputVal);
-
-        return success(res, {
-            application_id: id,
-            provision_text: savedRow ? savedRow.provision_text : null
-        }, "Special underwriting provisions updated successfully.", 200);
-    } catch (err) {
-        console.error("Save Underwriting Provisions Error:", err);
-        return error(res, err.message, 500);
-    }
-};
-
-// Get Contribution text for an application
-export const getContribution = async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
-
-        const application = await EbamModel.getCOCPdfData(id);
-        if (!application) return error(res, "Application not found.", 404);
-
-        const row = await EbamModel.getUnderwritingProvisions(id);
-        
-        return success(res, {
-            application_id: id,
-            contribution_text: row ? row.contribution_text : null
-        }, "Contribution text fetched successfully.", 200);
-    } catch (err) {
-        console.error("Get Contribution Error:", err);
-        return error(res, err.message, 500);
-    }
-};
-
-// Save/Update Contribution text for an application
-export const saveContribution = async (req, res) => {
-    try {
-        const id = parseInt(req.params.id);
-        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
-
-        const application = await EbamModel.getCOCPdfData(id);
-        if (!application) return error(res, "Application not found.", 404);
-
-        const inputVal = req.body.contribution_text ?? req.body.contribution;
-        if (inputVal === undefined) {
-            return error(res, "Validation failed.", 400, [
-                { field: "contribution_text", message: "contribution_text or contribution field is required." }
-            ]);
-        }
-
-        const savedRow = await EbamModel.saveContributionText(id, inputVal);
-
-        return success(res, {
-            application_id: id,
-            contribution_text: savedRow ? savedRow.contribution_text : null
-        }, "Contribution text updated successfully.", 200);
-    } catch (err) {
-        console.error("Save Contribution Error:", err);
         return error(res, err.message, 500);
     }
 };
