@@ -11,7 +11,8 @@ const buildCOCTemplateData = (data) => {
         appData, riders, rankings, rankingRiders, provisions, contribution_text, eligible_individuals, participation_requirements, termination_age,
         provision_enrollment, provision_rollover, provision_termination, provision_definitions, provision_claims, refund_of_premiums,
         amount_of_insurance, coverage_period, due_dates,
-        nel, nmed, med, max_limit, underwriting_notes
+        nel, nmed, med, max_limit, underwriting_notes,
+        provision_face_amount, provision_premium_computation, provision_non_coverage
     } = data;
 
     if ((appData.coverage_type_id === 32 || appData.coverage_type_id === 34) && rankingRiders.length > 0) {
@@ -44,6 +45,9 @@ const buildCOCTemplateData = (data) => {
         provision_termination: provision_termination || null,
         provision_definitions: provision_definitions || null,
         provision_claims: provision_claims || null,
+        provision_face_amount: provision_face_amount || null,
+        provision_premium_computation: provision_premium_computation || null,
+        provision_non_coverage: provision_non_coverage || null,
         refund_of_premiums: refund_of_premiums || null,
         amount_of_insurance: amount_of_insurance || null,
         coverage_period: coverage_period || null,
