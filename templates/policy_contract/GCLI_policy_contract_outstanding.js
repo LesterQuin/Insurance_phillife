@@ -181,12 +181,10 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
 
         return `
             <table class="data-table" style="width: 100%; border-collapse: collapse; margin-top: 15px;">
-                <thead>
-                    <tr>
-                        <th colspan="2" style="text-align: center; font-size: 10pt; font-weight: bold; background-color: #f1f5f9; color: #000000; text-transform: uppercase; padding: 8px; border: 1px solid #000;">SPECIAL UNDERWRITING PROVISIONS</th>
-                    </tr>
-                </thead>
                 <tbody>
+                    <tr>
+                        <td colspan="2" style="text-align: center; font-size: 10pt; font-weight: bold; background-color: #f1f5f9; color: #000000; text-transform: uppercase; padding: 8px; border: 1px solid #000;">SPECIAL UNDERWRITING PROVISIONS</td>
+                    </tr>
                     <tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">ENROLLMENT</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${enrollment}</td>
@@ -241,6 +239,10 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         .page-break {
             page-break-after: always;
             break-after: page;
+        }
+        tr {
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .watermark-review {
             position: fixed;
@@ -552,73 +554,140 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
 
         <!-- Resume main Data Table for Premium Rates, Refund of Premiums, Taxes, and Termination Age -->
         <table class="data-table">
-            <thead>
-                <tr>
-                    <th colspan="2" style="text-align: center; font-size: 10pt; font-weight: bold; background-color: #ffffff; color: #000000; text-transform: uppercase; padding: 8px; border: 1px solid #000;">
-                        ${(application?.payment_mode_name || 'MONTHLY').toUpperCase()} RATE PER ₱1,000 OF AMOUNT OF INSURANCE AND TERM OF LOAN
-                    </th>
-                </tr>
-            </thead>
             <tbody>
                 <tr>
-                    <td colspan="2" style="padding: 15px; border: 1px solid #000; text-align: center; vertical-align: middle;">
-                        <!-- Nested Rates Table -->
-                        ${(() => {
-                            const rates = details?.rates || [];
-                            const basicRates = rates.filter(r => r.rider_id === '0' || r.rider_id === null || r.rider_id === 0 || !r.rider_id);
-                            if (basicRates.length === 0) {
-                                return '<div style="font-size: 10pt; font-weight: bold; color: #718096;">None</div>';
-                            }
-                            basicRates.sort((a, b) => (a.term_months || 0) - (b.term_months || 0));
-                            
-                            const rowsHtml = basicRates.map(r => {
-                                const baseRate = parseFloat(r.premium_amount || r.premium_rate || 0);
-                                const term = r.term_months || 1;
-                                const termStr = term === 1 ? '1 month' : term + ' months';
-                                return `
-                                    <tr>
-                                        <td style="border: 1px solid #000; padding: 6px 12px; font-style: italic; font-size: 9.5pt; text-align: center; width: 50%; font-weight: bold;">${termStr}</td>
-                                        <td style="border: 1px solid #000; padding: 6px 12px; font-style: italic; font-size: 9.5pt; text-align: center; width: 50%; font-weight: bold;">${baseRate.toFixed(2)}</td>
-                                    </tr>
-                                `;
-                            }).join('\n');
-
-                            return `
-                                <table style="margin: 0 auto; border-collapse: collapse; min-width: 250px;">
-                                    <thead>
-                                        <tr style="background-color: #ffffff;">
-                                            <th style="border: 1px solid #000; padding: 6px 12px; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; text-align: center; width: 50%;">TERM OF LOAN</th>
-                                            <th style="border: 1px solid #000; padding: 6px 12px; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; text-align: center; width: 50%;">${application?.basic_plan_acronym || application?.plan_acronym || 'GCLIP'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${rowsHtml}
-                                    </tbody>
-                                </table>
-                            `;
-                        })()}
-
-                        <!-- Formula Text -->
-                        <div style="font-style: italic; margin-top: 15px; font-size: 9.5pt; line-height: 1.5; text-align: left;">
-                            The Premium is computed as follows:<br>
-                            <strong style="font-weight: bold;">Premium = Total Outstanding Loan Obligation / 1,000 * ${(application?.payment_mode_name || 'Monthly')} Rate * Term of Loan in Months</strong>
-                        </div>
+                    <td colspan="2" style="text-align: center; font-size: 10pt; font-weight: bold; background-color: #ffffff; color: #000000; text-transform: uppercase; padding: 8px; border: 1px solid #000;">
+                        ${(application?.payment_mode_name || 'MONTHLY').toUpperCase()} RATE PER ₱1,000 OF AMOUNT OF INSURANCE AND TERM OF LOAN
                     </td>
                 </tr>
-            <tr>
-                <th style="width: 20%;">REFUND OF PREMIUMS</th>
-                <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000; font-style: italic;">
-                    ${application.refund_of_premiums ?? ''}
-                </td>
-            </tr>
-            <tr>
-                <th>TAXES</th>
-                <td>Inclusive</td>
-            </tr>
-            <tr>
-                <th>TERMINATION AGE</th>
-                <td><strong>Group Credit Life Insurance Plan (GCLIP):</strong> ${application.termination_age ?? '__'} years old</td>
-            </tr>
+                
+                <!-- Rates Lists -->
+                ${(() => {
+                    const rates = details?.rates || [];
+                    const basicRates = rates.filter(r => r.rider_id === '0' || r.rider_id === null || r.rider_id === 0 || !r.rider_id);
+                    if (basicRates.length === 0) {
+                        return `
+                            <tr>
+                                <td colspan="2" style="font-size: 9pt; font-weight: bold; color: #718096; border: 1px solid #000; padding: 10px; text-align: center;">None</td>
+                            </tr>
+                        `;
+                    }
+
+                    // Group rates by attained age dynamically
+                    const groups = {};
+
+                    basicRates.forEach(r => {
+                        let key = '';
+                        let label = '';
+                        if (r.borrower_category === '18_65' || !r.attained_age) {
+                            key = '18_65';
+                            label = 'Standard Rates (Age 18 - 65)';
+                        } else {
+                            key = 'age_' + r.attained_age;
+                            label = 'Age ' + r.attained_age;
+                        }
+
+                        if (!groups[key]) {
+                            groups[key] = { 
+                                label: label, 
+                                sortKey: key === '18_65' ? 0 : parseInt(r.attained_age), 
+                                rates: [] 
+                            };
+                        }
+                        groups[key].rates.push(r);
+                    });
+
+                    let htmlContent = '';
+                    const sortedKeys = Object.keys(groups).sort((a, b) => {
+                        return groups[a].sortKey - groups[b].sortKey;
+                    });
+
+                    sortedKeys.forEach(catKey => {
+                        const group = groups[catKey];
+                        if (!group || group.rates.length === 0) return;
+
+                        // Sort by term
+                        group.rates.sort((a, b) => (a.term_months || 0) - (b.term_months || 0));
+
+                        // Chunk into rows of 3 columns
+                        const chunks = [];
+                        for (let i = 0; i < group.rates.length; i += 3) {
+                            chunks.push(group.rates.slice(i, i + 3));
+                        }
+
+                        const rowsHtml = chunks.map(chunk => {
+                            let rowCols = '';
+                            for (let j = 0; j < 3; j++) {
+                                const r = chunk[j];
+                                if (r) {
+                                    const baseRate = parseFloat(r.premium_amount || r.premium_rate || 0);
+                                    const term = r.term_months || 1;
+                                    const termStr = term === 1 ? '1 Month' : term + ' Months';
+                                    rowCols += `
+                                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; width: 16.66%; font-weight: 500;">${termStr}</td>
+                                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; width: 16.66%; font-weight: bold;">${baseRate.toFixed(3)}</td>
+                                    `;
+                                } else {
+                                    rowCols += `
+                                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; width: 16.66%;"></td>
+                                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; width: 16.66%;"></td>
+                                    `;
+                                }
+                            }
+                            return `<tr>${rowCols}</tr>`;
+                        }).join('\n');
+
+                        htmlContent += `
+                            <tr style="page-break-inside: avoid; break-inside: avoid;">
+                                <td colspan="2" style="padding: 10px 15px; border: 1px solid #000; text-align: center; vertical-align: middle;">
+                                    <div style="font-weight: bold; font-size: 9pt; text-align: left; margin-bottom: 5px; text-transform: uppercase;">${group.label}</div>
+                                    <table style="margin: 0 auto; border-collapse: collapse; width: 100%; font-family: 'Cambria', Georgia, serif;">
+                                        <thead>
+                                            <tr style="background-color: #ffffff;">
+                                                <th style="border: 1px solid #000; padding: 4px 6px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-align: center; width: 16.66%;">TERM OF LOAN</th>
+                                                <th style="border: 1px solid #000; padding: 4px 6px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-align: center; width: 16.66%;">${application?.basic_plan_acronym || application?.plan_acronym || 'GCLIP'}</th>
+                                                <th style="border: 1px solid #000; padding: 4px 6px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-align: center; width: 16.66%;">TERM OF LOAN</th>
+                                                <th style="border: 1px solid #000; padding: 4px 6px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-align: center; width: 16.66%;">${application?.basic_plan_acronym || application?.plan_acronym || 'GCLIP'}</th>
+                                                <th style="border: 1px solid #000; padding: 4px 6px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-align: center; width: 16.66%;">TERM OF LOAN</th>
+                                                <th style="border: 1px solid #000; padding: 4px 6px; font-weight: bold; font-size: 8.5pt; text-transform: uppercase; text-align: center; width: 16.66%;">${application?.basic_plan_acronym || application?.plan_acronym || 'GCLIP'}</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${rowsHtml}
+                                        </tbody>
+                                    </table>
+                                </td>
+                            </tr>
+                        `;
+                    });
+
+                    return htmlContent;
+                })()}
+
+                <!-- Formula Text Box -->
+                <tr style="page-break-inside: avoid; break-inside: avoid;">
+                    <td colspan="2" style="font-style: italic; font-size: 9pt; line-height: 1.45; text-align: left; border: 1px solid #000; padding: 8px 12px; background-color: #ffffff;">
+                        The Premium is computed as follows:<br>
+                        <strong style="font-weight: bold;">Premium = Total Outstanding Loan Obligation / 1,000 * ${(application?.payment_mode_name || 'Monthly')} Rate * Term of Loan in Months</strong>
+                    </td>
+                </tr>
+
+                <!-- Remaining Parameters Table -->
+                <tr>
+                    <th style="width: 20%; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">REFUND OF PREMIUMS</th>
+                    <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000; font-style: italic;">
+                        ${application.refund_of_premiums ?? ''}
+                    </td>
+                </tr>
+                <tr>
+                    <th style="width: 20%; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">TAXES</th>
+                    <td style="font-size: 9.5pt; padding: 8px 10px; border: 1px solid #000;">Inclusive</td>
+                </tr>
+                <tr>
+                    <th style="width: 20%; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">TERMINATION AGE</th>
+                    <td style="font-size: 9.5pt; padding: 8px 10px; border: 1px solid #000;"><strong>Group Credit Life Insurance Plan (GCLIP):</strong> ${application.termination_age ?? '__'} years old</td>
+                </tr>
+            </tbody>
         </table>
 
         <div style="margin-top: 20px;"></div>
@@ -635,7 +704,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             .sla-container {
                 border: 3px double #000;
                 font-family: 'Cambria', Georgia, serif;
-                margin-top: 15px;
+                margin-top: 10px;
             }
             .sla-table {
                 width: 100%;
@@ -653,11 +722,18 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             }
             .sla-table td {
                 border: 1px solid #000;
-                padding: 4px 6px !important;
-                font-size: 7.5pt !important;
+                padding: 2.5px 4px !important;
+                font-size: 6.8pt !important;
+                line-height: 1.15;
             }
             .sla-table th {
                 border: 1px solid #000;
+                padding: 4px 4px !important;
+                font-size: 7.2pt !important;
+            }
+            .sla-table tr[style*="background-color: #ffff00"] td {
+                padding: 3px 6px !important;
+                font-size: 7.5pt !important;
             }
         </style>
         <div class="sla-container">
@@ -667,13 +743,13 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             </div>
             <table class="sla-table">
                 <thead>
-                    <tr style="background-color: #d1d5db; font-size: 8.5pt; font-weight: bold; text-align: center; border: 1px solid #000;">
-                        <th style="width: 20%; border: 1px solid #000; padding: 8px 6px;">TRANSACTION CATEGORY</th>
-                        <th style="width: 6%; border: 1px solid #000; padding: 8px 6px;">TAT (WD)</th>
-                        <th style="width: 24%; border: 1px solid #000; padding: 8px 6px;">RECKONING DATE</th>
-                        <th style="width: 17%; border: 1px solid #000; padding: 8px 6px;">MODE OF COMMUNICATION</th>
-                        <th style="width: 16%; border: 1px solid #000; padding: 8px 6px;">RESPONSIBLE</th>
-                        <th style="width: 17%; border: 1px solid #000; padding: 8px 6px;">CONTACT DETAILS</th>
+                    <tr style="background-color: #d1d5db; font-size: 7.2pt; font-weight: bold; text-align: center; border: 1px solid #000;">
+                        <th style="width: 18%; border: 1px solid #000; padding: 4px 3px;">TRANSACTION CATEGORY</th>
+                        <th style="width: 4%; border: 1px solid #000; padding: 4px 3px;">TAT (WD)</th>
+                        <th style="width: 23%; border: 1px solid #000; padding: 4px 3px;">RECKONING DATE</th>
+                        <th style="width: 17%; border: 1px solid #000; padding: 4px 3px;">MODE OF COMMUNICATION</th>
+                        <th style="width: 16%; border: 1px solid #000; padding: 4px 3px;">RESPONSIBLE</th>
+                        <th style="width: 22%; border: 1px solid #000; padding: 4px 3px;">CONTACT DETAILS</th>
                     </tr>
                 </thead>
                 <tbody style="font-size: 8pt;">
@@ -972,49 +1048,46 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
                     <td colspan="6" style="border: 1px solid #000; padding: 6px 10px; text-transform: uppercase;">COMMUNICATION</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Acknowledgement (Simple)</td>
+                    <td rowspan="2" style="border: 1px solid #000; padding: 6px 8px; font-style: italic; vertical-align: middle;">Acknowledgement</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">2</td>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Simple: working dates from receipt</td>
+                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Simple: working dates from the receipt of the complain/request</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center">Email</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">Policyholder/Phillife</td>
                     <td style="border: 1px solid #000; padding: 6px 8px;">ebam@phillife.com.ph/GMS</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Acknowledgement (Complex)</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">2</td>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Complex: working dates from receipt</td>
+                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Complex: working dates from the receipt of the complain/request</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center">Email</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">Policyholder/Phillife</td>
                     <td style="border: 1px solid #000; padding: 6px 8px;">ebam@phillife.com.ph/GMS</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Processing and Resolution (Simple)</td>
+                    <td rowspan="2" style="border: 1px solid #000; padding: 6px 8px; font-style: italic; vertical-align: middle;">Processing and Resolution<br>(assessment, investigation, & resolution)</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">7</td>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Simple: working dates from receipt</td>
+                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Simple: working dates from the receipt of the complain/request</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center">Email</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">Policyholder/Phillife</td>
                     <td style="border: 1px solid #000; padding: 6px 8px;">ebam@phillife.com.ph/GMS</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Processing and Resolution (Complex)</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">7</td>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Complex: working dates from receipt</td>
+                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Complex: working dates from the receipt of the complain/request</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center">Email</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">Policyholder/Phillife</td>
                     <td style="border: 1px solid #000; padding: 6px 8px;">ebam@phillife.com.ph/GMS</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Communication of resolution (Simple)</td>
+                    <td rowspan="2" style="border: 1px solid #000; padding: 6px 8px; font-style: italic; vertical-align: middle;">Communication of resolution to requesting consumer</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">9</td>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Simple: working dates from receipt</td>
+                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Simple: working dates from the receipt of the complain/request</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center">Email</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">Policyholder/Phillife</td>
                     <td style="border: 1px solid #000; padding: 6px 8px;">ebam@phillife.com.ph/GMS</td>
                 </tr>
                 <tr>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Communication of resolution (Complex)</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">47</td>
-                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Complex: working dates from receipt</td>
+                    <td style="border: 1px solid #000; padding: 6px 8px; font-style: italic;">Complex: working dates from the receipt of the complain/request</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center" >Email</td>
                     <td style="border: 1px solid #000; padding: 6px 8px; text-align: center;">Policyholder/Phillife</td>
                     <td style="border: 1px solid #000; padding: 6px 8px;">ebam@phillife.com.ph/GMS</td>
@@ -1171,8 +1244,6 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             Written notice of claim given by or in behalf of the Insured Debtor, to the Insurer or to any authorized representative of the Insurer, with information sufficient to identify the Insured Debtor, shall be deemed to be notice to the Insurer.
         </p>
 
-        <div class="page-break"></div>
-
         <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PROOF OF LOSS</div>
         <p class="paragraph">
             Written proof of loss must be furnished to the Insurer within ninety (90) days from the date of the loss to which the claim is made. Failure to comply within the time provided shall not invalidate nor reduce the claim if it is shown that it was not reasonably possible to submit such proof within the required time and that proof was submitted as soon as was reasonably possible.
@@ -1318,7 +1389,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         </blockquote>
         <p class="paragraph">
             shall not apply in determining the extent of liability under the provision of this Policy.
-        </p>
+        </p><br>
 
         <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">CURRENCY</div>
         <p class="paragraph">
