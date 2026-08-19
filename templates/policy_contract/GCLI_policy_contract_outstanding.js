@@ -54,8 +54,8 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
 
         let html = '';
         items.forEach((item, idx) => {
-            const amountVal = item.amount || '';
-            const ageVal = item.age || '';
+            const amountVal = item.amount || item.limit || item.max_amount || item.amount_of_insurance || '';
+            const ageVal = item.age || item.age_bracket || item.attained_age || item.age_range || '';
 
             if (idx === 0) {
                 if (isMerged) {
@@ -1597,8 +1597,8 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
                     <td style="border: 1px solid #000; padding: 3px 2px; text-align: center; font-style: italic;">X</td>
                 </tr>
                 ${(() => {
-                    const riderCount = Array.isArray(application?.riders) && application.riders.length > 0 ? application.riders.length : 0;
-                    const range = riderCount > 0 ? '18-22' : 'N/A';
+                    const hasRiders = Array.isArray(application?.riders) && application.riders.length > 0;
+                    const range = hasRiders ? '{{RIDER_PAGE_RANGE}}' : 'N/A';
                     return `
                         <tr>
                             <td style="border: 1px solid #000; padding: 3px 2px; text-align: center; font-style: italic;">${range}</td>
