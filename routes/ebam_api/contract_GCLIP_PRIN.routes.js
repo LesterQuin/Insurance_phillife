@@ -5,35 +5,35 @@ import { checkTemplateType } from '../../middlewares/validateTemplate.js';
 
 const router = express.Router();
 
-router.use('/:id', checkTemplateType('PRINCIPAL'));
+router.use('/:id/policy-contract/principal', checkTemplateType('PRINCIPAL'));
 
 // Underwriting Limits Table Parameters Management APIs
 router.get('/:id/policy-contract/principal/underwriting-limits', Controller.getUnderwritingLimits);
 router.post('/:id/policy-contract/principal/underwriting-limits', Controller.saveUnderwritingLimits);
-router.put('/:id/policy-contract/principal/underwriting-limits', authenticate, Controller.saveUnderwritingLimits);
+router.put('/:id/policy-contract/principal/underwriting-limits', Controller.saveUnderwritingLimits);
 
 // Contribution Management APIs
-router.get('/:id/policy-contract/principal/contribution', authenticate, Controller.getContribution);
+router.get('/:id/policy-contract/principal/contribution', Controller.getContribution);
 router.post('/:id/policy-contract/principal/contribution', Controller.saveContribution);
-router.put('/:id/policy-contract/principal/contribution', authenticate, Controller.saveContribution);
+router.put('/:id/policy-contract/principal/contribution', Controller.saveContribution);
 
 // Eligible Individuals Management APIs
-router.get('/:id/policy-contract/principal/eligible-individuals', authenticate, Controller.getEligibleIndividuals);
+router.get('/:id/policy-contract/principal/eligible-individuals', Controller.getEligibleIndividuals);
 router.post('/:id/policy-contract/principal/eligible-individuals', Controller.saveEligibleIndividuals);
 router.put('/:id/policy-contract/principal/eligible-individuals', Controller.saveEligibleIndividuals);
 
 // Participation Requirements Management APIs
-router.get('/:id/policy-contract/principal/participation-requirements', authenticate, Controller.getParticipationRequirements);
+router.get('/:id/policy-contract/principal/participation-requirements', Controller.getParticipationRequirements);
 router.post('/:id/policy-contract/principal/participation-requirements', Controller.saveParticipationRequirements);
-router.put('/:id/policy-contract/principal/participation-requirements', authenticate, Controller.saveParticipationRequirements);
+router.put('/:id/policy-contract/principal/participation-requirements', Controller.saveParticipationRequirements);
 
 // Special Underwriting Provisions Sections Management APIs
-router.get('/:id/policy-contract/principal/special-provisions', authenticate, Controller.getSpecialProvisions);
+router.get('/:id/policy-contract/principal/special-provisions', Controller.getSpecialProvisions);
 router.post('/:id/policy-contract/principal/special-provisions', Controller.saveSpecialProvisions);
-router.put('/:id/policy-contract/principal/special-provisions', authenticate, Controller.saveSpecialProvisions);
+router.put('/:id/policy-contract/principal/special-provisions', Controller.saveSpecialProvisions);
 
 // Unified Schedule of Insurance APIs
-router.get('/:id/policy-contract/principal/schedule-of-insurance', authenticate, Controller.getScheduleOfInsurance);
+router.get('/:id/policy-contract/principal/schedule-of-insurance', Controller.getScheduleOfInsurance);
 router.post('/:id/policy-contract/principal/schedule-of-insurance', Controller.saveScheduleOfInsurance);
 router.put('/:id/policy-contract/principal/schedule-of-insurance', Controller.saveScheduleOfInsurance);
 

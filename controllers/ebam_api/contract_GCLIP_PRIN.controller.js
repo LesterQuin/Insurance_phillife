@@ -99,7 +99,7 @@ export const saveEligibleIndividuals = async (req, res) => {
     }
 };
 
-// Get Participation Requirements text for an application
+// Get Participation Requirements for an application
 export const getParticipationRequirements = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
@@ -112,15 +112,16 @@ export const getParticipationRequirements = async (req, res) => {
         
         return success(res, {
             application_id: id,
-            participation_requirements: row ? row.participation_requirements : null
-        }, "Participation requirements text fetched successfully.", 200);
+            percentage: row ? (row.participation_percentage || '100%') : '100%',
+            minimum_no: row ? (row.participation_minimum_no || null) : null
+        }, "Participation requirements fetched successfully.", 200);
     } catch (err) {
         console.error("Get Participation Requirements Error:", err);
         return error(res, err.message, 500);
     }
 };
 
-// Save/Update Participation Requirements text for an application
+// Save/Update Participation Requirements for an application
 export const saveParticipationRequirements = async (req, res) => {
     try {
         const id = parseInt(req.params.id);
@@ -129,10 +130,10 @@ export const saveParticipationRequirements = async (req, res) => {
         const application = await EbamModel.getCOCPdfData(id);
         if (!application) return error(res, "Application not found.", 404);
 
-        const inputVal = req.body.participation_requirements ?? req.body.participation_requirements_text;
-        if (inputVal === undefined) {
+        const inputVal = req.body;
+        if (!inputVal || (inputVal.percentage === undefined && inputVal.minimum_no === undefined && inputVal.participation_requirements === undefined && inputVal.participation_percentage === undefined && inputVal.participation_minimum_no === undefined)) {
             return error(res, "Validation failed.", 400, [
-                { field: "participation_requirements", message: "participation_requirements or participation_requirements_text field is required." }
+                { field: "percentage", message: "percentage and/or minimum_no field is required." }
             ]);
         }
 
@@ -140,8 +141,9 @@ export const saveParticipationRequirements = async (req, res) => {
 
         return success(res, {
             application_id: id,
-            participation_requirements: savedRow ? savedRow.participation_requirements : null
-        }, "Participation requirements text updated successfully.", 200);
+            percentage: savedRow ? (savedRow.participation_percentage || '100%') : '100%',
+            minimum_no: savedRow ? (savedRow.participation_minimum_no || null) : null
+        }, "Participation requirements updated successfully.", 200);
     } catch (err) {
         console.error("Save Participation Requirements Error:", err);
         return error(res, err.message, 500);
