@@ -96,58 +96,70 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
     };
 
     // Helper to render dynamic table for Participation Requirements
-    const renderParticipationRequirements = (val) => {
-        if (!val) {
-            return `
-                <table style="width: 100%; border-collapse: collapse; margin-top: 4px;">
-                    <tbody>
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; width: 40%; font-style: italic;">Percentage of all Eligible Individuals</td>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; font-style: italic;">100%</td>
-                        </tr>
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; font-style: italic;">Minimum Number of Insureds</td>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; font-style: italic;"></td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
-        }
+    const renderParticipationRequirements = (appOrVal) => {
+        let percentage = '100%';
+        let minimumNoVal = null;
 
-        if (typeof val === 'object') {
-            const percentage = (val.percentage || '').trim();
-            const minimumNoVal = val.minimum_no;
+        if (typeof appOrVal === 'object' && appOrVal !== null) {
+            percentage = appOrVal.participation_percentage || appOrVal.percentage || '100%';
+            minimumNoVal = appOrVal.participation_minimum_no ?? appOrVal.minimum_no;
             
-            let minNoHtml = '';
-            let alignStyle = 'text-align: center;';
-
-            if (Array.isArray(minimumNoVal)) {
-                minNoHtml = `<ul style="margin: 0; padding-left: 15px; list-style-type: disc; text-align: left;">${minimumNoVal.map(item => `<li style="line-height: 1.4; font-size: 8.5pt;">${(item || '').trim()}</li>`).join('')}</ul>`;
-                alignStyle = 'text-align: left;';
-            } else {
-                minNoHtml = (minimumNoVal || '').trim();
-                if (minNoHtml.includes('<')) {
-                    alignStyle = 'text-align: left;';
+            // If legacy participation_requirements string exists
+            if (!minimumNoVal && appOrVal.participation_requirements) {
+                const reqRaw = appOrVal.participation_requirements;
+                if (typeof reqRaw === 'string' && (reqRaw.trim().startsWith('{') || reqRaw.trim().startsWith('['))) {
+                    try {
+                        const parsed = JSON.parse(reqRaw);
+                        percentage = parsed.percentage || percentage;
+                        minimumNoVal = parsed.minimum_no;
+                    } catch (e) {
+                        minimumNoVal = reqRaw;
+                    }
+                } else {
+                    minimumNoVal = reqRaw;
                 }
             }
-
-            return `
-                <table style="width: 100%; border-collapse: collapse; margin-top: 4px;">
-                    <tbody>
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; width: 40%; font-style: italic;">Percentage of all Eligible Individuals</td>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; font-style: italic;">${percentage || '100%'}</td>
-                        </tr>
-                        <tr>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; font-style: italic; vertical-align: middle;">Minimum Number of Insureds</td>
-                            <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; ${alignStyle} vertical-align: middle;">${minNoHtml}</td>
-                        </tr>
-                    </tbody>
-                </table>
-            `;
+        } else if (typeof appOrVal === 'string') {
+            if (appOrVal.trim().startsWith('{') || appOrVal.trim().startsWith('[')) {
+                try {
+                    const parsed = JSON.parse(appOrVal);
+                    percentage = parsed.percentage || '100%';
+                    minimumNoVal = parsed.minimum_no;
+                } catch (e) {
+                    minimumNoVal = appOrVal;
+                }
+            } else {
+                minimumNoVal = appOrVal;
+            }
         }
 
-        return val;
+        let minNoHtml = '';
+        let alignStyle = 'text-align: center;';
+
+        if (Array.isArray(minimumNoVal)) {
+            minNoHtml = `<ul style="margin: 0; padding-left: 15px; list-style-type: disc; text-align: left;">${minimumNoVal.map(item => `<li style="line-height: 1.4; font-size: 8.5pt;">${(item || '').trim()}</li>`).join('')}</ul>`;
+            alignStyle = 'text-align: left;';
+        } else if (minimumNoVal) {
+            minNoHtml = String(minimumNoVal).trim();
+            if (minNoHtml.includes('<')) {
+                alignStyle = 'text-align: left;';
+            }
+        }
+
+        return `
+            <table style="width: 100%; border-collapse: collapse; margin-top: 4px;">
+                <tbody>
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; width: 40%; font-style: italic;">Percentage of all Eligible Individuals</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; text-align: center; font-style: italic;">${percentage}</td>
+                    </tr>
+                    <tr>
+                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; font-style: italic; vertical-align: middle;">Minimum Number of Insureds</td>
+                        <td style="border: 1px solid #000; padding: 4px 6px; font-size: 8.5pt; ${alignStyle} vertical-align: middle;">${minNoHtml}</td>
+                    </tr>
+                </tbody>
+            </table>
+        `;
     };
 
     // Currency & Contribution
@@ -244,20 +256,27 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             page-break-inside: avoid;
             break-inside: avoid;
         }
+        .layout-table, .layout-table tr, .layout-table tbody, .layout-table td,
+        .rider-container, .rider-header-wrapper, .rider-body-wrapper {
+            page-break-inside: auto !important;
+            break-inside: auto !important;
+        }
         .watermark-review {
             position: fixed;
             top: 50%;
             left: 50%;
-            transform: translate(-70%, -70%) rotate(-35deg);
-            font-size: 75pt;
+            transform: translate(-50%, -50%) rotate(-35deg);
+            transform-origin: center center;
+            font-size: 70pt;
             color: rgba(220, 220, 220, 0.25);
-            font-weight: 400;
+            font-weight: bold;
             text-transform: uppercase;
             letter-spacing: 8px;
             pointer-events: none;
             z-index: 9999;
             user-select: none;
             white-space: nowrap;
+            text-align: center;
         }
         .header-logo {
             text-align: center;
@@ -269,7 +288,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
         .main-title {
             text-align: center;
             font-size: 15pt;
-            font-weight: 800;
+            font-weight: bold;
             color: #000;
             margin: 25px 0 10px 0;
             text-transform: uppercase;
@@ -319,6 +338,47 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             text-transform: uppercase;
             border-bottom: 2px solid #0d47a1;
             padding-bottom: 3px;
+        }
+        .policy-provisions-container {
+            font-family: 'Cambria', 'Cambria Math', Georgia, serif;
+            color: #000000;
+        }
+        .provisions-main-title {
+            font-family: 'Cambria', 'Cambria Math', Georgia, serif;
+            text-align: center;
+            font-size: 18pt;
+            font-weight: bold;
+            color: #000000;
+            margin: 25px 0 15px 0;
+            text-transform: uppercase;
+        }
+        .provisions-section-header {
+            font-family: 'Cambria', 'Cambria Math', Georgia, serif;
+            font-size: 13pt;
+            font-weight: bold;
+            color: #000000;
+            margin-top: 18px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            border-bottom: none;
+        }
+        .policy-provisions-container p,
+        .policy-provisions-container .paragraph,
+        .policy-provisions-container .paragraph-no-indent,
+        .policy-provisions-container ol,
+        .policy-provisions-container ul,
+        .policy-provisions-container li,
+        .policy-provisions-container blockquote,
+        .policy-provisions-container td,
+        .policy-provisions-container th {
+            font-family: 'Cambria', 'Cambria Math', Georgia, serif;
+            font-size: 11pt;
+            font-weight: normal;
+            line-height: 1.5;
+            color: #000000;
+        }
+        .policy-provisions-container th {
+            font-weight: bold;
         }
         .signature-block {
             margin-top: 40px;
@@ -450,11 +510,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             </tr>
             <tr>
                 <th>SUPPLEMENTARY BENEFITS/RIDERS</th>
-                <td>
-                    ${Array.isArray(application?.riders) && application.riders.length > 0
-                        ? application.riders.map(r => `${r.rider_name || r.name || r.acronym} (${r.acronym})`).join('<br>')
-                        : 'None'}
-                </td>
+                <td>${Array.isArray(application?.riders) && application.riders.length > 0 ? application.riders.map(r => `- ${r.rider_name || r.name || r.acronym}`) .join('<br>') : 'None' }</td>
             </tr>
             <tr>
                 <th>CURRENCY</th>
@@ -491,7 +547,7 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             <tr>
                 <th>PARTICIPATION REQUIREMENTS</th>
                 <td>
-                    ${renderParticipationRequirements(application?.participation_requirements)}
+                    ${renderParticipationRequirements(application)}
                 </td>
             </tr>
             <tr>
@@ -1130,280 +1186,283 @@ export function generateGCLIOutstandingPolicyContract(application = {}, details 
             <div style="font-size: 11pt; margin-top: 8px;">Signed on _________________ at ${application?.signing_location || businessAddress || ''}.</div>
         </div>
 
-        <div class="page-break"></div>
+        <div class="page-break"></div>        <!-- ================= SECTIONS I-IV: INSURANCE PROVISIONS ================= -->
+        <div class="policy-provisions-container">
 
-        <!-- ================= SECTIONS I-IV: INSURANCE PROVISIONS ================= -->
-        <!-- ================= SECTION I: INSURANCE PROVISIONS ================= -->
-        <div class="main-title" style="font-size: 14pt;">I. INSURANCE PROVISIONS</div>
-        
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">WHO MAY BE INSURED</div>
-        <p class="paragraph">
-            All debtors satisfying the eligibility provision stated in the Policy Data Page shall be eligible for insurance under this Policy on the date stated in the Policy Data Page.
-        </p>
+            <!-- ================= SECTION I: INSURANCE PROVISIONS ================= -->
+            <div class="provisions-main-title">I. INSURANCE PROVISIONS</div>
+            
+            <div class="provisions-section-header">WHO MAY BE INSURED</div>
+            <p class="paragraph">
+                All debtors satisfying the eligibility provision stated in the Policy Data Page shall be eligible for insurance under this Policy on the date stated in the Policy Data Page.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">ENROLLMENT</div>
-        <p class="paragraph">
-            Written application, on forms satisfactory to the Insurer, is required for each eligible debtor in respect of whom an application for insurance under this Policy is being made. Eligible debtors accepted by the Insurer for insurance coverage under this Policy are hereinafter referred to as Insured Debtors.
-        </p>
+            <div class="provisions-section-header">ENROLLMENT</div>
+            <p class="paragraph">
+                Written application, on forms satisfactory to the Insurer, is required for each eligible debtor in respect of whom an application for insurance under this Policy is being made. Eligible debtors accepted by the Insurer for insurance coverage under this Policy are hereinafter referred to as Insured Debtors.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">BENEFITS</div>
-        <p class="paragraph">
-            Each eligible debtor shall be insured in accordance with the Schedule of Insurance stated in the Policy Data Page.
-        </p>
-        <p class="paragraph">
-            Upon death of the Insured Debtor, the Insurer shall pay the Creditor the amount of his insurance to the extent of his outstanding loan balance and to his designated beneficiary any amount of insurance in excess of his outstanding loan balance.
-        </p>
+            <div class="provisions-section-header">BENEFITS</div>
+            <p class="paragraph">
+                Each eligible debtor shall be insured in accordance with the Schedule of Insurance stated in the Policy Data Page.
+            </p>
+            <p class="paragraph">
+                Upon death of the Insured Debtor, the Insurer shall pay the Creditor the amount of his insurance to the extent of his outstanding loan balance and to his designated beneficiary any amount of insurance in excess of his outstanding loan balance.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">EFFECTIVE DATE OF INDIVIDUAL INSURANCE</div>
-        <p class="paragraph">
-            Subject to the Evidence of Insurability provision, individual insurance shall take effect on the eligibility date of the debtor provided premiums are paid and provided further that if on account of illness or disability, any eligible debtor is bedridden or is confined in a hospital/clinic on the date his insurance would have become effective, as provided above, his insurance shall not become effective until the first day of the month coincident with or immediately following the date he fully recovers from such illness or disability, or of his discharge from the hospital/clinic as a fully recovered patient.
-        </p>
+            <div class="provisions-section-header">EFFECTIVE DATE OF INDIVIDUAL INSURANCE</div>
+            <p class="paragraph">
+                Subject to the Evidence of Insurability provision, individual insurance shall take effect on the eligibility date of the debtor provided premiums are paid and provided further that if on account of illness or disability, any eligible debtor is bedridden or is confined in a hospital/clinic on the date his insurance would have become effective, as provided above, his insurance shall not become effective until the first day of the month coincident with or immediately following the date he fully recovers from such illness or disability, or of his discharge from the hospital/clinic as a fully recovered patient.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">EVIDENCE OF INSURABILITY</div>
-        <p class="paragraph">
-            No evidence of insurability shall be required for amounts of insurance not exceeding the no-evidence limit stated in the Policy Data Page, if any, subject to conditions stated therein and provided further that:
-        </p>
-        <ol style="padding-left: 25px; line-height: 1.5;">
-            <li>the debtor’s application for insurance is received by the Insurer not later than 31 days after his date of eligibility; nor</li>
-            <li>the debtor is not applying for reinstatement of his insurance that he has voluntarily terminated.</li>
-        </ol>
-        <p class="paragraph">
-            The Insurer shall require evidence of insurability acceptable to it for amounts exceeding the No-Evidence Limit, if any, and to debtors not satisfying the above-stated conditions.
-        </p>
-        <p class="paragraph">
-            The insurance of a debtor subject to evidence of insurability shall take effect on the date such evidence is approved by the Insurer.
-        </p>
-        <p class="paragraph">
-            The Insurer reserves the right to charge extra premium for a debtor who is required to submit evidence of insurability and is found to be substandard or entirely decline his insurance which is subject to the evidence of insurability, if such evidence is found not acceptable or should the Creditor and/or debtor refuse to pay such extra premium.
-        </p>
+            <div class="provisions-section-header">EVIDENCE OF INSURABILITY</div>
+            <p class="paragraph">
+                No evidence of insurability shall be required for amounts of insurance not exceeding the no-evidence limit stated in the Policy Data Page, if any, subject to conditions stated therein and provided further that:
+            </p>
+            <ol style="padding-left: 25px; line-height: 1.5;">
+                <li>the debtor’s application for insurance is received by the Insurer not later than 31 days after his date of eligibility; nor</li>
+                <li>the debtor is not applying for reinstatement of his insurance that he has voluntarily terminated.</li>
+            </ol>
+            <p class="paragraph">
+                The Insurer shall require evidence of insurability acceptable to it for amounts exceeding the No-Evidence Limit, if any, and to debtors not satisfying the above-stated conditions.
+            </p>
+            <p class="paragraph">
+                The insurance of a debtor subject to evidence of insurability shall take effect on the date such evidence is approved by the Insurer.
+            </p>
+            <p class="paragraph">
+                The Insurer reserves the right to charge extra premium for a debtor who is required to submit evidence of insurability and is found to be substandard or entirely decline his insurance which is subject to the evidence of insurability, if such evidence is found not acceptable or should the Creditor and/or debtor refuse to pay such extra premium.
+            </p>
 
-        <div class="page-break"></div>
+            <div class="page-break"></div>
 
-        <!-- ================= SECTION II: PREMIUM PROVISIONS ================= -->
-        <div class="main-title" style="font-size: 14pt;">II. PREMIUM PROVISIONS</div>
-        
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PREMIUM RATES</div>
-        <p class="paragraph">
-            The premium rates per ₱ 1,000.00 of insurance by class of Insured Debtors shall be as stated in the Policy Data Page.
-        </p>
+            <!-- ================= SECTION II: PREMIUM PROVISIONS ================= -->
+            <div class="provisions-main-title">II. PREMIUM PROVISIONS</div>
+            
+            <div class="provisions-section-header">PREMIUM RATES</div>
+            <p class="paragraph">
+                The premium rates per ₱ 1,000.00 of insurance by class of Insured Debtors shall be as stated in the Policy Data Page.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">GUARANTEE OF AND RIGHT TO CHANGE THE PREMIUM RATE</div>
-        <p class="paragraph">
-            The premium rates are guaranteed for the first policy year. The Insurer reserves the right to establish new premium rates at the beginning of any renewal year or whenever the terms of this Policy are changed.
-        </p>
+            <div class="provisions-section-header">GUARANTEE OF AND RIGHT TO CHANGE THE PREMIUM RATE</div>
+            <p class="paragraph">
+                The premium rates are guaranteed for the first policy year. The Insurer reserves the right to establish new premium rates at the beginning of any renewal year or whenever the terms of this Policy are changed.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">COMPUTATION OF PREMIUMS DUE</div>
-        <p class="paragraph">
-            The amount of each premium due shall be determined by multiplying the applicable premium rate per ₱ 1,000.00 by the total amount of insurance in force on the said due date. A statement of premiums due including premium adjustments shall be furnished as of each due date by the Insurer.
-        </p>
+            <div class="provisions-section-header">COMPUTATION OF PREMIUMS DUE</div>
+            <p class="paragraph">
+                The amount of each premium due shall be determined by multiplying the applicable premium rate per ₱ 1,000.00 by the total amount of insurance in force on the said due date. A statement of premiums due including premium adjustments shall be furnished as of each due date by the Insurer.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PREMIUM ADJUSTMENTS</div>
-        <p class="paragraph">
-            Premiums shall be subject to adjustment on account of insurance added, increased, reduced and/or terminated. Premium adjustment during a policy year shall be calculated pro-rata using the premium rates effective at the beginning of that policy year, from the date the adjustment becomes effective to the next premium due date or as mutually agreed upon by the Creditor and the Insurer.
-        </p>
-        <p class="paragraph">
-            Premium adjustments shall be due when determined.
-        </p>
+            <div class="provisions-section-header">PREMIUM ADJUSTMENTS</div>
+            <p class="paragraph">
+                Premiums shall be subject to adjustment on account of insurance added, increased, reduced and/or terminated. Premium adjustment during a policy year shall be calculated pro-rata using the premium rates effective at the beginning of that policy year, from the date the adjustment becomes effective to the next premium due date or as mutually agreed upon by the Creditor and the Insurer.
+            </p>
+            <p class="paragraph">
+                Premium adjustments shall be due when determined.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PAYMENT OF PREMIUMS</div>
-        <p class="paragraph">
-            Premiums are payable to the Insurer in advance on each premium due date, at its Home Office or to a duly authorized agent of the Insurer or through the other offices as the Insurer may hereafter designate, in exchange for a receipt duly signed by the Insurer's authorized representative. The payment of any premium shall not maintain the insurance under this Policy in force beyond the date when the next premium becomes payable, except as set forth in the "GRACE PERIOD" provision.
-        </p>
+            <div class="provisions-section-header">PAYMENT OF PREMIUMS</div>
+            <p class="paragraph">
+                Premiums are payable to the Insurer in advance on each premium due date, at its Home Office or to a duly authorized agent of the Insurer or through the other offices as the Insurer may hereafter designate, in exchange for a receipt duly signed by the Insurer's authorized representative. The payment of any premium shall not maintain the insurance under this Policy in force beyond the date when the next premium becomes payable, except as set forth in the "GRACE PERIOD" provision.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">GRACE PERIOD</div>
-        <p class="paragraph">
-            A grace period of thirty-one (31) days following the due date shall be allowed the Creditor for the payment of each premium after the first during which insurance coverage hereunder shall remain in force. If any premium due is not paid within the grace period, this Policy shall automatically terminate at the expiration of the grace period, except that if the Creditor shall have given the Insurer written notice in advance of an earlier date of termination, this Policy shall terminate as such earlier date. The Creditor shall be liable to the Insurer for the payment of a pro-rata premium from the time this Policy was in force during the grace period.
-        </p>
+            <div class="provisions-section-header">GRACE PERIOD</div>
+            <p class="paragraph">
+                A grace period of thirty-one (31) days following the due date shall be allowed the Creditor for the payment of each premium after the first during which insurance coverage hereunder shall remain in force. If any premium due is not paid within the grace period, this Policy shall automatically terminate at the expiration of the grace period, except that if the Creditor shall have given the Insurer written notice in advance of an earlier date of termination, this Policy shall terminate as such earlier date. The Creditor shall be liable to the Insurer for the payment of a pro-rata premium from the time this Policy was in force during the grace period.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">TAXES</div>
-        <p class="paragraph">
-            The taxes specified in the Policy Data Page, if any, shall be for the account of the Creditor and shall be payable in the manner stated therein.
-        </p>
+            <div class="provisions-section-header">TAXES</div>
+            <p class="paragraph">
+                The taxes specified in the Policy Data Page, if any, shall be for the account of the Creditor and shall be payable in the manner stated therein.
+            </p>
 
-        <div class="page-break"></div>
+            <div class="page-break"></div>
 
-        <!-- ================= SECTION III: CLAIM PROVISIONS ================= -->
-        <div class="main-title" style="font-size: 14pt;">III. CLAIM PROVISIONS</div>
-        
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">BENEFICIARY</div>
-        <p class="paragraph">
-            The Creditor shall be the primary and irrevocable beneficiary of each Insured Debtor hereunder to the extent of his outstanding loan balance at the time of death of the Insured Debtor.
-        </p>
-        <p class="paragraph">
-            The Insured Debtor shall have the right to designate anybody, not disqualified by law, as beneficiary to receive the amount of insurance payable in excess of his outstanding loan balance, if any.
-        </p>
+            <!-- ================= SECTION III: CLAIM PROVISIONS ================= -->
+            <div class="provisions-main-title">III. CLAIM PROVISIONS</div>
+            
+            <div class="provisions-section-header">BENEFICIARY</div>
+            <p class="paragraph">
+                The Creditor shall be the primary and irrevocable beneficiary of each Insured Debtor hereunder to the extent of his outstanding loan balance at the time of death of the Insured Debtor.
+            </p>
+            <p class="paragraph">
+                The Insured Debtor shall have the right to designate anybody, not disqualified by law, as beneficiary to receive the amount of insurance payable in excess of his outstanding loan balance, if any.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">NOTICE OF CLAIM</div>
-        <p class="paragraph">
-            Written notice of claim must be given to the Insurer within thirty (30) days after the occurrence or commencement of any loss covered by this Policy or as soon thereafter as is reasonably possible. Failure to comply within the time provided shall not invalidate nor reduce the claim if it is given as soon as was reasonably possible.
-        </p>
-        <p class="paragraph">
-            The Insurer upon receipt of a notice of claim shall furnish to the claimant such forms as are usually required by the Insurer for filing proofs of loss. If such forms are not so furnished by the Insurer within fifteen (15) days after its receipt of such notice, the claimant shall be deemed to have complied with the requirements of this Policy as to proof of loss upon submitting, within the time fixed in this Policy for filing proofs of loss, written proof covering the occurrence, character and extent of the loss for which claim is made.
-        </p>
-        <p class="paragraph">
-            Written notice of claim given by or in behalf of the Insured Debtor, to the Insurer or to any authorized representative of the Insurer, with information sufficient to identify the Insured Debtor, shall be deemed to be notice to the Insurer.
-        </p>
+            <div class="provisions-section-header">NOTICE OF CLAIM</div>
+            <p class="paragraph">
+                Written notice of claim must be given to the Insurer within thirty (30) days after the occurrence or commencement of any loss covered by this Policy or as soon thereafter as is reasonably possible. Failure to comply within the time provided shall not invalidate nor reduce the claim if it is given as soon as was reasonably possible.
+            </p>
+            <p class="paragraph">
+                The Insurer upon receipt of a notice of claim shall furnish to the claimant such forms as are usually required by the Insurer for filing proofs of loss. If such forms are not so furnished by the Insurer within fifteen (15) days after its receipt of such notice, the claimant shall be deemed to have complied with the requirements of this Policy as to proof of loss upon submitting, within the time fixed in this Policy for filing proofs of loss, written proof covering the occurrence, character and extent of the loss for which claim is made.
+            </p>
+            <p class="paragraph">
+                Written notice of claim given by or in behalf of the Insured Debtor, to the Insurer or to any authorized representative of the Insurer, with information sufficient to identify the Insured Debtor, shall be deemed to be notice to the Insurer.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PROOF OF LOSS</div>
-        <p class="paragraph">
-            Written proof of loss must be furnished to the Insurer within ninety (90) days from the date of the loss to which the claim is made. Failure to comply within the time provided shall not invalidate nor reduce the claim if it is shown that it was not reasonably possible to submit such proof within the required time and that proof was submitted as soon as was reasonably possible.
-        </p>
+            <div class="provisions-section-header">PROOF OF LOSS</div>
+            <p class="paragraph">
+                Written proof of loss must be furnished to the Insurer within ninety (90) days from the date of the loss to which the claim is made. Failure to comply within the time provided shall not invalidate nor reduce the claim if it is shown that it was not reasonably possible to submit such proof within the required time and that proof was submitted as soon as was reasonably possible.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PAYMENT OF CLAIM</div>
-        <p class="paragraph">
-            The amount of any loss for which the Insurer may be liable under this Policy, shall be paid to the Creditor within thirty (30) days after proof of loss is received by the Insurer and ascertainment of the loss is made by agreement between the Creditor and the Insurer or by arbitration; but if such ascertainment is not made within sixty (60) days after such receipt by the Insurer of the proof of loss, then the loss shall be paid within ninety (90) days after such receipt.
-        </p>
-        <p class="paragraph">
-            Such amount paid shall be applied by the Creditor to reduce or completely extinguish the outstanding loan of the Insured Debtor to the Creditor.
-        </p>
-        <p class="paragraph">
-            Refusal or failure to pay the claim within the time prescribed herein shall entitle the Insured Debtor to collect interest for the duration of the delay at the rate of twice the ceiling prescribed by the Monetary Board, unless such refusal or failure to pay is based on the ground that the claim is fraudulent.
-        </p>
+            <div class="provisions-section-header">PAYMENT OF CLAIM</div>
+            <p class="paragraph">
+                The amount of any loss for which the Insurer may be liable under this Policy, shall be paid to the Creditor within thirty (30) days after proof of loss is received by the Insurer and ascertainment of the loss is made by agreement between the Creditor and the Insurer or by arbitration; but if such ascertainment is not made within sixty (60) days after such receipt by the Insurer of the proof of loss, then the loss shall be paid within ninety (90) days after such receipt.
+            </p>
+            <p class="paragraph">
+                Such amount paid shall be applied by the Creditor to reduce or completely extinguish the outstanding loan of the Insured Debtor to the Creditor.
+            </p>
+            <p class="paragraph">
+                Refusal or failure to pay the claim within the time prescribed herein shall entitle the Insured Debtor to collect interest for the duration of the delay at the rate of twice the ceiling prescribed by the Monetary Board, unless such refusal or failure to pay is based on the ground that the claim is fraudulent.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">PHYSICAL EXAMINATION AND AUTOPSY</div>
-        <p class="paragraph">
-            The Insurer, at its own expense, shall have the right and opportunity to examine an Insured Debtor when and as often as the Insurer may reasonably require while the claim is pending hereunder, and also the right and opportunity to make an autopsy in case of death where it is not forbidden by law.
-        </p>
+            <div class="provisions-section-header">PHYSICAL EXAMINATION AND AUTOPSY</div>
+            <p class="paragraph">
+                The Insurer, at its own expense, shall have the right and opportunity to examine an Insured Debtor when and as often as the Insurer may reasonably require while the claim is pending hereunder, and also the right and opportunity to make an autopsy in case of death where it is not forbidden by law.
+            </p>
 
-        <div class="page-break"></div>
+            <div class="page-break"></div>
 
-        <!-- ================= SECTION IV: GENERAL PROVISIONS ================= -->
-        <div class="main-title" style="font-size: 14pt;">IV. GENERAL PROVISIONS</div>
+            <!-- ================= SECTION IV: GENERAL PROVISIONS ================= -->
+            <div class="provisions-main-title">IV. GENERAL PROVISIONS</div>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">THE CONTRACT</div>
-        <p class="paragraph">
-            This Policy, the Policy Data Page, the Creditor’s application attached hereto, any riders, endorsements or amendments herein and the Insured Debtors’ applications (including evidence of insurability, if any) constitute the entire contract. All statements made by the Creditor or by the Insured Debtors shall be deemed representations and not warranties. No statement made by any Insured Debtor shall be used to contest the validity of the insurance unless it is written and signed by him and a copy furnished to him or to his beneficiaries.
-        </p>
-        <p class="paragraph">
-            No agent is authorized to alter or amend this Policy, to accept premiums in arrears or to extend the due date of any premium, to waive any notice or proof of claim required by the Insurer, or to extend the date before which any such notice or proof be submitted.
-        </p>
-        <p class="paragraph">
-            This Policy may at any time be amended and changed by written agreement between the Insurer and the Creditor. Any such amendment shall be binding on all Insureds whether their insurance became effective prior to, on, or after the effective date of the amendment.
-        </p>
+            <div class="provisions-section-header">THE CONTRACT</div>
+            <p class="paragraph">
+                This Policy, the Policy Data Page, the Creditor’s application attached hereto, any riders, endorsements or amendments herein and the Insured Debtors’ applications (including evidence of insurability, if any) constitute the entire contract. All statements made by the Creditor or by the Insured Debtors shall be deemed representations and not warranties. No statement made by any Insured Debtor shall be used to contest the validity of the insurance unless it is written and signed by him and a copy furnished to him or to his beneficiaries.
+            </p>
+            <p class="paragraph">
+                No agent is authorized to alter or amend this Policy, to accept premiums in arrears or to extend the due date of any premium, to waive any notice or proof of claim required by the Insurer, or to extend the date before which any such notice or proof be submitted.
+            </p>
+            <p class="paragraph">
+                This Policy may at any time be amended and changed by written agreement between the Insurer and the Creditor. Any such amendment shall be binding on all Insureds whether their insurance became effective prior to, on, or after the effective date of the amendment.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">POLICY EFFECTIVITY</div>
-        <p class="paragraph">
-            This Policy becomes effective only upon the payment of its initial premium and its delivery to the Creditor. The Effective Date, shown in the Policy Data Page shall be used to determine premium due dates, policy years and policy anniversaries.
-        </p>
+            <div class="provisions-section-header">POLICY EFFECTIVITY</div>
+            <p class="paragraph">
+                This Policy becomes effective only upon the payment of its initial premium and its delivery to the Creditor. The Effective Date, shown in the Policy Data Page shall be used to determine premium due dates, policy years and policy anniversaries.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">DATA REQUIRED</div>
-        <p class="paragraph">
-            The Creditor shall furnish the Insurer promptly in writing all information necessary for the efficient administration of this Policy including (1) debtors becoming eligible and their respective dates of birth and amount of insurance (2) Insured Debtors whose insurance terminates and their respective termination dates, and (3) changes in the classification and amounts of insurance of an Insured Debtor, if any.
-        </p>
-        <p class="paragraph">
-            All documents furnished to the Creditor by a debtor in connection with his insurance and such other records as may have a bearing on the insurance under this Policy, shall be open for inspection by the Insurer at reasonable hours.
-        </p>
+            <div class="provisions-section-header">DATA REQUIRED</div>
+            <p class="paragraph">
+                The Creditor shall furnish the Insurer promptly in writing all information necessary for the efficient administration of this Policy including (1) debtors becoming eligible and their respective dates of birth and amount of insurance (2) Insured Debtors whose insurance terminates and their respective termination dates, and (3) changes in the classification and amounts of insurance of an Insured Debtor, if any.
+            </p>
+            <p class="paragraph">
+                All documents furnished to the Creditor by a debtor in connection with his insurance and such other records as may have a bearing on the insurance under this Policy, shall be open for inspection by the Insurer at reasonable hours.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">CLERICAL ERROR</div>
-        <p class="paragraph">
-            Clerical error in keeping the records shall not invalidate an insurance which otherwise is validly in force nor shall it continue an insurance which otherwise is validly terminated.
-        </p>
+            <div class="provisions-section-header">CLERICAL ERROR</div>
+            <p class="paragraph">
+                Clerical error in keeping the records shall not invalidate an insurance which otherwise is validly in force nor shall it continue an insurance which otherwise is validly terminated.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">AGE AND MISSTATEMENT OF AGE</div>
-        <p class="paragraph">
-            Age, unless defined otherwise, shall mean age at last birthday. The Insurer may request proof of age of any Insured Debtor. Benefits payable are suspended until the requested proof is given.
-        </p>
-        <p class="paragraph">
-            If the age of the Insured Debtor has been misstated, the amount of insurance shall be adjusted to the amount that the premium would have purchased at the correct age, applicable risk class and applicable premium rates as of the effective date.
-        </p>
-        <p class="paragraph">
-            If at the correct age, the Insured Debtor is not eligible for any coverage under this Policy or its riders, the Insurer shall refund the corresponding premiums actually received by the Insurer.
-        </p>
+            <div class="provisions-section-header">AGE AND MISSTATEMENT OF AGE</div>
+            <p class="paragraph">
+                Age, unless defined otherwise, shall mean age at last birthday. The Insurer may request proof of age of any Insured Debtor. Benefits payable are suspended until the requested proof is given.
+            </p>
+            <p class="paragraph">
+                If the age of the Insured Debtor has been misstated, the amount of insurance shall be adjusted to the amount that the premium would have purchased at the correct age, applicable risk class and applicable premium rates as of the effective date.
+            </p>
+            <p class="paragraph">
+                If at the correct age, the Insured Debtor is not eligible for any coverage under this Policy or its riders, the Insurer shall refund the corresponding premiums actually received by the Insurer.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">RENEWAL</div>
-        <p class="paragraph">
-            The Creditor shall be entitled to renew this Policy upon payment of the premium due on the effective date of renewal.
-        </p>
+            <div class="provisions-section-header">RENEWAL</div>
+            <p class="paragraph">
+                The Creditor shall be entitled to renew this Policy upon payment of the premium due on the effective date of renewal.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">TERMINATION OF THIS POLICY</div>
-        <p class="paragraph">
-            This Policy shall automatically terminate if premiums due remain unpaid beyond the grace period as stated in the Grace Period provision of this Policy.
-        </p>
-        <p class="paragraph">
-            The Creditor may discontinue this Policy at any time by giving written notice to the Insurer at least 31 days prior to the date of termination.
-        </p>
-        <p class="paragraph">
-            The Insurer may also terminate this Policy at any time by giving at least 31 days prior written notice to the Creditor if the number of Insureds is less than the minimum number stated in the Policy Data Page or the percentage of Insured Debtors is less than the minimum percentage stated in the Policy Data Page.
-        </p>
-        <p class="paragraph">
-            Notice of termination shall be in writing, mailed or delivered to the Creditor at the address shown in this Policy or application.
-        </p>
+            <div class="provisions-section-header">TERMINATION OF THIS POLICY</div>
+            <p class="paragraph">
+                This Policy shall automatically terminate if premiums due remain unpaid beyond the grace period as stated in the Grace Period provision of this Policy.
+            </p>
+            <p class="paragraph">
+                The Creditor may discontinue this Policy at any time by giving written notice to the Insurer at least 31 days prior to the date of termination.
+            </p>
+            <p class="paragraph">
+                The Insurer may also terminate this Policy at any time by giving at least 31 days prior written notice to the Creditor if the number of Insureds is less than the minimum number stated in the Policy Data Page or the percentage of Insured Debtors is less than the minimum percentage stated in the Policy Data Page.
+            </p>
+            <p class="paragraph-no-indent">
+                Notice of termination shall be in writing, mailed or delivered to the Creditor at the address shown in this Policy or application.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">TERMINATION OF INDIVIDUAL INSURANCE</div>
-        <p class="paragraph">
-            The insurance of all Insured Debtors hereunder shall automatically terminate on the earliest of the following:
-        </p>
-        <ol style="padding-left: 25px; line-height: 1.5;">
-            <li>the date this Policy terminates; or</li>
-            <li>the policy anniversary immediately succeeding the date he attains the termination age stated in the Policy Data Page; or</li>
-            <li>the date the Insured Debtor enters military, naval or air service; or</li>
-            <li>the date any one payment towards the Insured’s loan becomes six (6) months overdue, notwithstanding payments for his insurance; or</li>
-            <li>the Insured Debtor ceases to be a debtor of the Creditor.</li>
-        </ol>
+            <div class="provisions-section-header">TERMINATION OF INDIVIDUAL INSURANCE</div>
+            <p class="paragraph-no-indent">
+                The insurance of all Insured Debtors hereunder shall automatically terminate on the earliest of the following:
+            </p>
+            <ol style="padding-left: 25px; line-height: 1.5;">
+                <li>the date this Policy terminates; or</li>
+                <li>the policy anniversary immediately succeeding the date he attains the termination age stated in the Policy Data Page; or</li>
+                <li>the date the Insured Debtor enters military, naval or air service; or</li>
+                <li>the date any one payment towards the Insured’s loan becomes six (6) months overdue, notwithstanding payments for his insurance; or</li>
+                <li>the Insured Debtor ceases to be a debtor of the Creditor.</li>
+            </ol>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">LEGAL PROCEEDINGS</div>
-        <p class="paragraph">
-            If a claim is made and an action or suit is not commenced either with the Insurance Commission or any court of competent jurisdiction within 24 months from notice of denial of claim, then the claim shall for all purposes be deemed to have been abandoned and shall not thereafter be reopened or reconsidered.
-        </p>
+            <div class="provisions-section-header">LEGAL PROCEEDINGS</div>
+            <p class="paragraph">
+                If a claim is made and an action or suit is not commenced either with the Insurance Commission or any court of competent jurisdiction within 24 months from notice of denial of claim, then the claim shall for all purposes be deemed to have been abandoned and shall not thereafter be reopened or reconsidered.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">INCONTESTABILITY</div>
-        <p class="paragraph">
-            This policy shall be incontestable after one (1) year from the effective date or the date of its last reinstatement, except for non-payment of premiums. Similarly, any individual insurance, or any additional portion thereof, shall not be contested after it has been in force during the lifetime of the Insured Debtor for a period of one (1) year from its effective date or date of last reinstatement, except for non-payment of premium.
-        </p>
-        <p class="paragraph">
-            No statement made by the Insured Debtor relating to his insurability shall be used in contesting the validity of the insurance with respect to which such statement was made after such insurance has been in force during the Insured Debtor’s lifetime for a period of one (1) year from its effective date or the date of last reinstatement, nor unless contained in a written instrument signed by him.
-        </p>
+            <div class="provisions-section-header">INCONTESTABILITY</div>
+            <p class="paragraph">
+                This policy shall be incontestable after one (1) year from the effective date or the date of its last reinstatement, except for non-payment of premiums. Similarly, any individual insurance, or any additional portion thereof, shall not be contested after it has been in force during the lifetime of the Insured Debtor for a period of one (1) year from its effective date or date of last reinstatement, except for non-payment of premium.
+            </p>
+            <p class="paragraph">
+                No statement made by the Insured Debtor relating to his insurability shall be used in contesting the validity of the insurance with respect to which such statement was made after such insurance has been in force during the Insured Debtor’s lifetime for a period of one (1) year from its effective date or the date of last reinstatement, nor unless contained in a written instrument signed by him.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">SUICIDE CLAUSE</div>
-        <p class="paragraph">
-            The Insurer will not be liable if an Insured Debtor dies within one (1) year after the effective date or date of last reinstatement of his insurance coverage, provided however, that suicide committed in the state of insanity shall be compensable regardless of the date of commission.
-        </p>
-        <p class="paragraph">
-            Where suicide is not compensable, the liability of the Insurer will be limited to the return of premiums paid pertaining to the Insured.
-        </p>
+            <div class="provisions-section-header">SUICIDE CLAUSE</div>
+            <p class="paragraph">
+                The Insurer will not be liable if an Insured Debtor dies within one (1) year after the effective date or date of last reinstatement of his insurance coverage, provided however, that suicide committed in the state of insanity shall be compensable regardless of the date of commission.
+            </p>
+            <p class="paragraph">
+                Where suicide is not compensable, the liability of the Insurer will be limited to the return of premiums paid pertaining to the Insured.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">INDIVIDUAL CONFIRMATION OF INSURANCE COVERAGE</div>
-        <p class="paragraph">
-            The Insurer shall issue to the Creditor, for delivery to each Insured Debtor, an individual confirmation of insurance coverage setting forth a summary of the essential features of the individual insurance coverage and other privileges to which the Insured Debtor is entitled. These forms do not constitute a contract but are merely informative statements setting forth the benefits and the claim procedures and are not transferable.
-        </p>
+            <div class="provisions-section-header">INDIVIDUAL CONFIRMATION OF INSURANCE COVERAGE</div>
+            <p class="paragraph">
+                The Insurer shall issue to the Creditor, for delivery to each Insured Debtor, an individual confirmation of insurance coverage setting forth a summary of the essential features of the individual insurance coverage and other privileges to which the Insured Debtor is entitled. These forms do not constitute a contract but are merely informative statements setting forth the benefits and the claim procedures and are not transferable.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">REINSTATEMENT</div>
-        <p class="paragraph">
-            This Policy may be reinstated any time after it has been terminated provided the conditions set by the Insurer at the time of reinstatement are met and the appropriate premiums are paid. Only losses that occur after the effective date of reinstatement shall be covered.
-        </p>
-        <p class="paragraph">
-            If a debtor whose insurance is terminated in accordance with the termination provision of this Policy again becomes entitled to participate for insurance hereunder, such debtor may again become insured under this Policy by submitting, without expense to the Insurer, an evidence of insurability acceptable to it. His insurance shall take effect once the evidence is approved by the Insurer and the corresponding premium is paid.
-        </p>
+            <div class="provisions-section-header">REINSTATEMENT</div>
+            <p class="paragraph">
+                This Policy may be reinstated any time after it has been terminated provided the conditions set by the Insurer at the time of reinstatement are met and the appropriate premiums are paid. Only losses that occur after the effective date of reinstatement shall be covered.
+            </p>
+            <p class="paragraph">
+                If a debtor whose insurance is terminated in accordance with the termination provision of this Policy again becomes entitled to participate for insurance hereunder, such debtor may again become insured under this Policy by submitting, without expense to the Insurer, an evidence of insurability acceptable to it. His insurance shall take effect once the evidence is approved by the Insurer and the corresponding premium is paid.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">NON-WAIVER OF POLICY PROVISION</div>
-        <p class="paragraph">
-            Failure of the Insurer to insist upon compliance with any provision of this Policy at any given time or under any given set of circumstances shall not operate to waive or modify such provision, or in any manner whatsoever to render it unenforceable, as to any other time or as to any other occurrence, whether the circumstances are, or are not, the same.
-        </p>
+            <div class="provisions-section-header">NON-WAIVER OF POLICY PROVISION</div>
+            <p class="paragraph">
+                Failure of the Insurer to insist upon compliance with any provision of this Policy at any given time or under any given set of circumstances shall not operate to waive or modify such provision, or in any manner whatsoever to render it unenforceable, as to any other time or as to any other occurrence, whether the circumstances are, or are not, the same.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">ARTICLE 1250 (R.A. No. 386) NOT APPLICABLE</div>
-        <p class="paragraph">
-            It is hereby declared and agreed that the provision of Article 1250 of the Civil Code of the Philippines (Republic Act No. 386) which reads:
-        </p>
-        <blockquote style="font-style: italic; margin: 10px 30px; line-height: 1.4;">
-            “in case of extraordinary inflation or deflation of the currency stipulated should supervene, the value of the currency at the time of the establishment of the obligation shall be the basis of payment…”
-        </blockquote>
-        <p class="paragraph">
-            shall not apply in determining the extent of liability under the provision of this Policy.
-        </p><br>
+            <div class="provisions-section-header">ARTICLE 1250 (R.A. No. 386) NOT APPLICABLE</div>
+            <p class="paragraph">
+                It is hereby declared and agreed that the provision of Article 1250 of the Civil Code of the Philippines (Republic Act No. 386) which reads:
+            </p>
+            <blockquote style="font-style: italic; margin: 10px 30px; line-height: 1.4;">
+                “in case of extraordinary inflation or deflation of the currency stipulated should supervene, the value of the currency at the time of the establishment of the obligation shall be the basis of payment…”
+            </blockquote>
+            <p class="paragraph">
+                shall not apply in determining the extent of liability under the provision of this Policy.
+            </p><br>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">CURRENCY</div>
-        <p class="paragraph">
-            All amounts mentioned in this Policy refer to the currency stated in the Policy Data Page.
-        </p>
+            <div class="provisions-section-header">CURRENCY</div>
+            <p class="paragraph">
+                All amounts mentioned in this Policy refer to the currency stated in the Policy Data Page.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">AVAILABILITY OF THIS POLICY</div>
-        <p class="paragraph">
-            This Policy shall be kept in the main office and in the custody of an officer of the Creditor. It will be available to the Insured Debtors for their inspection during regular business hours of the Creditor.
-        </p>
+            <div class="provisions-section-header">AVAILABILITY OF THIS POLICY</div>
+            <p class="paragraph">
+                This Policy shall be kept in the main office and in the custody of an officer of the Creditor. It will be available to the Insured Debtors for their inspection during regular business hours of the Creditor.
+            </p>
 
-        <div class="section-header" style="font-size: 11pt; border-bottom: none; margin-top: 15px;">POLICY DATA PAGE PROVISIONS</div>
-        <p class="paragraph">
-            The Provisions stated in the Policy Data Page shall supersede any inconsistent provision herein.
+            <div class="provisions-section-header">POLICY DATA PAGE PROVISIONS</div>
+            <p class="paragraph">
+                The Provisions stated in the Policy Data Page shall supersede any inconsistent provision herein.
+            </p>
+
+        </div>
         </p>
 
         <div class="page-break"></div>

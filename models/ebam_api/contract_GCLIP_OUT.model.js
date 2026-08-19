@@ -36,10 +36,15 @@ export const ensureUnderwritingProvisionsTable = async () => {
                 ALTER TABLE DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting
                 ADD eligible_individuals NVARCHAR(MAX) NULL;
             END
-            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting', 'participation_requirements') IS NULL
+            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting', 'participation_percentage') IS NULL
             BEGIN
                 ALTER TABLE DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting
-                ADD participation_requirements NVARCHAR(MAX) NULL;
+                ADD participation_percentage NVARCHAR(50) NULL;
+            END
+            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting', 'participation_minimum_no') IS NULL
+            BEGIN
+                ALTER TABLE DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting
+                ADD participation_minimum_no NVARCHAR(MAX) NULL;
             END
             IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting', 'termination_age') IS NULL
             BEGIN
@@ -103,7 +108,8 @@ export const getUnderwritingProvisions = async (applicationId) => {
     const result = await pool.request()
         .input('application_id', sql.Int, applicationId)
         .query(`
-            SELECT provision_id, application_id, provision_text, contribution_text, eligible_individuals, participation_requirements, termination_age,
+            SELECT provision_id, application_id, provision_text, contribution_text, eligible_individuals,
+                   participation_percentage, participation_minimum_no, termination_age,
                    provision_enrollment, provision_rollover, provision_termination, provision_definitions, provision_claims, refund_of_premiums,
                    amount_of_insurance, coverage_period, due_dates, created_at, updated_at
             FROM DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting
@@ -112,17 +118,10 @@ export const getUnderwritingProvisions = async (applicationId) => {
 
     const row = result.recordset[0];
     if (row) {
-        let parsedRequirements = row.participation_requirements;
-        try {
-            if (row.participation_requirements && (row.participation_requirements.startsWith('{') || row.participation_requirements.startsWith('['))) {
-                parsedRequirements = JSON.parse(row.participation_requirements);
-            }
-        } catch (e) {
-            // Keep as raw string
-        }
         return {
             ...row,
-            participation_requirements: parsedRequirements,
+            participation_percentage: row.participation_percentage || '100%',
+            participation_minimum_no: row.participation_minimum_no,
             termination_age: row.termination_age,
             provision_enrollment: row.provision_enrollment,
             provision_rollover: row.provision_rollover,
@@ -268,31 +267,45 @@ export const saveEligibleIndividuals = async (applicationId, eligibleIndividuals
     return await getUnderwritingProvisions(applicationId);
 };
 
-// Save/update participation requirements text for an application
-export const saveParticipationRequirements = async (applicationId, participationRequirementsText = null) => {
+// Save/update participation requirements (percentage & minimum_no) for an application
+export const saveParticipationRequirements = async (applicationId, params = {}) => {
     const pool = await poolPromise;
     await ensureUnderwritingProvisionsTable();
 
-    const textToSave = typeof participationRequirementsText === 'object' && participationRequirementsText !== null
-        ? JSON.stringify(participationRequirementsText)
-        : (typeof participationRequirementsText === 'string' 
-            ? participationRequirementsText 
-            : (participationRequirementsText ? String(participationRequirementsText) : null));
+    let percentage = null;
+    let minimumNo = null;
+
+    if (typeof params === 'string') {
+        try {
+            const parsed = JSON.parse(params);
+            percentage = parsed.percentage || null;
+            minimumNo = typeof parsed.minimum_no === 'string' ? parsed.minimum_no : (Array.isArray(parsed.minimum_no) ? JSON.stringify(parsed.minimum_no) : null);
+        } catch (e) {
+            minimumNo = params;
+        }
+    } else if (typeof params === 'object' && params !== null) {
+        const bodyObj = params.participation_requirements || params;
+        percentage = bodyObj.percentage || bodyObj.participation_percentage || null;
+        const minVal = bodyObj.minimum_no ?? bodyObj.participation_minimum_no;
+        minimumNo = typeof minVal === 'string' ? minVal : (Array.isArray(minVal) ? JSON.stringify(minVal) : (minVal ? JSON.stringify(minVal) : null));
+    }
 
     await pool.request()
         .input('application_id', sql.Int, applicationId)
-        .input('participation_requirements', sql.NVarChar(sql.MAX), textToSave)
+        .input('participation_percentage', sql.NVarChar(50), percentage)
+        .input('participation_minimum_no', sql.NVarChar(sql.MAX), minimumNo)
         .query(`
             MERGE INTO DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting WITH (HOLDLOCK) AS target
             USING (SELECT @application_id AS application_id) AS source
             ON target.application_id = source.application_id
             WHEN MATCHED THEN
                 UPDATE SET 
-                    participation_requirements = @participation_requirements,
+                    participation_percentage = COALESCE(@participation_percentage, target.participation_percentage),
+                    participation_minimum_no = COALESCE(@participation_minimum_no, target.participation_minimum_no),
                     updated_at = GETDATE()
             WHEN NOT MATCHED THEN
-                INSERT (application_id, participation_requirements, created_at, updated_at)
-                VALUES (@application_id, @participation_requirements, GETDATE(), GETDATE());
+                INSERT (application_id, participation_percentage, participation_minimum_no, created_at, updated_at)
+                VALUES (@application_id, @participation_percentage, @participation_minimum_no, GETDATE(), GETDATE());
         `);
 
     return await getUnderwritingProvisions(applicationId);
