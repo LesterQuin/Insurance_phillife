@@ -3,6 +3,7 @@ import * as Controller from '../../controllers/ebam_api/ebam_api.controller.js';
 import { authenticate } from '../../middlewares/authenticate.js';
 import contractGCLIPRoutes from './contract_GCLIP_OUT.routes.js';
 import contractGCLIPPrinRoutes from './contract_GCLIP_PRIN.routes.js';
+import contractGPARoutes from './contract_GPA.routes.js';
 
 const router = express.Router();
 
@@ -18,5 +19,8 @@ router.use(contractGCLIPRoutes);
 
 // Mount GCLIP Principal policy contract endpoints
 router.use(contractGCLIPPrinRoutes);
+
+// Mount GPA GADDP policy contract endpoints
+router.use(contractGPARoutes);
 
 export default router;

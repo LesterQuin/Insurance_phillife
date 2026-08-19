@@ -4,6 +4,7 @@ import * as User from '../user/user_model.js';
 
 import * as GclipOutModel from './contract_GCLIP_OUT.model.js';
 import * as GclipPrinModel from './contract_GCLIP_PRIN.model.js';
+import * as GpaModel from './contract_GPA.model.js';
 
 export const getCOCPdfData = async (id) => {
     const appData = await Model.getApplicationById(id);
@@ -20,16 +21,19 @@ export const getCOCPdfData = async (id) => {
     let limitsRow = null;
 
     if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
-        if (amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
+        if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
             provisionsRow = await GclipPrinModel.getUnderwritingProvisions(id);
             limitsRow = await GclipPrinModel.getUnderwritingLimits(id);
         } else {
             provisionsRow = await GclipOutModel.getUnderwritingProvisions(id);
             limitsRow = await GclipOutModel.getUnderwritingLimits(id);
         }
+    } else if (nameUpper.includes('ACCIDENTAL DEATH') || nameUpper.includes('GPA') || nameUpper.includes('G-ADD') || nameUpper.includes('GADDP')) {
+        provisionsRow = await GpaModel.getUnderwritingProvisions(id);
+        limitsRow = null;
     } else {
-        provisionsRow = await GclipOutModel.getUnderwritingProvisions(id);
-        limitsRow = await GclipOutModel.getUnderwritingLimits(id);
+        provisionsRow = await GpaModel.getUnderwritingProvisions(id);
+        limitsRow = null;
     }
     const user = appData.user_id ? await User.getUserById(appData.user_id) : { firstname: 'Phillife', lastname: 'Representative' };
 
@@ -41,7 +45,9 @@ export const getCOCPdfData = async (id) => {
         provisions: provisionsRow ? provisionsRow.provision_text : null,
         contribution_text: provisionsRow ? provisionsRow.contribution_text : null,
         eligible_individuals: provisionsRow ? provisionsRow.eligible_individuals : null,
-        participation_requirements: provisionsRow ? provisionsRow.participation_requirements : null,
+        participation_requirements: provisionsRow ? (provisionsRow.participation_requirements || null) : null,
+        participation_percentage: provisionsRow ? (provisionsRow.participation_percentage || null) : null,
+        participation_minimum_no: provisionsRow ? (provisionsRow.participation_minimum_no || null) : null,
         termination_age: provisionsRow ? provisionsRow.termination_age : null,
         provision_enrollment: provisionsRow ? provisionsRow.provision_enrollment : null,
         provision_rollover: provisionsRow ? provisionsRow.provision_rollover : null,
@@ -55,6 +61,9 @@ export const getCOCPdfData = async (id) => {
         amount_of_insurance: provisionsRow ? provisionsRow.amount_of_insurance : null,
         coverage_period: provisionsRow ? provisionsRow.coverage_period : null,
         due_dates: provisionsRow ? provisionsRow.due_dates : null,
+        first_due_date: provisionsRow ? provisionsRow.first_due_date : null,
+        renewal_due_date: provisionsRow ? provisionsRow.renewal_due_date : null,
+        additions_due_date: provisionsRow ? provisionsRow.additions_due_date : null,
         nel: limitsRow ? limitsRow.nel : [],
         nmed: limitsRow ? limitsRow.nmed : [],
         med: limitsRow ? limitsRow.med : [],

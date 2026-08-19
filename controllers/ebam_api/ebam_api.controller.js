@@ -8,9 +8,10 @@ import { getApplicationRates } from '../../models/actuarial_api/actuarial.model.
 // Helper to build application structure for template
 const buildCOCTemplateData = (data) => {
     const { 
-        appData, riders, rankings, rankingRiders, provisions, contribution_text, eligible_individuals, participation_requirements, termination_age,
+        appData, riders, rankings, rankingRiders, provisions, contribution_text, eligible_individuals, participation_requirements,
+        participation_percentage, participation_minimum_no, termination_age,
         provision_enrollment, provision_rollover, provision_termination, provision_definitions, provision_claims, refund_of_premiums,
-        amount_of_insurance, coverage_period, due_dates,
+        amount_of_insurance, coverage_period, due_dates, first_due_date, renewal_due_date, additions_due_date,
         nel, nmed, med, max_limit, underwriting_notes,
         provision_face_amount, provision_premium_computation, provision_non_coverage
     } = data;
@@ -39,6 +40,8 @@ const buildCOCTemplateData = (data) => {
         contribution_text: contribution_text || null,
         eligible_individuals: eligible_individuals || null,
         participation_requirements: participation_requirements || null,
+        participation_percentage: participation_percentage || null,
+        participation_minimum_no: participation_minimum_no || null,
         termination_age: termination_age || null,
         provision_enrollment: provision_enrollment || null,
         provision_rollover: provision_rollover || null,
@@ -52,6 +55,9 @@ const buildCOCTemplateData = (data) => {
         amount_of_insurance: amount_of_insurance || null,
         coverage_period: coverage_period || null,
         due_dates: due_dates || null,
+        first_due_date: first_due_date || null,
+        renewal_due_date: renewal_due_date || null,
+        additions_due_date: additions_due_date || null,
         nel: nel || [],
         nmed: nmed || [],
         med: med || [],
@@ -152,9 +158,53 @@ export const downloadCOCPDF = async (req, res) => {
  * - Page 1 (Cover Page): Rendered with displayHeaderFooter: false (GUARANTEED NO FOOTER)
  * - Pages 2+: Rendered with displayHeaderFooter: true (REPEATING CORPORATE FOOTER)
  */
+const getSpecificContractTemplateName = (application = {}) => {
+    const basicPlanName = (application?.basic_plan_name || application?.plan_name || application?.basic_plan_acronym || application?.plan_acronym || '').toUpperCase();
+    const amountLoansName = (application?.amount_loans_name || '').toUpperCase();
+
+    // 1. GCLI (Group Credit Life Insurance)
+    if (basicPlanName.includes('CREDIT LIFE') || basicPlanName.includes('GCLI') || basicPlanName.includes('G-CLI')) {
+        if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || basicPlanName.includes('PRINCIPAL')) {
+            return 'GCLI_policy_contract_principal';
+        }
+        return 'GCLI_policy_contract_outstanding';
+    }
+
+    // 2. GPA / GADDP (Group Personal Accident / Group Accidental Death & Disability Plan)
+    if (basicPlanName.includes('ACCIDENTAL DEATH') || basicPlanName.includes('GADDP') || basicPlanName.includes('GPA') || basicPlanName.includes('G-ADD') || basicPlanName.includes('GADD')) {
+        return 'GPA_policy_contract_GADDP';
+    }
+
+    // Uncreated basic plan templates return null
+    return null;
+};
+
 const createMasterPolicyContractPDF = async (application, details, riderTemplatesHtml) => {
-    const { generateMasterPolicyContractTemplate } = await import('../../templates/policy_contract/policy_contract_generator.js');
-    const fullHtml = await generateMasterPolicyContractTemplate(application, details, riderTemplatesHtml);
+    const templateFileName = getSpecificContractTemplateName(application);
+    if (!templateFileName) {
+        const planDisplay = application?.basic_plan_name || application?.plan_name || 'this basic plan';
+        const err = new Error(`The policy contract template for ${planDisplay} has not been created yet.`);
+        err.statusCode = 422;
+        throw err;
+    }
+
+    const templateModule = await import(`../../templates/policy_contract/${templateFileName}.js?update=${Date.now()}`);
+    
+    const generateFn = templateModule.generateGPAGADDPPolicyContract || 
+                       templateModule.generateGCLIOutstandingPolicyContract || 
+                       templateModule.generateGCLIPrincipalPolicyContract || 
+                       templateModule.generateGYRTPolicyContract || 
+                       templateModule.generateGCI45PolicyContract || 
+                       templateModule.default;
+
+    if (typeof generateFn !== 'function') {
+        const planDisplay = application?.basic_plan_name || application?.plan_name || templateFileName;
+        const err = new Error(`The policy contract template for ${planDisplay} has not been created yet.`);
+        err.statusCode = 422;
+        throw err;
+    }
+
+    const fullHtml = generateFn(application, details, riderTemplatesHtml);
 
     const pageBreakMarker = '<div class="page-break"></div>';
     const splitIndex = fullHtml.indexOf(pageBreakMarker);
@@ -202,10 +252,21 @@ const createMasterPolicyContractPDF = async (application, details, riderTemplate
     let docBody = await PDFDocument.load(pdfBufferBody);
     const measuredTotalPages = 1 + docBody.getPageCount();
     const measuredRiderEnd = measuredTotalPages - 1;
-    const exactRiderRange = measuredRiderEnd >= 18 ? `18-${measuredRiderEnd}` : '18';
+
+    let riderStart = 19;
+    if (templateFileName.includes('principal')) {
+        riderStart = 20;
+    } else if (templateFileName.includes('GPA') || templateFileName.includes('GADDP') || templateFileName.includes('outstanding')) {
+        riderStart = 19;
+    }
+
+    const hasRiders = Array.isArray(application?.riders) && application.riders.length > 0;
+    const exactRiderRange = hasRiders
+        ? (measuredRiderEnd >= riderStart ? `${riderStart}-${measuredRiderEnd}` : `${riderStart}`)
+        : 'N/A';
 
     if (htmlBody.includes('{{RIDER_PAGE_RANGE}}')) {
-        const updatedHtmlBody = htmlBody.replace('{{RIDER_PAGE_RANGE}}', exactRiderRange);
+        const updatedHtmlBody = htmlBody.replace(/\{\{RIDER_PAGE_RANGE\}\}/g, exactRiderRange);
         pdfBufferBody = await Helper.generatePDFBuffer(updatedHtmlBody, {
             preferCSSPageSize: true,
             displayHeaderFooter: true,
@@ -269,6 +330,16 @@ const extractRiderBody = (html) => {
     if (bodyStart !== -1 && bodyEnd !== -1) {
         bodyContent = html.substring(bodyStart + 6, bodyEnd);
     }
+
+    // Unwrap layout-table if present so the header logo and body details flow naturally on the same page
+    bodyContent = bodyContent
+        .replace(/<table[^>]*class=["']layout-table["'][^>]*>/gi, '')
+        .replace(/<\/table>/gi, '')
+        .replace(/<thead[^>]*>/gi, '<div class="rider-header-wrapper">')
+        .replace(/<\/thead>/gi, '</div>')
+        .replace(/<tbody[^>]*>/gi, '<div class="rider-body-wrapper">')
+        .replace(/<\/tbody>/gi, '</div>');
+
     return `${styles}\n${bodyContent}`;
 };
 
@@ -315,12 +386,15 @@ export const viewPolicyContractPDF = async (req, res) => {
             'Content-Type': 'application/pdf',
             'Content-Disposition': `inline; filename=MasterPolicyContract_${id}.pdf`,
             'Content-Length': pdfBuffer.length,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
         });
 
         res.end(pdfBuffer);
     } catch (err) {
         console.error("Master Policy Contract PDF Error:", err);
-        return error(res, err.message, 500);
+        return error(res, err.message, err.statusCode || 500);
     }
 };
 
@@ -366,11 +440,14 @@ export const downloadPolicyContractPDF = async (req, res) => {
             'Content-Type': 'application/pdf',
             'Content-Disposition': `attachment; filename=MasterPolicyContract_${id}.pdf`,
             'Content-Length': pdfBuffer.length,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
         });
 
         res.end(pdfBuffer);
     } catch (err) {
         console.error("Master Policy Contract Download Error:", err);
-        return error(res, err.message, 500);
+        return error(res, err.message, err.statusCode || 500);
     }
 };

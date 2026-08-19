@@ -24,15 +24,22 @@ export const checkTemplateType = (expectedType) => {
 
             let actualType = 'OUTSTANDING';
             if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
-                if (amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
+                if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
                     actualType = 'PRINCIPAL';
                 }
+            } else if (nameUpper.includes('ACCIDENTAL DEATH') || nameUpper.includes('GPA') || nameUpper.includes('G-ADD') || nameUpper.includes('GADDP') || nameUpper.includes('DISABILITY')) {
+                actualType = 'GPA';
             }
 
             if (actualType !== expectedType) {
-                const msg = expectedType === 'OUTSTANDING'
-                    ? `This application (${id}) uses the GCLI Principal (Initial Loan Amount) template. Please use GCLI Principal API endpoints instead (with /principal/ in path).`
-                    : `This application (${id}) uses the GCLI Outstanding template. Please use GCLI Outstanding API endpoints instead (with /oustanding/ in path).`;
+                let msg = '';
+                if (actualType === 'PRINCIPAL') {
+                    msg = `This application (${id}) uses the GCLI Principal (Initial Loan Amount) template. Please use GCLI Principal API endpoints instead (with /principal/ in path).`;
+                } else if (actualType === 'OUTSTANDING') {
+                    msg = `This application (${id}) uses the GCLI Outstanding template. Please use GCLI Outstanding API endpoints instead (with /outstanding/ in path).`;
+                } else if (actualType === 'GPA') {
+                    msg = `This application (${id}) uses the GPA / GADDP template. Please use GPA API endpoints instead (with /gpa/ in path).`;
+                }
                 
                 return res.status(400).json({
                     success: false,
