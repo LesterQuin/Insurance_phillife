@@ -11,6 +11,27 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
     const logoDataUri = details?.logoDataUri || '';
     const showReviewWatermark = details?.isReview !== false;
 
+    const _contributionText = application?.contribution_text || '';
+    const hasEligibleIndividualsGPA = (application?.eligible_individuals && application.eligible_individuals.trim() !== '');
+    const hasContributionGPA = (_contributionText && _contributionText.trim() !== '');
+    const hasParticipationGPA = (application?.participation_minimum_no && String(application.participation_minimum_no).trim() !== '');
+    const hasSpecialProvisionsGPA = (application?.provision_text && application.provision_text.trim() !== '');
+
+    const hasScheduleOfInsuranceGPA = (application?.first_due_date && application.first_due_date.trim() !== '') || 
+                                      (application?.renewal_due_date && application.renewal_due_date.trim() !== '') || 
+                                      (application?.additions_due_date && application.additions_due_date.trim() !== '');
+
+    const hasAnyEbamInput = hasScheduleOfInsuranceGPA || 
+                            hasSpecialProvisionsGPA || 
+                            hasContributionGPA || 
+                            hasEligibleIndividualsGPA || 
+                            hasParticipationGPA;
+
+    let cleanRidersHtml = riderTemplatesHtml;
+    if (details.showSignoff === false && cleanRidersHtml.endsWith('<div class="page-break"></div>')) {
+        cleanRidersHtml = cleanRidersHtml.substring(0, cleanRidersHtml.length - '<div class="page-break"></div>'.length);
+    }
+
     // Company & Client Info
     const groupName = application?.group_name || 'COFORGE BPS PHILIPPINES, INC.';
     const businessAddress = application?.business_address || 'Ground Floor, Vector-3, Northgate Cyberzone, Filinvest City, Alabang 1781 City of Muntinlupa, NCR';
@@ -637,19 +658,19 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
         .provisions-main-title {
             font-family: 'Cambria', 'Cambria Math', Georgia, serif;
             text-align: center;
-            font-size: 18pt;
+            font-size: 16pt;
             font-weight: bold;
             color: #000000;
-            margin: 25px 0 15px 0;
+            margin: 15px 0 10px 0;
             text-transform: uppercase;
         }
         .provisions-section-header {
             font-family: 'Cambria', 'Cambria Math', Georgia, serif;
-            font-size: 13pt;
+            font-size: 11.5pt;
             font-weight: bold;
             color: #000000;
-            margin-top: 18px;
-            margin-bottom: 8px;
+            margin-top: 10px;
+            margin-bottom: 4px;
             text-transform: uppercase;
             border-bottom: none;
         }
@@ -663,13 +684,16 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
         .policy-provisions-container td,
         .policy-provisions-container th {
             font-family: 'Cambria', 'Cambria Math', Georgia, serif;
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: normal;
-            line-height: 1.5;
+            line-height: 1.35;
             color: #000000;
         }
         .policy-provisions-container th {
             font-weight: bold;
+        }
+        .policy-provisions-container li {
+            line-height: 1.35;
         }
         .signature-block {
             margin-top: 40px;
@@ -706,7 +730,7 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
             table-layout: fixed;
         }
         .sla-table thead {
-            display: table-header-group !important;
+            display: table-row-group !important;
         }
         .sla-table tr {
             page-break-inside: avoid;
@@ -838,7 +862,7 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
                 <th>CURRENCY</th>
                 <td>Philippine Peso</td>
             </tr>
-            <tr>
+            ${hasEligibleIndividualsGPA ? `<tr>
                 <th>ELIGIBLE INDIVIDUALS</th>
                 <td>
                     ${eligibleIndividuals}
@@ -861,22 +885,22 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
                         </tbody>
                     </table>
                 </td>
-            </tr>
-            <tr>
+            </tr>` : ''}
+            ${hasContributionGPA ? `<tr>
                 <th>CONTRIBUTION</th>
                 <td>${contributionText}</td>
-            </tr>
-            <tr>
+            </tr>` : ''}
+            ${hasParticipationGPA ? `<tr>
                 <th>PARTICIPATION REQUIREMENTS</th>
                 <td>${renderParticipationRequirements(application)}</td>
-            </tr>
-            <tr>
+            </tr>` : ''}
+            ${hasSpecialProvisionsGPA ? `<tr>
                 <th>SPECIAL UNDERWRITING PROVISIONS</th>
                 <td>${specialProvisions ? (specialProvisions.includes('<') ? specialProvisions : specialProvisions.replace(/\n/g, '<br>')) : 'None'}</td>
-            </tr>
+            </tr>` : ''}
         </table>
 
-        <!-- ================= SCHEDULE OF INSURANCE HEADER ================= -->
+        ${hasScheduleOfInsuranceGPA ? `<!-- ================= SCHEDULE OF INSURANCE HEADER ================= -->
         <table style="width: 100%; border-collapse: collapse; border: 1.5px solid #000; font-family: 'Cambria', Georgia, serif; font-size: 9.5pt; line-height: 1.4; margin-top: 15px; margin-bottom: -1.5px; table-layout: fixed;">
             <colgroup>
                 <col style="width: 15%;">
@@ -963,7 +987,7 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
             </tbody>
         </table>
 
-        <div class="page-break"></div>
+        <div class="page-break"></div>` : ''}
 
         <!-- ================= SLA / TAT TABLE ================= -->
         <div style="font-size: 9.5pt; color: #4a5568; margin-bottom: 10px; font-weight: bold;">Continuation of ${policyNo}:</div>
@@ -1548,7 +1572,7 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
             <div class="provisions-section-header">PHYSICAL EXAMINATION AND AUTOPSY</div>
             <p class="paragraph">
                 The Insurer, at its own expense, shall have the right and opportunity to examine an Insured when and as often as the Insurer may reasonably require while the claim is pending hereunder, and also the right and opportunity to make an autopsy in case of death where it is not forbidden by law.
-            </p>
+            </p><br>
 
             <div class="provisions-section-header">PAYMENT OF CLAIM</div>
             <p class="paragraph">
@@ -1728,12 +1752,12 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
             </div>
         </div>
 
-        <div class="page-break"></div>
-
+        ${(cleanRidersHtml || (details.showSignoff !== false && hasAnyEbamInput)) ? '<div class="page-break"></div>' : ''}
+        
         <!-- ================= ATTACHED RIDER TEMPLATES ================= -->
-        ${riderTemplatesHtml}
+        ${cleanRidersHtml}
 
-        <!-- ================= SIGN-OFF CHECKLIST ================= -->
+        ` + (details.showSignoff !== false && hasAnyEbamInput ? `<!-- ================= SIGN-OFF CHECKLIST ================= -->
         <div style="font-weight: bold; text-align: center; font-size: 14pt; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">GROUP POLICY SIGN-OFF</div>
 
         <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 6px; font-size: 9pt; font-family: 'Cambria', Georgia, serif;">
@@ -1935,6 +1959,7 @@ export function generateGPAGADDPPolicyContract(application = {}, details = {}, r
         </table>
 
     </div>
+        ` : '') + `
 </body>
 </html>
     `;
