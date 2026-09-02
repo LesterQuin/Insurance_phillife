@@ -11,6 +11,54 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
     const logoDataUri = details?.logoDataUri || '';
     const showReviewWatermark = details?.isReview !== false;
 
+    const _contributionText = application?.contribution_text || '';
+    const _amountOfInsurance = application?.amount_of_insurance ?? '';
+    const _coveragePeriod = application?.coverage_period ?? '';
+    const _dueDates = application?.due_dates ?? '';
+
+    const hasEligibleIndividuals = (application?.eligible_individuals && application.eligible_individuals.trim() !== '');
+    const hasContribution = (_contributionText && _contributionText.trim() !== '');
+    const hasParticipation = (application?.participation_percentage || application?.participation_minimum_no);
+
+    const hasValidLimitData = (items) => {
+        if (!Array.isArray(items) || items.length === 0) return false;
+        return items.some(item => {
+            const amountVal = String(item.amount || item.limit || item.max_amount || item.amount_of_insurance || '').trim();
+            const ageVal = String(item.age || item.age_bracket || item.attained_age || item.age_range || '').trim();
+            return amountVal !== '' || ageVal !== '';
+        });
+    };
+
+    const hasUnderwritingLimits = hasValidLimitData(application?.nel) || 
+                                  hasValidLimitData(application?.nmed) || 
+                                  hasValidLimitData(application?.med) || 
+                                  hasValidLimitData(application?.max_limit);
+
+    const hasScheduleOfInsurance = (_amountOfInsurance && _amountOfInsurance.trim() !== '') || 
+                                   (_coveragePeriod && _coveragePeriod.trim() !== '') || 
+                                   (_dueDates && _dueDates.trim() !== '');
+
+    const hasRefundAndTermination = (application?.refund_of_premiums && application.refund_of_premiums.trim() !== '') || 
+                                    (application?.termination_age);
+
+    const hasSpecialProvisions = (application?.provision_enrollment && application.provision_enrollment.trim() !== '') || 
+                                 (application?.provision_rollover && application.provision_rollover.trim() !== '') || 
+                                 (application?.provision_termination && application.provision_termination.trim() !== '') || 
+                                 (application?.provision_definitions && application.provision_definitions.trim() !== '') || 
+                                 (application?.provision_claims && application.provision_claims.trim() !== '');
+
+    const hasAnyEbamInput = hasUnderwritingLimits || 
+                            hasScheduleOfInsurance || 
+                            hasSpecialProvisions || 
+                            hasContribution || 
+                            hasEligibleIndividuals || 
+                            (application?.participation_minimum_no && String(application.participation_minimum_no).trim() !== '');
+
+    let cleanRidersHtml = riderTemplatesHtml;
+    if (details.showSignoff === false && cleanRidersHtml.endsWith('<div class="page-break"></div>')) {
+        cleanRidersHtml = cleanRidersHtml.substring(0, cleanRidersHtml.length - '<div class="page-break"></div>'.length);
+    }
+
     // Company & Client Info
     const groupName = application?.group_name || 'COFORGE BPS PHILIPPINES, INC.';
     const businessAddress = application?.business_address || 'Ground Floor, Vector-3, Northgate Cyberzone, Filinvest City, Alabang 1781 City of Muntinlupa, NCR';
@@ -34,26 +82,22 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
     // Helper to render dynamic table rows for underwriting limits parameter
     const renderParameterRows = (label, items, isMerged = false) => {
         if (!Array.isArray(items) || items.length === 0) {
-            if (isMerged) {
-                return `
-                    <tr>
-                        <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; font-style: italic;">${label}</td>
-                        <td colspan="2" style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt;"></td>
-                    </tr>
-                `;
-            } else {
-                return `
-                    <tr>
-                        <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; font-style: italic;">${label}</td>
-                        <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; text-align: center; font-style: italic;"></td>
-                        <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; text-align: center; font-style: italic;"></td>
-                    </tr>
-                `;
-            }
+            return '';
+        }
+
+        // Filter out empty items
+        const validItems = items.filter(item => {
+            const amountVal = String(item.amount || item.limit || item.max_amount || item.amount_of_insurance || '').trim();
+            const ageVal = String(item.age || item.age_bracket || item.attained_age || item.age_range || '').trim();
+            return amountVal !== '' || ageVal !== '';
+        });
+
+        if (validItems.length === 0) {
+            return '';
         }
 
         let html = '';
-        items.forEach((item, idx) => {
+        validItems.forEach((item, idx) => {
             const amountVal = item.amount || item.limit || item.max_amount || item.amount_of_insurance || '';
             const ageVal = item.age || item.age_bracket || item.attained_age || item.age_range || '';
 
@@ -61,14 +105,14 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                 if (isMerged) {
                     html += `
                         <tr>
-                            <td rowspan="${items.length}" style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; font-style: italic; vertical-align: middle;">${label}</td>
+                            <td rowspan="${validItems.length}" style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; font-style: italic; vertical-align: middle;">${label}</td>
                             <td colspan="2" style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt;">${amountVal}</td>
                         </tr>
                     `;
                 } else {
                     html += `
                         <tr>
-                            <td rowspan="${items.length}" style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; font-style: italic; vertical-align: middle;">${label}</td>
+                            <td rowspan="${validItems.length}" style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; font-style: italic; vertical-align: middle;">${label}</td>
                             <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; text-align: center; font-style: italic; vertical-align: middle;">${amountVal}</td>
                             <td style="border: 1px solid #000; padding: 6px 8px; font-size: 9pt; text-align: center; font-style: italic; vertical-align: middle;">${ageVal}</td>
                         </tr>
@@ -200,38 +244,38 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                     <tr>
                         <td colspan="2" style="text-align: center; font-size: 10pt; font-weight: bold; background-color: #f1f5f9; color: #000000; text-transform: uppercase; padding: 8px; border: 1px solid #000;">SPECIAL UNDERWRITING PROVISIONS</td>
                     </tr>
-                    <tr>
+                    ${enrollment && enrollment.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">ENROLLMENT</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${enrollment}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${rollover && rollover.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">ROLL-OVER PROVISIONS</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${rollover}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${termination && termination.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">TERMINATION OF INDIVIDUAL INSURANCE</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${termination}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${definitions && definitions.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">GENERAL DEFINITIONS</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${definitions}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${faceAmount && faceAmount.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">FACE AMOUNT OF INSURANCE</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${faceAmount}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${premiumComp && premiumComp.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">PREMIUM COMPUTATION</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${premiumComp}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${claims && claims.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">CLAIMS PROCEDURE</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${claims}</td>
-                    </tr>
-                    <tr>
+                    </tr>` : ''}
+                    ${nonCoverage && nonCoverage.trim() !== '' ? `<tr>
                         <td style="width: 20%; font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">NON-COVERAGE PROVISIONS</td>
                         <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000;">${nonCoverage}</td>
-                    </tr>
+                    </tr>` : ''}
                 </tbody>
             </table>
         `;
@@ -361,19 +405,19 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
         .provisions-main-title {
             font-family: 'Cambria', 'Cambria Math', Georgia, serif;
             text-align: center;
-            font-size: 18pt;
+            font-size: 16pt;
             font-weight: bold;
             color: #000000;
-            margin: 25px 0 15px 0;
+            margin: 15px 0 10px 0;
             text-transform: uppercase;
         }
         .provisions-section-header {
             font-family: 'Cambria', 'Cambria Math', Georgia, serif;
-            font-size: 13pt;
+            font-size: 11.5pt;
             font-weight: bold;
             color: #000000;
-            margin-top: 18px;
-            margin-bottom: 8px;
+            margin-top: 10px;
+            margin-bottom: 4px;
             text-transform: uppercase;
             border-bottom: none;
         }
@@ -387,13 +431,16 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
         .policy-provisions-container td,
         .policy-provisions-container th {
             font-family: 'Cambria', 'Cambria Math', Georgia, serif;
-            font-size: 11pt;
+            font-size: 10pt;
             font-weight: normal;
-            line-height: 1.5;
+            line-height: 1.35;
             color: #000000;
         }
         .policy-provisions-container th {
             font-weight: bold;
+        }
+        .policy-provisions-container li {
+            line-height: 1.35;
         }
         .signature-block {
             margin-top: 40px;
@@ -531,7 +578,7 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                 <th>CURRENCY</th>
                 <td>${currencyName}</td>
             </tr>
-            <tr>
+            ${hasEligibleIndividuals ? `<tr>
                 <th>ELIGIBLE INDIVIDUALS</th>
                 <td>
                     ${application?.eligible_individuals || ''}
@@ -554,18 +601,18 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                         </tbody>
                     </table>
                 </td>
-            </tr>
-            <tr>
+            </tr>` : ''}
+            ${hasContribution ? `<tr>
                 <th>CONTRIBUTION</th>
                 <td>${contributionText}</td>
-            </tr>
-            <tr>
+            </tr>` : ''}
+            ${hasParticipation ? `<tr>
                 <th>PARTICIPATION REQUIREMENTS</th>
                 <td>
                     ${renderParticipationRequirements(application)}
                 </td>
-            </tr>
-            <tr>
+            </tr>` : ''}
+            ${hasUnderwritingLimits ? `<tr>
                 <th style="font-weight: bold; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">UNDERWRITING PROVISIONS</th>
                 <td style="padding: 0; vertical-align: middle;">
                     <table style="width: 100%; border-collapse: collapse; border-bottom: 1px solid #000; border-top: hidden; border-left: hidden; border-right: hidden;">
@@ -590,10 +637,10 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                     </div>
                     ` : ''}
                 </td>
-            </tr>
+            </tr>` : ''}
         </table>
 
-        <div class="page-break"></div>
+        ${hasScheduleOfInsurance ? `<div class="page-break"></div>
         <!-- Standalone Schedule of Insurance Table -->
         <table class="data-table" style="margin-top: 15px; margin-bottom: 15px;">
             <thead>
@@ -622,7 +669,7 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                     <td style="width: 30%; font-size: 9.5pt; vertical-align: middle; padding: 8px 10px; color: #000; font-style: italic; line-height: 1.35; border: 1px solid #000; font-weight: 500;">${dueDates}</td>
                 </tr>
             </tbody>
-        </table>
+        </table>` : ''}
 
         <!-- Resume main Data Table for Premium Rates, Refund of Premiums, Taxes, and Termination Age -->
         <table class="data-table">
@@ -744,7 +791,7 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                     </td>
                 </tr>
 
-                <!-- Remaining Parameters Table -->
+                ${hasRefundAndTermination ? `<!-- Remaining Parameters Table -->
                 <tr>
                     <th style="width: 20%; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">REFUND OF PREMIUMS</th>
                     <td style="font-size: 9.5pt; text-align: justify; padding: 8px 10px; line-height: 1.45; border: 1px solid #000; font-style: italic;">
@@ -758,16 +805,16 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                 <tr>
                     <th style="width: 20%; font-weight: bold; font-size: 9.5pt; text-transform: uppercase; border: 1px solid #000; background-color: #f1f5f9;">TERMINATION AGE</th>
                     <td style="font-size: 9.5pt; padding: 8px 10px; border: 1px solid #000;"><strong>Group Credit Life Insurance Plan (GCLIP):</strong> ${application.termination_age ?? '__'} years old</td>
-                </tr>
+                </tr>` : ''}
             </tbody>
         </table>
 
         <div style="margin-top: 20px;"></div>
 
-        <!-- ================= PAGE 3: SPECIAL UNDERWRITING PROVISIONS ================= -->
+        ${hasSpecialProvisions ? `<!-- ================= PAGE 3: SPECIAL UNDERWRITING PROVISIONS ================= -->
         <div class="provisions-container" style="margin-top: 10px;">
             ${getSpecialUnderwritingProvisionsHtml()}
-        </div>
+        </div>` : ''}
 
         <div class="page-break"></div>
 
@@ -786,7 +833,7 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
                 table-layout: fixed;
             }
             .sla-table thead {
-                display: table-header-group !important;
+                display: table-row-group !important;
             }
             .sla-table tr {
                 page-break-inside: avoid;
@@ -1251,46 +1298,46 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
 
         <div class="page-break"></div>
 
-        <!-- ================= SECTION II: PREMIUM PROVISIONS ================= -->
-        <div class="provisions-main-title">II. PREMIUM PROVISIONS</div>
-        
-        <div class="provisions-section-header">PREMIUM RATES</div>
-        <p class="paragraph">
-            The premium rates per ₱ 1,000.00 of insurance by class of Insured Debtors shall be as stated in the Policy Data Page.
-        </p>
+            <!-- ================= SECTION II: PREMIUM PROVISIONS ================= -->
+            <div class="provisions-main-title">II. PREMIUM PROVISIONS</div>
+            
+            <div class="provisions-section-header">PREMIUM RATES</div>
+            <p class="paragraph">
+                The premium rates per ₱ 1,000.00 of insurance by class of Insured Debtors shall be as stated in the Policy Data Page.
+            </p>
 
-        <div class="provisions-section-header">GUARANTEE OF AND RIGHT TO CHANGE THE PREMIUM RATE</div>
-        <p class="paragraph">
-            The premium rates are guaranteed for the first policy year. The Insurer reserves the right to establish new premium rates at the beginning of any renewal year or whenever the terms of this Policy are changed.
-        </p>
+            <div class="provisions-section-header">GUARANTEE OF AND RIGHT TO CHANGE THE PREMIUM RATE</div>
+            <p class="paragraph">
+                The premium rates are guaranteed for the first policy year. The Insurer reserves the right to establish new premium rates at the beginning of any renewal year or whenever the terms of this Policy are changed.
+            </p>
 
-        <div class="provisions-section-header">COMPUTATION OF PREMIUMS DUE</div>
-        <p class="paragraph">
-            The amount of each premium due shall be determined by multiplying the applicable premium rate per ₱ 1,000.00 by the total amount of insurance in force on the said due date. A statement of premiums due including premium adjustments shall be furnished as of each due date by the Insurer.
-        </p>
+            <div class="provisions-section-header">COMPUTATION OF PREMIUMS DUE</div>
+            <p class="paragraph">
+                The amount of each premium due shall be determined by multiplying the applicable premium rate per ₱ 1,000.00 by the total amount of insurance in force on the said due date. A statement of premiums due including premium adjustments shall be furnished as of each due date by the Insurer.
+            </p>
 
-        <div class="provisions-section-header">PREMIUM ADJUSTMENTS</div>
-        <p class="paragraph">
-            Premiums shall be subject to adjustment on account of insurance added, increased, reduced and/or terminated. Premium adjustment during a policy year shall be calculated pro-rata using the premium rates effective at the beginning of that policy year, from the date the adjustment becomes effective to the next premium due date or as mutually agreed upon by the Creditor and the Insurer.
-        </p>
-        <p class="paragraph">
-            Premium adjustments shall be due when determined.
-        </p>
+            <div class="provisions-section-header">PREMIUM ADJUSTMENTS</div>
+            <p class="paragraph">
+                Premiums shall be subject to adjustment on account of insurance added, increased, reduced and/or terminated. Premium adjustment during a policy year shall be calculated pro-rata using the premium rates effective at the beginning of that policy year, from the date the adjustment becomes effective to the next premium due date or as mutually agreed upon by the Creditor and the Insurer.
+            </p>
+            <p class="paragraph">
+                Premium adjustments shall be due when determined.
+            </p>
 
-        <div class="provisions-section-header">PAYMENT OF PREMIUMS</div>
-        <p class="paragraph">
-            Premiums are payable to the Insurer in advance on each premium due date, at its Home Office or to a duly authorized agent of the Insurer or through the other offices as the Insurer may hereafter designate, in exchange for a receipt duly signed by the Insurer's authorized representative. The payment of any premium shall not maintain the insurance under this Policy in force beyond the date when the next premium becomes payable, except as set forth in the "GRACE PERIOD" provision.
-        </p>
+            <div class="provisions-section-header">PAYMENT OF PREMIUMS</div>
+            <p class="paragraph">
+                Premiums are payable to the Insurer in advance on each premium due date, at its Home Office or to a duly authorized agent of the Insurer or through the other offices as the Insurer may hereafter designate, in exchange for a receipt duly signed by the Insurer's authorized representative. The payment of any premium shall not maintain the insurance under this Policy in force beyond the date when the next premium becomes payable, except as set forth in the "GRACE PERIOD" provision.
+            </p>
 
-        <div class="provisions-section-header">GRACE PERIOD</div>
-        <p class="paragraph">
-            A grace period of thirty-one (31) days following the due date shall be allowed the Creditor for the payment of each premium after the first during which insurance coverage hereunder shall remain in force. If any premium due is not paid within the grace period, this Policy shall automatically terminate at the expiration of the grace period, except that if the Creditor shall have given the Insurer written notice in advance of an earlier date of termination, this Policy shall terminate as such earlier date. The Creditor shall be liable to the Insurer for the payment of a pro-rata premium from the time this Policy was in force during the grace period.
-        </p>
+            <div class="provisions-section-header">GRACE PERIOD</div>
+            <p class="paragraph">
+                A grace period of thirty-one (31) days following the due date shall be allowed the Creditor for the payment of each premium after the first during which insurance coverage hereunder shall remain in force. If any premium due is not paid within the grace period, this Policy shall automatically terminate at the expiration of the grace period, except that if the Creditor shall have given the Insurer written notice in advance of an earlier date of termination, this Policy shall terminate as such earlier date. The Creditor shall be liable to the Insurer for the payment of a pro-rata premium from the time this Policy was in force during the grace period.
+            </p>
 
-        <div class="provisions-section-header">TAXES</div>
-        <p class="paragraph">
-            The taxes specified in the Policy Data Page, if any, shall be for the account of the Creditor and shall be payable in the manner stated therein.
-        </p>
+            <div class="provisions-section-header">TAXES</div>
+            <p class="paragraph">
+                The taxes specified in the Policy Data Page, if any, shall be for the account of the Creditor and shall be payable in the manner stated therein.
+            </p>
 
         <div class="page-break"></div>
 
@@ -1488,12 +1535,12 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
             </div>
         </div>
 
-        <div class="page-break"></div>
-
+        ${(cleanRidersHtml || (details.showSignoff !== false && hasAnyEbamInput)) ? '<div class="page-break"></div>' : ''}
+        
         <!-- ================= ATTACHED RIDER TEMPLATES ================= -->
-        ${riderTemplatesHtml}
+        ${cleanRidersHtml}
 
-        <!-- ================= PAGE 23: SIGN-OFF CHECKLIST ================= -->
+        ` + (details.showSignoff !== false && hasAnyEbamInput ? `<!-- ================= PAGE 23: SIGN-OFF CHECKLIST ================= -->
         <div style="font-weight: bold; text-align: center; font-size: 14pt; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.5px;">GROUP POLICY SIGN-OFF</div>
 
         <table style="width: 100%; border: 1px solid #000; border-collapse: collapse; margin-bottom: 6px; font-size: 9pt; font-family: 'Cambria', Georgia, serif;">
@@ -1694,6 +1741,7 @@ export function generateGCLIPrincipalPolicyContract(application = {}, details = 
             </tbody>
         </table>
     </div>
+        ` : '') + `
 </body>
 </html>
     `;
