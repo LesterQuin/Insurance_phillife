@@ -2,13 +2,27 @@ import { poolPromise, sql } from '../../config/db.js';
 import * as Model from '../financial_Insurance_form.model.js';
 import * as User from '../user/user_model.js';
 
-import * as GclipOutModel from './contract_GCLIP_OUT.model.js';
-import * as GclipPrinModel from './contract_GCLIP_PRIN.model.js';
-import * as GpaModel from './contract_GPA.model.js';
-
 export const getCOCPdfData = async (id) => {
     const appData = await Model.getApplicationById(id);
     if (!appData) return null;
+
+    // Restore ebam_status_id and ebam_status_name from nested array
+    if (appData.ebam_status && appData.ebam_status.length > 0) {
+        appData.ebam_status_id = appData.ebam_status[0].status_id;
+        appData.ebam_status_name = appData.ebam_status[0].status_name;
+    } else {
+        appData.ebam_status_id = null;
+        appData.ebam_status_name = null;
+    }
+
+    // Handle GMS Status and EBAM Status Flow mapping
+    if (appData.status_id !== 7) {
+        appData.ebam_status_id = null;
+        appData.ebam_status_name = null;
+    } else if (appData.status_id === 7 && !appData.ebam_status_id) {
+        appData.ebam_status_id = 18;
+        appData.ebam_status_name = 'For Contract Creation';
+    }
     
     const riders = await Model.getApplicationRiders(id);
     const rankings = await Model.getCoverageRankingsByAppId(id);
@@ -20,19 +34,58 @@ export const getCOCPdfData = async (id) => {
     let provisionsRow = null;
     let limitsRow = null;
 
+    const pool = await poolPromise;
+
     if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
         if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
-            provisionsRow = await GclipPrinModel.getUnderwritingProvisions(id);
-            limitsRow = await GclipPrinModel.getUnderwritingLimits(id);
+            const provRes = await pool.request().input('id', sql.Int, id).query(`
+                SELECT * FROM DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting 
+                WHERE application_id = @id;
+            `);
+            provisionsRow = provRes.recordset?.[0] || null;
+
+            const limitsRes = await pool.request().input('id', sql.Int, id).query(`
+                SELECT * FROM DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting_limits 
+                WHERE application_id = @id;
+            `);
+            const rawLimits = limitsRes.recordset?.[0] || null;
+            if (rawLimits) {
+                limitsRow = {
+                    nel: rawLimits.nel_json ? JSON.parse(rawLimits.nel_json) : [],
+                    nmed: rawLimits.nmed_json ? JSON.parse(rawLimits.nmed_json) : [],
+                    med: rawLimits.med_json ? JSON.parse(rawLimits.med_json) : [],
+                    max_limit: rawLimits.max_limit_json ? JSON.parse(rawLimits.max_limit_json) : [],
+                    underwriting_notes: rawLimits.underwriting_notes || null
+                };
+            }
         } else {
-            provisionsRow = await GclipOutModel.getUnderwritingProvisions(id);
-            limitsRow = await GclipOutModel.getUnderwritingLimits(id);
+            const provRes = await pool.request().input('id', sql.Int, id).query(`
+                SELECT * FROM DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting 
+                WHERE application_id = @id;
+            `);
+            provisionsRow = provRes.recordset?.[0] || null;
+
+            const limitsRes = await pool.request().input('id', sql.Int, id).query(`
+                SELECT * FROM DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting_limits 
+                WHERE application_id = @id;
+            `);
+            const rawLimits = limitsRes.recordset?.[0] || null;
+            if (rawLimits) {
+                limitsRow = {
+                    nel: rawLimits.nel_json ? JSON.parse(rawLimits.nel_json) : [],
+                    nmed: rawLimits.nmed_json ? JSON.parse(rawLimits.nmed_json) : [],
+                    med: rawLimits.med_json ? JSON.parse(rawLimits.med_json) : [],
+                    max_limit: rawLimits.max_limit_json ? JSON.parse(rawLimits.max_limit_json) : [],
+                    underwriting_notes: rawLimits.underwriting_notes || null
+                };
+            }
         }
-    } else if (nameUpper.includes('ACCIDENTAL DEATH') || nameUpper.includes('GPA') || nameUpper.includes('G-ADD') || nameUpper.includes('GADDP')) {
-        provisionsRow = await GpaModel.getUnderwritingProvisions(id);
-        limitsRow = null;
     } else {
-        provisionsRow = await GpaModel.getUnderwritingProvisions(id);
+        const provRes = await pool.request().input('id', sql.Int, id).query(`
+            SELECT * FROM DHUB_UAT.sg.financial_insurance_gpa_underwriting 
+            WHERE application_id = @id;
+        `);
+        provisionsRow = provRes.recordset?.[0] || null;
         limitsRow = null;
     }
     const user = appData.user_id ? await User.getUserById(appData.user_id) : { firstname: 'Phillife', lastname: 'Representative' };
@@ -72,3 +125,43 @@ export const getCOCPdfData = async (id) => {
         user
     };
 };
+
+export const updateEbamStatus = async (applicationId, statusId) => {
+    const pool = await poolPromise;
+    const result = await pool.request()
+        .input('application_id', sql.Int, applicationId)
+        .input('status_id', sql.Int, statusId)
+        .query(`
+            UPDATE DHUB_UAT.sg.financial_insurance_application
+            SET ebam_status_id = @status_id, updated_at = GETDATE()
+            WHERE application_id = @application_id;
+
+            SELECT 
+                fia.application_id, 
+                fia.status_id AS gms_status_id,
+                gms_status.status_name AS gms_status_name,
+                fia.ebam_status_id,
+                ebam_status.status_name AS ebam_status_name
+            FROM DHUB_UAT.sg.financial_insurance_application fia
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup gms_status
+                ON fia.status_id = gms_status.status_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup ebam_status
+                ON fia.ebam_status_id = ebam_status.status_id
+            WHERE fia.application_id = @application_id;
+        `);
+    return result.recordset[0];
+};
+
+export const getEbamStatusLookupList = async () => {
+    const pool = await poolPromise;
+    const result = await pool.request().query(`
+        SELECT status_id, status_name, group_type, parent_id 
+        FROM DHUB_UAT.sg.financial_insurance_status_lookup 
+        WHERE (group_type = 'EBAM' OR parent_id = 3) 
+          AND status_id >= 20 
+          AND is_active = 1
+        ORDER BY status_id ASC;
+    `);
+    return result.recordset ?? [];
+};
+

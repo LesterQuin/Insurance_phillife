@@ -354,11 +354,13 @@ export const viewPolicyContractPDF = async (req, res) => {
 
         const application = buildCOCTemplateData(data);
         const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
+        const showSignoff = req.query.signoff !== '0' && req.query.signoff !== 'false' && req.query.signoff !== 'off';
         const rates = await getApplicationRates(id);
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
             riders: data.riders || [],
             isReview: showWatermark,
+            showSignoff: showSignoff,
             rates: rates || []
         };
 
@@ -409,11 +411,13 @@ export const downloadPolicyContractPDF = async (req, res) => {
 
         const application = buildCOCTemplateData(data);
         const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
+        const showSignoff = req.query.signoff !== '0' && req.query.signoff !== 'false' && req.query.signoff !== 'off';
         const rates = await getApplicationRates(id);
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
             riders: data.riders || [],
             isReview: showWatermark,
+            showSignoff: showSignoff,
             rates: rates || []
         };
 
@@ -451,3 +455,15 @@ export const downloadPolicyContractPDF = async (req, res) => {
         return error(res, err.message, err.statusCode || 500);
     }
 };
+
+// Get list of EBAM Status lookup items
+export const getEbamStatusList = async (req, res) => {
+    try {
+        const statuses = await EbamModel.getEbamStatusLookupList();
+        return success(res, statuses, "EBAM statuses fetched successfully.", 200);
+    } catch (err) {
+        console.error("Get EBAM Statuses Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+

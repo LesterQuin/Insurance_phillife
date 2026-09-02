@@ -1,6 +1,7 @@
 import express from 'express';
 import * as Controller from '../../controllers/ebam_api/ebam_api.controller.js';
-import { authenticate } from '../../middlewares/authenticate.js';
+import { updateEbamStatusController } from '../../controllers/ebam_api/contract_GCLIP_OUT.controller.js';
+import { authenticate, isEbam } from '../../middlewares/authenticate.js';
 import contractGCLIPRoutes from './contract_GCLIP_OUT.routes.js';
 import contractGCLIPPrinRoutes from './contract_GCLIP_PRIN.routes.js';
 import contractGPARoutes from './contract_GPA.routes.js';
@@ -13,6 +14,8 @@ router.get('/:id/coc/download', authenticate, Controller.downloadCOCPDF);
 // EBAM Master Policy Contract Generation APIs
 router.get('/:id/policy-contract/view-pdf', Controller.viewPolicyContractPDF); // view-pdf?watermark=true
 router.get('/:id/policy-contract/download', Controller.downloadPolicyContractPDF); // download?watermark=true
+router.patch('/:id/policy-contract/status', authenticate, isEbam, updateEbamStatusController);
+router.get('/statuses', authenticate, Controller.getEbamStatusList);
 
 // Mount GCLIP Outstanding policy contract endpoints
 router.use(contractGCLIPRoutes);
