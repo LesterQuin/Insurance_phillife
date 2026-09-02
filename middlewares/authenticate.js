@@ -54,20 +54,18 @@ export const isCFE = (req, res, next) => {
 
 export const isActuarial = (req, res, next) => {
     const DEPT_ACTUARIAL_ID = 18;
-    if (req.user && Number(req.user.department_id) === DEPT_ACTUARIAL_ID) {
+    if (req.user && (Number(req.user.department_id) === DEPT_ACTUARIAL_ID || req.user.roleName === 'Super Admin')) {
         next();
     } else {
         return res.status(403).json({ status: false, message: 'Forbidden: Actuarial department access required.' });
     }
 };
 
-
-// Group Sales & Marketing Head
-// Team Leader
-// Corporate Financial Executive
-// Marketing Officer
-// Accounts Management & Servicing
-// Marketing Assistant
-// Super Admin
-// Analyst
-// Assistant Vice President
+export const isEbam = (req, res, next) => {
+    const DEPT_EBAM_ID = 20;
+    if (req.user && (Number(req.user.department_id) === DEPT_EBAM_ID || req.user.roleName === 'Super Admin')) {
+        next();
+    } else {
+        return res.status(403).json({ status: false, message: 'Forbidden: EBAM department access required.' });
+    }
+};

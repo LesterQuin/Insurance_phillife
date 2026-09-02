@@ -389,6 +389,16 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
                 fia.maximum_age,
                 fia.payment_mode_id,
                 fia.status_id,
+                CASE 
+                    WHEN fia.status_id = 7 AND fia.ebam_status_id IS NULL THEN 18 
+                    WHEN fia.status_id <> 7 THEN NULL
+                    ELSE fia.ebam_status_id 
+                END AS ebam_status_id,
+                CASE 
+                    WHEN fia.status_id = 7 AND fia.ebam_status_id IS NULL THEN 'For Contract Creation'
+                    WHEN fia.status_id <> 7 THEN NULL
+                    ELSE ebam_status.status_name 
+                END AS ebam_status_name,
                 fia.group_classification_id,
                 fia.other_group_classification,
                 fia.business_type_id,
@@ -467,6 +477,8 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
             FROM DHUB_UAT.sg.financial_insurance_application fia
             LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup ebam_status
+                ON fia.ebam_status_id = ebam_status.status_id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
@@ -597,6 +609,19 @@ export const getAllApplications = async (userId = null, excludeDrafts = false, s
             app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
 
             app.department_files = deptFilesMap[app.application_id] || [];
+            
+            if (app.ebam_status_id) {
+                app.ebam_status = [
+                    {
+                        status_id: app.ebam_status_id,
+                        status_name: app.ebam_status_name
+                    }
+                ];
+            } else {
+                app.ebam_status = [];
+            }
+            delete app.ebam_status_id;
+            delete app.ebam_status_name;
         });
     }
     return apps;
@@ -706,6 +731,16 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
                 fia.maximum_age,
                 fia.payment_mode_id,
                 fia.status_id,
+                CASE 
+                    WHEN fia.status_id = 7 AND fia.ebam_status_id IS NULL THEN 18 
+                    WHEN fia.status_id <> 7 THEN NULL
+                    ELSE fia.ebam_status_id 
+                END AS ebam_status_id,
+                CASE 
+                    WHEN fia.status_id = 7 AND fia.ebam_status_id IS NULL THEN 'For Contract Creation'
+                    WHEN fia.status_id <> 7 THEN NULL
+                    ELSE ebam_status.status_name 
+                END AS ebam_status_name,
                 fia.group_classification_id,
                 fia.other_group_classification,
                 fia.business_type_id,
@@ -785,6 +820,8 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
             FROM DHUB_UAT.sg.financial_insurance_application fia
             LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup ebam_status
+                ON fia.ebam_status_id = ebam_status.status_id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
@@ -919,6 +956,19 @@ export const getAllApplicationsPaginated = async (userId = null, excludeDrafts =
             app.actuarial_files = appActFiles ? JSON.stringify(appActFiles) : null;
 
             app.department_files = deptFilesMap[app.application_id] || [];
+            
+            if (app.ebam_status_id) {
+                app.ebam_status = [
+                    {
+                        status_id: app.ebam_status_id,
+                        status_name: app.ebam_status_name
+                    }
+                ];
+            } else {
+                app.ebam_status = [];
+            }
+            delete app.ebam_status_id;
+            delete app.ebam_status_name;
         });
     }
 
@@ -1231,6 +1281,7 @@ export const getApplicationById = async (id) => {
             SELECT 
                 fia.*,
                 fis.status_name,
+                ebam_status.status_name AS ebam_status_name,
                 ps.name AS proposal_status_name,
                 gc.name AS group_classification_name,
                 bt.name AS business_type_name,
@@ -1275,6 +1326,8 @@ export const getApplicationById = async (id) => {
             FROM DHUB_UAT.sg.financial_insurance_application fia
             LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup fis
                 ON fia.status_id = fis.status_id
+            LEFT JOIN DHUB_UAT.sg.financial_insurance_status_lookup ebam_status
+                ON fia.ebam_status_id = ebam_status.status_id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups gc
                 ON fia.group_classification_id = gc.id
             LEFT JOIN DHUB_UAT.sg.financial_insurance_group_lookups bt
@@ -1318,6 +1371,28 @@ export const getApplicationById = async (id) => {
 
     const app = res.recordset?.[0] ?? null;
     if (app) {
+        // Handle GMS/EBAM status mapping
+        if (app.status_id !== 7) {
+            app.ebam_status_id = null;
+            app.ebam_status_name = null;
+        } else if (app.status_id === 7 && !app.ebam_status_id) {
+            app.ebam_status_id = 18;
+            app.ebam_status_name = 'For Contract Creation';
+        }
+
+        if (app.ebam_status_id) {
+            app.ebam_status = [
+                {
+                    status_id: app.ebam_status_id,
+                    status_name: app.ebam_status_name
+                }
+            ];
+        } else {
+            app.ebam_status = [];
+        }
+        delete app.ebam_status_id;
+        delete app.ebam_status_name;
+
         // Resolve duplicate company_tin array collision by prioritizing the metadata column
         app.company_tin = app.meta_company_tin || (Array.isArray(app.company_tin) ? app.company_tin[0] : app.company_tin) || null;
         delete app.meta_company_tin;
