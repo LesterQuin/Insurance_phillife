@@ -290,9 +290,32 @@ export const parseExcelRatesMiddleware = async (req, res, next) => {
             if (excelFile.filepath && fs.existsSync(excelFile.filepath)) {
                 fs.promises.unlink(excelFile.filepath).catch(e => console.error("Temp file cleanup failed:", e));
             }
+
+            const companyEntry = metaRows.find(row => row['Metadata Key'] === 'Company Name');
+            let templateCompany = companyEntry && companyEntry['Value'] ? String(companyEntry['Value']).trim() : null;
+
+            if (!templateCompany && parsedAppId) {
+                try {
+                    const templateApp = await MainModel.getApplicationById(parsedAppId);
+                    if (templateApp && templateApp.group_name) {
+                        templateCompany = templateApp.group_name;
+                    }
+                } catch (e) {
+                    // Ignore error if lookup fails
+                }
+            }
+
+            let generatedFor = templateCompany || (parsedAppId ? `Application ID ${parsedAppId}` : 'unknown');
+            let currentCompany = app.group_name || `Application ID ${applicationId}`;
+
+            if (templateCompany && app.group_name && templateCompany.toLowerCase() === app.group_name.toLowerCase()) {
+                generatedFor = `${templateCompany} (Application ID ${parsedAppId || 'unknown'})`;
+                currentCompany = `${app.group_name} (Application ID ${applicationId})`;
+            }
+
             return res.status(400).json({
                 status: false,
-                message: `Failed to parse Excel file: Template mismatch. This template was generated for Application ID ${parsedAppId || 'unknown'}, but you are trying to upload it to Application ID ${applicationId}.`
+                message: `Failed to parse Excel file: Template mismatch. This template was generated for ${generatedFor}, but you are trying to upload it to ${currentCompany}.`
             });
         }
 
