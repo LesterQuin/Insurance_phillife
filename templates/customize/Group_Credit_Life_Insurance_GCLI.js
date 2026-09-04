@@ -572,26 +572,46 @@ export const generateGCLIPDFContent = (application, user, details) => {
         </tr>
 
         ${
-          application.minimum_age > 18 && application.borrower_amount_under_min && parseFloat(application.borrower_amount_under_min) > 0
+          application.minimum_age > 18 && (
+            (application.borrower_amount_under_min && parseFloat(application.borrower_amount_under_min) > 0) ||
+            (application.max_loan_amount && parseFloat(application.max_loan_amount) > 0)
+          )
             ? `
         <tr>
             <td>18-${application.minimum_age - 1}</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(application.borrower_amount_under_min)}</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(
+              (application.borrower_amount_under_min && parseFloat(application.borrower_amount_under_min) > 0)
+                ? application.borrower_amount_under_min
+                : application.max_loan_amount
+            )}</td>
         </tr>`
             : ""
         }
 
         <tr>
             <td>${application.minimum_age || 18}-${application.maximum_age || 65}</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(maxAmount18_65)}</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(
+              (maxAmount18_65 && parseFloat(maxAmount18_65) > 0)
+                ? maxAmount18_65
+                : (application.borrower_amount_18_65 && parseFloat(application.borrower_amount_18_65) > 0)
+                  ? application.borrower_amount_18_65
+                  : (application.max_loan_amount || 0)
+            )}</td>
         </tr>
 
         ${
-          application.maximum_age < 65 && application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0
+          application.maximum_age < 65 && (
+            (application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0) ||
+            (application.max_loan_amount && parseFloat(application.max_loan_amount) > 0)
+          )
             ? `
         <tr>
             <td>${application.maximum_age + 1}-65</td>
-            <td>Initial amount balance maximum of Php ${formatNumber(application.borrower_amount_over_max)}</td>
+            <td>Initial amount balance maximum of Php ${formatNumber(
+              (application.borrower_amount_over_max && parseFloat(application.borrower_amount_over_max) > 0)
+                ? application.borrower_amount_over_max
+                : application.max_loan_amount
+            )}</td>
         </tr>`
             : ""
         }

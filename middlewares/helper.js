@@ -815,7 +815,9 @@ export const generateProposalHtml = async (id) => {
     const details = {
         totalAnnualPremium: appData.total_annual_premium || 0,
         maturity,
-        maxAmount18_65: appData.borrower_amount_18_65 || 0,
+        maxAmount18_65: (appData.borrower_amount_18_65 && parseFloat(appData.borrower_amount_18_65) > 0)
+            ? appData.borrower_amount_18_65
+            : (appData.max_loan_amount || 0),
         maxAmount66_70: appData.borrower_amount_66_70 || 0,
         maxAmount71_75: appData.borrower_amount_71_75 || 0,
         maxAmount76_80: appData.borrower_amount_76_80 || 0,
