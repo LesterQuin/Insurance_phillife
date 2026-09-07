@@ -112,6 +112,16 @@ export const ensureUnderwritingProvisionsTable = async () => {
                 ALTER TABLE DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting
                 ADD provision_non_coverage NVARCHAR(MAX) NULL;
             END
+            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting', 'signing_location') IS NULL
+            BEGIN
+                ALTER TABLE DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting
+                ADD signing_location NVARCHAR(500) NULL;
+            END
+            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting', 'doc_code') IS NULL
+            BEGIN
+                ALTER TABLE DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting
+                ADD doc_code NVARCHAR(100) NULL;
+            END
         END
     `);
 };
@@ -229,7 +239,9 @@ export const getGclipPrincipalData = async (applicationId) => {
             med: medParsed,
             max_limit: maxLimitParsed,
             underwriting_notes: underwritingNotes
-        }
+        },
+        signing_location: provRow?.signing_location || null,
+        doc_code: provRow?.doc_code || null
     };
 };
 
@@ -312,6 +324,8 @@ export const saveGclipPrincipalData = async (applicationId, data) => {
         const premiumComputation = getVal(data.gclip_special_provision?.premium_computation, existingProv?.provision_premium_computation);
         const claims = getVal(data.gclip_special_provision?.claims_procedure ?? data.gclip_special_provision?.claims, existingProv?.provision_claims);
         const nonCoverageProvision = getVal(data.gclip_special_provision?.non_coverage_provision, existingProv?.provision_non_coverage);
+        const signingLocation = getVal(data.signing_location ?? data.gclip_signing_location, existingProv?.signing_location);
+        const docCode = getVal(data.doc_code ?? data.document_code ?? data.form_code, existingProv?.doc_code);
 
         provReq.input('application_id', sql.Int, applicationId);
         provReq.input('contribution_text', sql.NVarChar(sql.MAX), contributionText);
@@ -331,6 +345,8 @@ export const saveGclipPrincipalData = async (applicationId, data) => {
         provReq.input('provision_premium_computation', sql.NVarChar(sql.MAX), premiumComputation);
         provReq.input('provision_claims', sql.NVarChar(sql.MAX), claims);
         provReq.input('provision_non_coverage', sql.NVarChar(sql.MAX), nonCoverageProvision);
+        provReq.input('signing_location', sql.NVarChar(500), signingLocation);
+        provReq.input('doc_code', sql.NVarChar(100), docCode);
 
         await provReq.query(`
             MERGE INTO DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting WITH (HOLDLOCK) AS target
@@ -355,6 +371,8 @@ export const saveGclipPrincipalData = async (applicationId, data) => {
                     provision_premium_computation = @provision_premium_computation,
                     provision_claims = @provision_claims,
                     provision_non_coverage = @provision_non_coverage,
+                    signing_location = @signing_location,
+                    doc_code = @doc_code,
                     updated_at = GETDATE()
             WHEN NOT MATCHED THEN
                 INSERT (
@@ -363,7 +381,7 @@ export const saveGclipPrincipalData = async (applicationId, data) => {
                     coverage_period, refund_of_premiums, termination_age, due_dates,
                     provision_enrollment, provision_rollover, provision_termination,
                     provision_definitions, provision_face_amount, provision_premium_computation,
-                    provision_claims, provision_non_coverage, created_at, updated_at
+                    provision_claims, provision_non_coverage, signing_location, doc_code, created_at, updated_at
                 )
                 VALUES (
                     @application_id, @contribution_text, @eligible_individuals,
@@ -371,7 +389,7 @@ export const saveGclipPrincipalData = async (applicationId, data) => {
                     @coverage_period, @refund_of_premiums, @termination_age, @due_dates,
                     @provision_enrollment, @provision_rollover, @provision_termination,
                     @provision_definitions, @provision_face_amount, @provision_premium_computation,
-                    @provision_claims, @provision_non_coverage, GETDATE(), GETDATE()
+                    @provision_claims, @provision_non_coverage, @signing_location, @doc_code, GETDATE(), GETDATE()
                 );
         `);
 

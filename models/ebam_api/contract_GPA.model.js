@@ -48,6 +48,16 @@ export const ensureUnderwritingProvisionsTable = async () => {
                 ALTER TABLE DHUB_UAT.sg.financial_insurance_gpa_underwriting
                 ADD additions_due_date NVARCHAR(MAX) NULL;
             END
+            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gpa_underwriting', 'signing_location') IS NULL
+            BEGIN
+                ALTER TABLE DHUB_UAT.sg.financial_insurance_gpa_underwriting
+                ADD signing_location NVARCHAR(500) NULL;
+            END
+            IF COL_LENGTH('DHUB_UAT.sg.financial_insurance_gpa_underwriting', 'doc_code') IS NULL
+            BEGIN
+                ALTER TABLE DHUB_UAT.sg.financial_insurance_gpa_underwriting
+                ADD doc_code NVARCHAR(100) NULL;
+            END
         END
     `);
 };
@@ -110,7 +120,9 @@ export const getGpaData = async (applicationId) => {
             first_due_date: row?.first_due_date || "",
             renewal_due_date: row?.renewal_due_date || "",
             additions_due_date: row?.additions_due_date || ""
-        }
+        },
+        signing_location: row?.signing_location || null,
+        doc_code: row?.doc_code || null
     };
 };
 
@@ -171,6 +183,8 @@ export const saveGpaData = async (applicationId, data) => {
         const firstDueDate = getVal(data.gpa_schedule_of_insurance?.first_due_date, existingProv?.first_due_date);
         const renewalDueDate = getVal(data.gpa_schedule_of_insurance?.renewal_due_date, existingProv?.renewal_due_date);
         const additionsDueDate = getVal(data.gpa_schedule_of_insurance?.additions_due_date, existingProv?.additions_due_date);
+        const signingLocation = getVal(data.signing_location ?? data.gpa_signing_location, existingProv?.signing_location);
+        const docCode = getVal(data.doc_code ?? data.document_code ?? data.form_code, existingProv?.doc_code);
 
         req.input('application_id', sql.Int, applicationId);
         req.input('contribution_text', sql.NVarChar(sql.MAX), contributionText);
@@ -181,6 +195,8 @@ export const saveGpaData = async (applicationId, data) => {
         req.input('first_due_date', sql.NVarChar(sql.MAX), firstDueDate);
         req.input('renewal_due_date', sql.NVarChar(sql.MAX), renewalDueDate);
         req.input('additions_due_date', sql.NVarChar(sql.MAX), additionsDueDate);
+        req.input('signing_location', sql.NVarChar(500), signingLocation);
+        req.input('doc_code', sql.NVarChar(100), docCode);
 
         await req.query(`
             MERGE INTO DHUB_UAT.sg.financial_insurance_gpa_underwriting WITH (HOLDLOCK) AS target
@@ -196,17 +212,19 @@ export const saveGpaData = async (applicationId, data) => {
                     first_due_date = @first_due_date,
                     renewal_due_date = @renewal_due_date,
                     additions_due_date = @additions_due_date,
+                    signing_location = @signing_location,
+                    doc_code = @doc_code,
                     updated_at = GETDATE()
             WHEN NOT MATCHED THEN
                 INSERT (
                     application_id, contribution_text, eligible_individuals,
                     participation_percentage, participation_minimum_no, provision_text,
-                    first_due_date, renewal_due_date, additions_due_date, created_at, updated_at
+                    first_due_date, renewal_due_date, additions_due_date, signing_location, doc_code, created_at, updated_at
                 )
                 VALUES (
                     @application_id, @contribution_text, @eligible_individuals,
                     @participation_percentage, @participation_minimum_no, @provision_text,
-                    @first_due_date, @renewal_due_date, @additions_due_date, GETDATE(), GETDATE()
+                    @first_due_date, @renewal_due_date, @additions_due_date, @signing_location, @doc_code, GETDATE(), GETDATE()
                 );
         `);
 
