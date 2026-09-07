@@ -88,6 +88,13 @@ export const getCOCPdfData = async (id) => {
         provisionsRow = provRes.recordset?.[0] || null;
         limitsRow = null;
     }
+
+    if (provisionsRow && provisionsRow.signing_location) {
+        appData.signing_location = provisionsRow.signing_location;
+    }
+    if (provisionsRow && provisionsRow.doc_code) {
+        appData.doc_code = provisionsRow.doc_code;
+    }
     const user = appData.user_id ? await User.getUserById(appData.user_id) : { firstname: 'Phillife', lastname: 'Representative' };
 
     return {
@@ -117,6 +124,8 @@ export const getCOCPdfData = async (id) => {
         first_due_date: provisionsRow ? provisionsRow.first_due_date : null,
         renewal_due_date: provisionsRow ? provisionsRow.renewal_due_date : null,
         additions_due_date: provisionsRow ? provisionsRow.additions_due_date : null,
+        signing_location: provisionsRow ? provisionsRow.signing_location : null,
+        doc_code: provisionsRow ? provisionsRow.doc_code : null,
         nel: limitsRow ? limitsRow.nel : [],
         nmed: limitsRow ? limitsRow.nmed : [],
         med: limitsRow ? limitsRow.med : [],
@@ -164,4 +173,136 @@ export const getEbamStatusLookupList = async () => {
     `);
     return result.recordset ?? [];
 };
+
+// Save or override signing address specifically
+export const saveSigningAddress = async (applicationId, signingLocation) => {
+    const pool = await poolPromise;
+    const application = await getCOCPdfData(applicationId);
+    if (!application) throw new Error("Application not found.");
+
+    const nameUpper = (application.appData.basic_plan_name || application.appData.plan_name || '').toUpperCase();
+    const amountLoansName = (application.appData.amount_loans_name || '').toUpperCase();
+
+    let targetTable = 'DHUB_UAT.sg.financial_insurance_gpa_underwriting';
+    if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
+        if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting';
+        } else {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting';
+        }
+    }
+
+    const req = pool.request();
+    req.input('application_id', sql.Int, applicationId);
+    req.input('signing_location', sql.NVarChar(500), signingLocation);
+
+    await req.query(`
+        MERGE INTO ${targetTable} WITH (HOLDLOCK) AS target
+        USING (SELECT @application_id AS application_id) AS source
+        ON target.application_id = source.application_id
+        WHEN MATCHED THEN
+            UPDATE SET signing_location = @signing_location, updated_at = GETDATE()
+        WHEN NOT MATCHED THEN
+            INSERT (application_id, signing_location, created_at, updated_at)
+            VALUES (@application_id, @signing_location, GETDATE(), GETDATE());
+    `);
+
+    return await getCOCPdfData(applicationId);
+};
+
+// Reset signing address back to null (uses fallback business_address)
+export const resetSigningAddress = async (applicationId) => {
+    const pool = await poolPromise;
+    const application = await getCOCPdfData(applicationId);
+    if (!application) throw new Error("Application not found.");
+
+    const nameUpper = (application.appData.basic_plan_name || application.appData.plan_name || '').toUpperCase();
+    const amountLoansName = (application.appData.amount_loans_name || '').toUpperCase();
+
+    let targetTable = 'DHUB_UAT.sg.financial_insurance_gpa_underwriting';
+    if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
+        if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting';
+        } else {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting';
+        }
+    }
+
+    const req = pool.request();
+    req.input('application_id', sql.Int, applicationId);
+    await req.query(`
+        UPDATE ${targetTable}
+        SET signing_location = NULL, updated_at = GETDATE()
+        WHERE application_id = @application_id;
+    `);
+
+    return await getCOCPdfData(applicationId);
+};
+
+// Save or override Cover Page Document Code (Page 1 bottom left)
+export const saveDocCode = async (applicationId, docCode) => {
+    const pool = await poolPromise;
+    const application = await getCOCPdfData(applicationId);
+    if (!application) throw new Error("Application not found.");
+
+    const nameUpper = (application.appData.basic_plan_name || application.appData.plan_name || '').toUpperCase();
+    const amountLoansName = (application.appData.amount_loans_name || '').toUpperCase();
+
+    let targetTable = 'DHUB_UAT.sg.financial_insurance_gpa_underwriting';
+    if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
+        if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting';
+        } else {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting';
+        }
+    }
+
+    const req = pool.request();
+    req.input('application_id', sql.Int, applicationId);
+    req.input('doc_code', sql.NVarChar(100), docCode);
+
+    await req.query(`
+        MERGE INTO ${targetTable} WITH (HOLDLOCK) AS target
+        USING (SELECT @application_id AS application_id) AS source
+        ON target.application_id = source.application_id
+        WHEN MATCHED THEN
+            UPDATE SET doc_code = @doc_code, updated_at = GETDATE()
+        WHEN NOT MATCHED THEN
+            INSERT (application_id, doc_code, created_at, updated_at)
+            VALUES (@application_id, @doc_code, GETDATE(), GETDATE());
+    `);
+
+    return await getCOCPdfData(applicationId);
+};
+
+
+// Clear Cover Page Document Code (reverts to empty/no display)
+export const clearDocCode = async (applicationId) => {
+    const pool = await poolPromise;
+    const application = await getCOCPdfData(applicationId);
+    if (!application) throw new Error("Application not found.");
+
+    const nameUpper = (application.appData.basic_plan_name || application.appData.plan_name || '').toUpperCase();
+    const amountLoansName = (application.appData.amount_loans_name || '').toUpperCase();
+
+    let targetTable = 'DHUB_UAT.sg.financial_insurance_gpa_underwriting';
+    if (nameUpper.includes('CREDIT LIFE') || nameUpper.includes('GCLI') || nameUpper.includes('G-CLI')) {
+        if (amountLoansName.includes('INITIAL') || amountLoansName.includes('ANNUAL') || amountLoansName.includes('ORIGINAL') || amountLoansName.includes('PRINCIPAL') || amountLoansName.includes('DECREASING') || nameUpper.includes('PRINCIPAL')) {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_principal_underwriting';
+        } else {
+            targetTable = 'DHUB_UAT.sg.financial_insurance_gcli_outstanding_underwriting';
+        }
+    }
+
+    const req = pool.request();
+    req.input('application_id', sql.Int, applicationId);
+    await req.query(`
+        UPDATE ${targetTable}
+        SET doc_code = NULL, updated_at = GETDATE()
+        WHERE application_id = @application_id;
+    `);
+
+    return await getCOCPdfData(applicationId);
+};
+export const resetDocCode = clearDocCode;
 

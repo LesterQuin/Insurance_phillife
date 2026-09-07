@@ -15,7 +15,22 @@ router.get('/:id/coc/download', authenticate, Controller.downloadCOCPDF);
 router.get('/:id/policy-contract/view-pdf', Controller.viewPolicyContractPDF); // view-pdf?watermark=true
 router.get('/:id/policy-contract/download', Controller.downloadPolicyContractPDF); // download?watermark=true
 router.patch('/:id/policy-contract/status', authenticate, isEbam, updateEbamStatusController);
-router.get('/statuses', authenticate, Controller.getEbamStatusList);
+router.get('/statuses', authenticate, isEbam, Controller.getEbamStatusList);
+
+// EBAM Master Policy Contract TAT (Turn-Around Time) APIs
+router.get('/:id/policy-contract/tat', authenticate, isEbam, Controller.getContractTatController);
+router.put('/:id/policy-contract/tat', authenticate, isEbam, Controller.saveContractTatController);
+router.delete('/:id/policy-contract/tat', authenticate, isEbam, Controller.resetContractTatController);
+
+// EBAM Master Policy Contract Signing Address APIs
+router.get('/:id/policy-contract/signing-address', authenticate, Controller.getContractSigningAddressController);
+router.put('/:id/policy-contract/signing-address', authenticate, isEbam, Controller.saveContractSigningAddressController);
+router.delete('/:id/policy-contract/signing-address', authenticate, isEbam, Controller.resetContractSigningAddressController);
+
+// EBAM Master Policy Contract Document Code (Cover Page bottom left) APIs
+router.get('/:id/policy-contract/doc-code', authenticate, Controller.getContractDocCodeController);
+router.put('/:id/policy-contract/doc-code', authenticate, isEbam, Controller.saveContractDocCodeController);
+router.delete('/:id/policy-contract/doc-code', authenticate, isEbam, Controller.clearContractDocCodeController);
 
 // Mount GCLIP Outstanding policy contract endpoints
 router.use(contractGCLIPRoutes);

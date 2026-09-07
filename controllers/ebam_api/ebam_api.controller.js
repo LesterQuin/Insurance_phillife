@@ -1,5 +1,6 @@
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as EbamModel from '../../models/ebam_api/ebam_api.model.js';
+import * as TatModel from '../../models/ebam_api/contract_tat.model.js';
 import * as Helper from '../../middlewares/helper.js';
 import { success, error } from '../../utils/response.js';
 import { generateCOCTemplate } from '../../templates/coc/cocTemplate.js';
@@ -12,6 +13,7 @@ const buildCOCTemplateData = (data) => {
         participation_percentage, participation_minimum_no, termination_age,
         provision_enrollment, provision_rollover, provision_termination, provision_definitions, provision_claims, refund_of_premiums,
         amount_of_insurance, coverage_period, due_dates, first_due_date, renewal_due_date, additions_due_date,
+        signing_location, doc_code,
         nel, nmed, med, max_limit, underwriting_notes,
         provision_face_amount, provision_premium_computation, provision_non_coverage
     } = data;
@@ -36,6 +38,8 @@ const buildCOCTemplateData = (data) => {
     return { 
         ...appData, 
         riders,
+        signing_location: signing_location || appData.signing_location || null,
+        doc_code: doc_code || appData.doc_code || null,
         special_underwriting_provisions: provisions || null,
         contribution_text: contribution_text || null,
         eligible_individuals: eligible_individuals || null,
@@ -356,13 +360,16 @@ export const viewPolicyContractPDF = async (req, res) => {
         const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
         const showSignoff = req.query.signoff !== '0' && req.query.signoff !== 'false' && req.query.signoff !== 'off';
         const rates = await getApplicationRates(id);
+        const tatData = await TatModel.getContractTat(id);
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
             riders: data.riders || [],
             isReview: showWatermark,
             showSignoff: showSignoff,
-            rates: rates || []
+            rates: rates || [],
+            tat: tatData.items || []
         };
+        application.tat = tatData.items || [];
 
         // Dynamically compile selected riders
         let riderTemplatesHtml = '';
@@ -413,13 +420,16 @@ export const downloadPolicyContractPDF = async (req, res) => {
         const showWatermark = req.query.watermark !== '0' && req.query.watermark !== 'false' && req.query.watermark !== 'off';
         const showSignoff = req.query.signoff !== '0' && req.query.signoff !== 'false' && req.query.signoff !== 'off';
         const rates = await getApplicationRates(id);
+        const tatData = await TatModel.getContractTat(id);
         const details = {
             logoDataUri: Helper.getImageDataUri('img/phillife-logo-hd.png'),
             riders: data.riders || [],
             isReview: showWatermark,
             showSignoff: showSignoff,
-            rates: rates || []
+            rates: rates || [],
+            tat: tatData.items || []
         };
+        application.tat = tatData.items || [];
 
         let riderTemplatesHtml = '';
         if (Array.isArray(data.riders) && data.riders.length > 0) {
@@ -463,6 +473,357 @@ export const getEbamStatusList = async (req, res) => {
         return success(res, statuses, "EBAM statuses fetched successfully.", 200);
     } catch (err) {
         console.error("Get EBAM Statuses Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Get Contract TAT (Turn-Around Time) SLA items for an application
+export const getContractTatController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const tatData = await TatModel.getContractTat(id);
+        return success(res, tatData, "Contract TAT data fetched successfully.", 200);
+    } catch (err) {
+        console.error("Get Contract TAT Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Save or Update Contract TAT (Turn-Around Time) SLA items for an application
+export const saveContractTatController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        // Verify proposal is booked (status_id === 7) before allowing saves
+        if (application.appData.status_id !== 7) {
+            return error(res, "Cannot input or modify contract details unless GMS status is Booked.", 400);
+        }
+
+        // Edit lock verification
+        const currentEbamStatus = application.appData.ebam_status_id || 18;
+        const lockedStatuses = [20, 22, 23, 24]; // For Contract Review, Approved, Ready for Issuance, Issued
+        if (lockedStatuses.includes(currentEbamStatus)) {
+            return error(res, "Contract is locked for editing while under review, approved, or issued. Change status to 'For Revision' to make updates.", 400);
+        }
+
+        const items = req.body.items || req.body.tat_items || req.body;
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Validation failed.",
+                errors: [
+                    {
+                        field: "items",
+                        message: "Invalid payload. 'items' must be a non-empty array of TAT entries."
+                    }
+                ]
+            });
+        }
+
+        const maxSortOrder = TatModel.DEFAULT_TAT_ITEMS.length; // 37
+        const validationErrors = [];
+
+        items.forEach((item, idx) => {
+            const fieldPrefix = `items[${idx}]`;
+
+            if (item.sort_order !== undefined && item.sort_order !== null) {
+                const parsedOrder = parseInt(item.sort_order);
+                if (isNaN(parsedOrder) || parsedOrder < 1 || parsedOrder > maxSortOrder) {
+                    validationErrors.push({
+                        field: `${fieldPrefix}.sort_order`,
+                        message: `Invalid sort_order '${item.sort_order}'. Must be an existing sort order between 1 and ${maxSortOrder}.`
+                    });
+                }
+            } else if (item.activity) {
+                const actName = String(item.activity).trim().toUpperCase();
+                const exists = TatModel.DEFAULT_TAT_ITEMS.some(d => (d.activity || '').trim().toUpperCase() === actName);
+                if (!exists) {
+                    validationErrors.push({
+                        field: `${fieldPrefix}.activity`,
+                        message: `Invalid activity '${item.activity}'. Activity does not exist in standard TAT items (must be one of the standard activities 1 to ${maxSortOrder}).`
+                    });
+                }
+            } else {
+                validationErrors.push({
+                    field: fieldPrefix,
+                    message: `Each item must specify either an existing 'sort_order' (1 to ${maxSortOrder}) or a valid 'activity' name.`
+                });
+            }
+        });
+
+        if (validationErrors.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Validation failed.",
+                errors: validationErrors
+            });
+        }
+
+        const userId = req.user?.user_id || req.user?.id || null;
+        const savedTat = await TatModel.saveContractTat(id, items, userId, req.ip);
+
+        return success(res, savedTat, "Contract TAT data saved successfully.", 200);
+    } catch (err) {
+        console.error("Save Contract TAT Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Reset Contract TAT (Turn-Around Time) SLA items back to template defaults
+export const resetContractTatController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        // Verify proposal is booked
+        if (application.appData.status_id !== 7) {
+            return error(res, "Cannot modify contract details unless GMS status is Booked.", 400);
+        }
+
+        // Edit lock verification
+        const currentEbamStatus = application.appData.ebam_status_id || 18;
+        const lockedStatuses = [20, 22, 23, 24];
+        if (lockedStatuses.includes(currentEbamStatus)) {
+            return error(res, "Contract is locked for editing while under review, approved, or issued. Change status to 'For Revision' to make updates.", 400);
+        }
+
+        const userId = req.user?.user_id || req.user?.id || null;
+        const resetData = await TatModel.resetContractTat(id, userId, req.ip);
+
+        return success(res, resetData, "Contract TAT data reset to default template values successfully.", 200);
+    } catch (err) {
+        console.error("Reset Contract TAT Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Get Contract Conforme Signing Address
+export const getContractSigningAddressController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const fallbackAddress = application.appData.business_address;
+        const customAddress = application.signing_location || null;
+        const activeAddress = customAddress || fallbackAddress;
+
+        return success(res, {
+            application_id: id,
+            is_custom: Boolean(customAddress),
+            signing_location: customAddress,
+            fallback_address: fallbackAddress,
+            active_address: activeAddress
+        }, "Signing address fetched successfully.", 200);
+    } catch (err) {
+        console.error("Get Signing Address Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Save or Update Contract Conforme Signing Address
+export const saveContractSigningAddressController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        // Verify proposal is booked (status_id === 7)
+        if (application.appData.status_id !== 7) {
+            return error(res, "Cannot modify contract details unless GMS status is Booked.", 400);
+        }
+
+        // Edit lock verification
+        // const currentEbamStatus = application.appData.ebam_status_id || 18;
+        // const lockedStatuses = [20, 22, 23, 24];
+        // if (lockedStatuses.includes(currentEbamStatus)) {
+        //     return error(res, "Contract is locked for editing while under review, approved, or issued. Change status to 'For Revision' to make updates.", 400);
+        // }
+
+        const signingLocation = req.body.signing_location ?? req.body.address ?? req.body.signing_address;
+        if (signingLocation === undefined || signingLocation === null || String(signingLocation).trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: "Validation failed.",
+                errors: [
+                    {
+                        field: "signing_location",
+                        message: "signing_location is required and must not be empty."
+                    }
+                ]
+            });
+        }
+
+        const updatedApp = await EbamModel.saveSigningAddress(id, String(signingLocation).trim());
+        const fallbackAddress = updatedApp.appData.business_address;
+        const customAddress = updatedApp.signing_location || null;
+
+        return success(res, {
+            application_id: id,
+            is_custom: true,
+            signing_location: customAddress,
+            fallback_address: fallbackAddress,
+            active_address: customAddress || fallbackAddress
+        }, "Signing address updated successfully.", 200);
+    } catch (err) {
+        console.error("Save Signing Address Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Reset Contract Conforme Signing Address back to default fallback
+export const resetContractSigningAddressController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        // Verify proposal is booked (status_id === 7)
+        if (application.appData.status_id !== 7) {
+            return error(res, "Cannot modify contract details unless GMS status is Booked.", 400);
+        }
+
+        // Edit lock verification
+        const currentEbamStatus = application.appData.ebam_status_id || 18;
+        const lockedStatuses = [20, 22, 23, 24];
+        if (lockedStatuses.includes(currentEbamStatus)) {
+            return error(res, "Contract is locked for editing while under review, approved, or issued. Change status to 'For Revision' to make updates.", 400);
+        }
+
+        const updatedApp = await EbamModel.resetSigningAddress(id);
+        const fallbackAddress = updatedApp.appData.business_address;
+
+        return success(res, {
+            application_id: id,
+            is_custom: false,
+            signing_location: null,
+            fallback_address: fallbackAddress,
+            active_address: fallbackAddress
+        }, "Signing address reset to default company business address successfully.", 200);
+    } catch (err) {
+        console.error("Reset Signing Address Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Get Cover Page Document Code (Page 1 bottom left)
+export const getContractDocCodeController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        const customDocCode = application.doc_code || null;
+
+        return success(res, {
+            application_id: id,
+            has_doc_code: Boolean(customDocCode),
+            doc_code: customDocCode
+        }, "Document code fetched successfully.", 200);
+    } catch (err) {
+        console.error("Get Document Code Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Save or Update Cover Page Document Code (Page 1 bottom left)
+export const saveContractDocCodeController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        // Verify proposal is booked (status_id === 7)
+        if (application.appData.status_id !== 7) {
+            return error(res, "Cannot modify contract details unless GMS status is Booked.", 400);
+        }
+
+        // Edit lock verification
+        // const currentEbamStatus = application.appData.ebam_status_id || 18;
+        // const lockedStatuses = [20, 22, 23, 24];
+        // if (lockedStatuses.includes(currentEbamStatus)) {
+        //     return error(res, "Contract is locked for editing while under review, approved, or issued. Change status to 'For Revision' to make updates.", 400);
+        // }
+
+        const docCode = req.body.doc_code ?? req.body.document_code ?? req.body.form_code;
+        if (docCode === undefined || docCode === null || String(docCode).trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: "Validation failed.",
+                errors: [
+                    {
+                        field: "doc_code",
+                        message: "doc_code is required and must not be empty."
+                    }
+                ]
+            });
+        }
+
+        const updatedApp = await EbamModel.saveDocCode(id, String(docCode).trim());
+
+        return success(res, {
+            application_id: id,
+            has_doc_code: true,
+            doc_code: updatedApp.doc_code || String(docCode).trim()
+        }, "Document code saved successfully.", 200);
+    } catch (err) {
+        console.error("Save Document Code Error:", err);
+        return error(res, err.message, 500);
+    }
+};
+
+// Clear Cover Page Document Code (Page 1 bottom left)
+export const clearContractDocCodeController = async (req, res) => {
+    try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) return error(res, "Invalid application ID format.", 400);
+
+        const application = await EbamModel.getCOCPdfData(id);
+        if (!application) return error(res, "Application not found.", 404);
+
+        // Verify proposal is booked (status_id === 7)
+        if (application.appData.status_id !== 7) {
+            return error(res, "Cannot modify contract details unless GMS status is Booked.", 400);
+        }
+
+        // Edit lock verification
+        // const currentEbamStatus = application.appData.ebam_status_id || 18;
+        // const lockedStatuses = [20, 22, 23, 24];
+        // if (lockedStatuses.includes(currentEbamStatus)) {
+        //     return error(res, "Contract is locked for editing while under review, approved, or issued. Change status to 'For Revision' to make updates.", 400);
+        // }
+
+        await EbamModel.clearDocCode(id);
+
+        return success(res, {
+            application_id: id,
+            has_doc_code: false,
+            doc_code: null
+        }, "Document code cleared successfully.", 200);
+    } catch (err) {
+        console.error("Clear Document Code Error:", err);
         return error(res, err.message, 500);
     }
 };
